@@ -1,0 +1,60 @@
+DerinEngine
+===========
+Version: 0.1.19
+Status : Beta (active development build)
+
+The version is defined in the code at:
+  - deep_engine/__init__.py  ->  __version__ = "0.1.19"
+
+The engine and the demo game (Star Collector Hero) share a single version line.
+The plan is to reach 1.0.0 once the five priority areas of the 2D v1 roadmap
+(physics, tilemap + layers, scene tree + editor UI, animation + keyframes, UI)
+are complete.
+  - custom_level.json        ->  meta.version = 1  (level file format version, separate)
+
+Version history:
+  0.1.0  (beta)  First official release. Playable prototype with the level file
+                 system active.
+  0.1.9  (beta)  Fixed Levels 1/2 removed; the main modes are now campaign (P),
+                 random (4), editor (3) and custom (C). Sniper escape window +
+                 trampoline launch fix. Procedural generator is deterministic.
+  0.1.10 (beta)  New boss types (randomly distributed across biomes) + Breakable
+                 Platform mechanic. Flying, Sniper (laser) and Shield bosses.
+  0.2.0  (beta)  Big menu / game-feed update oriented to V2.0:
+                 - The game starts from a MAIN MENU with a live campaign entry
+                   level running in the background (close-up shot of the player).
+                 - 'Start Campaign' returns the camera to normal in-game size and
+                   continues from the same level.
+                 - Camera zoom capability (wide angle <-> close-up) added.
+                 - The menu shows drifting stars in the parallax sky instead of
+                   fireworks; the player stands as a fixed figure gazing at them.
+  0.1.19 (beta)  Playability + menu/UI + editor improvement package:
+                 - Enemy spawn telegraph (SpawnIn): enemies blink in and are
+                   harmless before they appear; all enemy types have it.
+                 - i-frame tuning (Health 'iframe_duration', player 1.0s) + a
+                   rescue after falling: return to the last safe ground
+                   (checkpoint) instead of restarting the level.
+                 - Boss variety: the Flying boss pushes the player DOWN with wind
+                   while underneath; the Shield boss shows its shield shards as a
+                   health bar.
+                 - Soft crossfade between modes from the menu (fade to black +
+                   opening into the new scene via 'FadeOverlay').
+                 - Mouse support in menus: click options to select (campaign /
+                   random / editor / custom / language) + a "click" UI sound.
+                 - Breakable Platform tool added to the editor (tool 9).
+                 - Editor inspector: click an object -> selection box + top-right
+                   Inspector panel (name/tag/position/size/components).
+                 - Camera gradient vignette (stronger in the menu, lighter in
+                   gameplay) + a red flash on hit.
+                 - SpawnIn fine-tuning: spawn telegraph speeds up when the player
+                   is near; type-based durations (patrol/flyer/hopper/turret/sniper).
+                 - i-frame parameters per damage source (boss contact/beam longer
+                   than the player default).
+                 - Editor inspector property shortcuts: selected object moves with
+                   arrow keys, resizes with [ / ], recolors with R, deletes with DEL.
+                 - Web (pygbag) port with a fix for the startup deadlock: the
+                   async 'import wave' download used to freeze the game in the
+                   browser; WAV bytes are now packed in code ('_build_wav_bytes').
+                   The game starts on the web (30fps).
+
+The project uses git (main branch, initialized locally); releases can be tagged.

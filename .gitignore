@@ -1,0 +1,16 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Packaging outputs (PyInstaller / pygbag)
+dist/
+build/
+web-cache/
+
+# Runtime data (changes as the game runs)
+savegame.json
+motor.log
+
+# Local tool state
+*.lnk
+_e.txt
