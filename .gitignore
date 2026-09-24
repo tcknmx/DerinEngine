@@ -14,3 +14,8 @@ motor.log
 # Local tool state
 *.lnk
 _e.txt
+deep-tool.bat
+StarCollectorHero.spec
+
+# Screenshot taken for repo preview (superseded)
+repo_preview.png
