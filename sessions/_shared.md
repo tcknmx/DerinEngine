@@ -8,6 +8,14 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[ARAÇ] dead-code modülü yanlış sinyalleri temizlendi (26.09.2026).** `[11] Olu kod`
+  ilk sürümü "2 referans" olanları da şüpheli listeliyordu; çıktıda 18 giriş oldu ve
+  HEPİSİ aslında kullanılıyordu: `tween.ease_*` → `_EASING` kayıt sözlüğü,
+  `commands.cmd_*` → `_reg(...)` komut kaydı, `webpanel.Handler` → HTTP sunucusu.
+  Kural netleştirildi: **yalnızca 1 referans (sadece tanım satırı) = kesin ölü aday**;
+  2+ referans = kayıt/çağrı ile kullanılıyor → listelenmez. Module 11 artık "temiz"
+  raporluyor. (Gerçek tek bulgu zaten silinmişti: `save_scene_to_path`.)
+
 - **[ARAÇ] menü düzeltmesi (26.09.2026).** Check menüsü ekranında `[10]` iki kez
   çıkıyor, `[20] TÜMÜNÜ TARA` kayıptı: `_check_menu_loop`'ta sabit `print(t("menu_10"))`
   satırı eski "Scan ALL" için kalmış, modül eklerken güncellenmemişti →

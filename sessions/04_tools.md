@@ -57,7 +57,9 @@
    isteği): (a) **[10] Gizli bilgi** — anahtar/token/şifre literal'leri + gerçek
    token formatları (GitHub/Stripe/AWS/Google/PRIVATE KEY/JWT) + diskte `.env`
    varlığı; (b) **[11] Ölü kod** — üst-seviye def/class isimlerinin proje çapında
-   referans sayımı (1 ref = kesin aday, 2 ref = kontrol); (c) **[12] Karmaşıklık**
+   referans sayımı (ilk sürüm "1 ref = aday, 2 ref = kontrol"du → ikinci sürüm
+   **sadece 1 ref = kesin aday**; 2+ ref = kayıt/çağrı ile kullanılıyor, ör.
+   `ease_*` → `_EASING`, `cmd_*` → `_reg`); (c) **[12] Karmaşıklık**
    — en büyük dosyalar + en uzun yapılar (temizlik pusulası); (d) **[13] Çökme
    trendi** — motor.log traceback fonksiyon sayıları. Menü **20 = TÜMÜNÜ TARA** oldu
    (eski "10") ve ölü `menu_7: "[7] Scan ALL"` / `"[7] HEPSINI TARA"` kopya satırları

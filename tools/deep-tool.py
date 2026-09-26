@@ -1263,16 +1263,14 @@ def run_deadcode(collect):
                 continue
             seen.add(name)
             refs = len(re.findall(r"\b%s\b" % re.escape(name), allsrc))
-            if 0 < refs <= 2:
-                cands.append((refs, _rel(p), src[: m.start()].count("\n") + 1, m.group(0)))
+            if refs == 1:  # sadece kendi tanim satiri -> hicbir yerde kullanilmiyor
+                cands.append((_rel(p), src[: m.start()].count("\n") + 1, m.group(0)))
     if not cands:
         collect("INFO", "Tum ust-seviye fonksiyon/class'lara kodda basvuruluyor (olu aday yok).")
         return
-    for refs, path, lnum, decl in sorted(cands):
-        note = "hic baska referans yok (kesin aday)" if refs == 1 \
-            else "az referans (kontrol edilmeli)"
-        collect("INFO", "%s :: %s (L%d) - %d referans, %s"
-                % (path, decl, lnum, refs, note))
+    for path, lnum, decl in sorted(cands):
+        collect("INFO", "%s :: %s (L%d) - hic baska referans yok (kesin olu aday)"
+                % (path, decl, lnum))
 
 
 def run_complexity(collect):
