@@ -2,16 +2,9 @@
 game.state - Shared game state (global variables and constants).
 
 This module does not depend on any other game.* module; it keeps the game's
-global state (campaign, endless mode, level path) in one place. It does not
-hold any scene/function references to avoid circular imports.
+global state (campaign, endless mode) in one place. It does not hold any
+scene/function references to avoid circular imports.
 """
-
-import os
-
-from deep_engine import user_data_dir
-
-# Default level file (where the editor also saves)
-DEFAULT_LEVEL_PATH = os.path.join(user_data_dir(), "custom_level.json")
 
 # Global campaign state: chain (biome list) + start info.
 # Astro is always kept at the END of the list -> final boss.
@@ -23,7 +16,7 @@ campaign_state = {
     "sector_score": 0,     # active sector's (entrance + boss) cumulative total
 }
 
-# Active game mode: "campaign" (P), "endless" (4) or "custom" (C).
+# Active game mode: "campaign" (P) or "endless" (4).
 # The same entrance map is shared; portal behavior changes with this mode:
 #   campaign -> boss arena, endless -> new procedural map with rising difficulty.
 game_mode = "campaign"

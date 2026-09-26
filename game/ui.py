@@ -199,16 +199,6 @@ class MenuController(Component):
         self._hide_menu_ui()
         self.done = True
 
-    def _start_mode(self, factory):
-        # Switch to the NEW scene only after the fade (smooth crossfade); not instantly.
-        SoundFX.play("win")
-        self._pending_factory = factory
-        self._fading_out = True
-        self._fade_dir = +1   # fade in (0 -> 255)
-        # For other modes we want gameplay zoom like the campaign: drop the menu zoom
-        self.scene.camera_manual = False
-        self.scene.zoom_to(1.0)
-
     def update(self, dt: float):
         if self.done:
             return
@@ -229,8 +219,6 @@ class MenuController(Component):
                     self._pending_factory = None
                 self._fade_dir = -1    # lighten (255 -> 0)
             elif self._fade <= 0.0 and self._fade_dir < 0:
-                if Engine.instance and Engine.instance.editor:
-                    Engine.instance.editor.toggle()
                 self.done = True
             return
 
@@ -250,14 +238,6 @@ class MenuController(Component):
             else:
                 SoundFX.play("click")
                 print(I18n.t("endless_locked_warn"))
-        elif Input.get_key_down("3"):  #  Editor
-            # The editor is toggled once the scene change finishes (when the fade above ends)
-            from .scenes import build_procedural_level
-            self._start_mode(build_procedural_level)
-        elif Input.get_key_down("C"):  #  Custom level
-            from .builders import build_custom_level
-            state.game_mode = "custom"  # flat/self-looping level; does not touch the campaign score
-            self._start_mode(lambda: build_custom_level())
         elif (Input.get_key_down("P") or Input.get_key_down("SPACE")
               or Input.get_key_down("ENTER")):  # ▶ Campaign
             state.game_mode = "campaign"
@@ -283,13 +263,6 @@ class MenuController(Component):
             else:
                 SoundFX.play("click")
                 print(I18n.t("endless_locked_warn"))
-        elif action == "editor":
-            from .scenes import build_procedural_level
-            self._start_mode(build_procedural_level)
-        elif action == "custom":
-            from .builders import build_custom_level
-            state.game_mode = "custom"  # flat/self-looping level; does not touch the campaign score
-            self._start_mode(lambda: build_custom_level())
         elif action == "lang":
             I18n.toggle_language()
             SoundFX.play("click")
@@ -381,9 +354,7 @@ def build_main_menu_scene() -> Scene:
     _menu_item("M_RND", "menu_random", 610, 236, 23, (100, 255, 180),
                action=None if _endless_locked else "endless", locked=_endless_locked,
                lock_key="menu_random_locked")
-    _menu_item("M_E", "menu_editor", 610, 284, 23, (160, 200, 255), action="editor")
-    _menu_item("MC", "menu_custom", 610, 332, 23, (255, 200, 120), action="custom")
-    _menu_item("M4", "menu_lang", 610, 380, 23, (255, 230, 120), action="lang")
+    _menu_item("M4", "menu_lang", 610, 292, 23, (255, 230, 120), action="lang")
 
     # Controls info + High Score — bottom-center, aligned
     cinfo = GameObject(name="M5", x=450, y=520)

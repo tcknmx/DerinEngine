@@ -9,10 +9,8 @@ class I18n:
             "menu_subtitle": "DerinEngine ile Yapılmış 2D Aksiyon-Platform Oyunu",
             "menu_play_l1": "[1] Seviye 1'i Oyna (Orman Vadisi)",
             "menu_play_l2": "[2] Seviye 2'yi Oyna (Lav Mağarası & Boss)",
-            "menu_editor": "[3] Seviye Editörü",
             "menu_lang": "[T] Dili Değiştir",
             "menu_quit": "[ESC] Çıkış",
-            "menu_custom": "[C] Özel Seviye",
             "menu_procedural": "[P] Rastgele Seviye (Prosedürel)",
             "menu_highscore": "🏆 En Yüksek Skor: {score}",
 
@@ -23,7 +21,7 @@ class I18n:
             "menu_endless_locked": "(Kampanyayı bitirince açılır)",
             "endless_name": "SONSUZ MOD",
             "endless_locked_warn": "Sonsuz Mod kilitli! Önce Kampanyayı (P) bitir.",
-            "controls_info": "[A/D] Hareket  [SPACE] Zıpla  [F] Ateş  [E] Editör",
+            "controls_info": "[A/D] Hareket  [SPACE] Zıpla  [F] Ateş",
 
             "campaign_entrance": "BİYOM GİRİŞ",
             "campaign_boss": "BÖLÜM SONU CANAVARI",
@@ -54,7 +52,7 @@ class I18n:
             "tut_goal": "Sarı portala gir — Bölüm Sonu Canavarı seni bekliyor",
             "level_loop_goal": "Portal seni başlangıç noktasına geri gönderir.",
             
-            "l1_info": "[F/Sol Tık]: Ateş | [E]: Editör | [LSHIFT]: Dash | [Space]: Çift Zıplama | [T]: Dil",
+            "l1_info": "[F/Sol Tık]: Ateş | [LSHIFT]: Dash | [Space]: Çift Zıplama | [T]: Dil",
             "l2_info": "[F/Sol Tık]: Ateş Et | Düşman mermilerine dikkat!",
             
             "boss_name": "BÖLÜM SONU CANAVARI",
@@ -71,10 +69,6 @@ class I18n:
             "victory_praise": "Mükemmel Bir Zafer!",
             "victory_restart": "Yeniden Oynamak İçin [R] veya [SPACE]'e Bas",
             
-            "editor_active": "🎨 EDİTÖR MODU: Sol Tık=Ekle, Sağ Tık=Sil, 1-9=Araç Seç, S=Kaydet, P=Oyna",
-            "editor_saved": "💾 SEVİYE BAŞARIYLA KAYDEDİLDİ: custom_level.json",
-            "editor_loaded": "📂 SEVİYE YÜKLENDİ!",
-            
             "pu_magnet": "🧲 MANYETİK ÇEKİM AKTİF!",
             "pu_triple": "🔱 ÜÇLÜ LAZER AKTİF!",
             "pu_shield": "🛡️ ENERJİ KALKANI AKTİF!",
@@ -87,10 +81,8 @@ class I18n:
             "menu_subtitle": "A 2D Action-Platformer Built with DerinEngine",
             "menu_play_l1": "[1] Play Level 1 (Forest Valley)",
             "menu_play_l2": "[2] Play Level 2 (Magma Cave & Boss)",
-            "menu_editor": "[3] Level Editor",
             "menu_lang": "[T] Change Language",
             "menu_quit": "[ESC] Exit",
-            "menu_custom": "[C] Custom Level",
             "menu_procedural": "[P] Generate Random Level (Procedural)",
             "menu_highscore": "🏆 High Score: {score}",
 
@@ -101,7 +93,7 @@ class I18n:
             "menu_endless_locked": "(Unlocks after beating Campaign)",
             "endless_name": "ENDLESS MODE",
             "endless_locked_warn": "Endless Mode is locked! Beat the Campaign (P) first.",
-            "controls_info": "[A/D] Move  [SPACE] Jump  [F] Shoot  [E] Editor",
+            "controls_info": "[A/D] Move  [SPACE] Jump  [F] Shoot",
 
             "campaign_entrance": "BIOME ENTRANCE",
             "campaign_boss": "CHAPTER BOSS",
@@ -132,7 +124,7 @@ class I18n:
             "tut_goal": "Enter the yellow portal — a Boss awaits",
             "level_loop_goal": "The portal sends you back to the start.",
             
-            "l1_info": "[F/LClick]: Shoot | [E]: Editor | [LSHIFT]: Dash | [Space]: Double Jump | [T]: Lang",
+            "l1_info": "[F/LClick]: Shoot | [LSHIFT]: Dash | [Space]: Double Jump | [T]: Lang",
             "l2_info": "[F/LClick]: Shoot | Watch out for enemy projectiles!",
             
             "boss_name": "CHAPTER BOSS",
@@ -148,10 +140,6 @@ class I18n:
             "victory_subtitle": "You Have Successfully Cleared All Levels!",
             "victory_praise": "An Epic Victory!",
             "victory_restart": "Press [R] or [SPACE] to Play Again",
-            
-            "editor_active": "🎨 EDITOR MODE: L-Click=Add, R-Click=Delete, 1-9=Tool, S=Save, P=Play",
-            "editor_saved": "💾 LEVEL SAVED SUCCESSFULLY: custom_level.json",
-            "editor_loaded": "📂 LEVEL LOADED SUCCESSFULLY!",
             
             "pu_magnet": "🧲 COIN MAGNET ACTIVE!",
             "pu_triple": "🔱 TRIPLE LASER ACTIVE!",

@@ -15,7 +15,6 @@ from deep_engine import (
 )
 
 
-from .state import DEFAULT_LEVEL_PATH
 from . import state
 from .entities import (
     PlayerController,
@@ -60,12 +59,12 @@ def build_procedural_level(biome=None, seed=None, chunks=8, difficulty=0):
 
     # Build objects with builders (including Player — UI & controller come automatically)
     for entry in data["objects"]:
-        place_object(scene, dict(entry, restart_path=DEFAULT_LEVEL_PATH))
+        place_object(scene, dict(entry))
 
     scene.start()
 
     # Write the target star count to the UI
-    _builders._finalize_custom_scene(scene)
+    _builders._finalize_goal_ui(scene)
 
     # Link the goal portal with the player's scene (restart behavior)
     restart_stack = [biome, seed, chunks, difficulty]
@@ -221,7 +220,7 @@ def build_campaign_boss(biome, difficulty, index):
             pass
 
     for entry in data["objects"]:
-        place_object(scene, dict(entry, restart_path=DEFAULT_LEVEL_PATH))
+        place_object(scene, dict(entry))
     scene.start()
 
     # In the boss arena the goal is defeating the boss, not collecting stars -> adjust the UI

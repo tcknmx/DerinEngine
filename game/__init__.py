@@ -2,7 +2,7 @@
 
 All of the game logic from main.py's former single file has been split into
 this package:
-    - state:     global state (campaign, endless mode, level path)
+    - state:     global state (campaign, endless mode)
     - entities:  player, enemies, goal portal, small helpers
     - bosses:    boss classes
     - ui:        menu, victory, game over, UI components
@@ -13,9 +13,9 @@ Names that need to be exposed are re-exported below.
 """
 
 from . import state
-from .state import DEFAULT_LEVEL_PATH, campaign_state, game_mode, endless_state
+from .state import campaign_state, game_mode, endless_state
 
-from . import entities, bosses, ui, builders, scenes
+from . import entities, bosses, ui, builders, scenes, commands
 
 # --- entities ---
 from .entities import (
@@ -58,8 +58,6 @@ from .ui import (
 
 # --- builders ---
 from .builders import (
-    build_custom_level,
-    _ensure_custom_level,
     _register_level_builders,
 )
 

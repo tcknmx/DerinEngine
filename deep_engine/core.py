@@ -37,6 +37,8 @@ class Engine:
         self.debug_font = pygame.font.SysFont("Consolas", 14)
         from .lighting import LightingEngine
         self.lighting = LightingEngine(ambient_darkness=130)
+        from .console import DevConsole
+        self.console = DevConsole(self.width, self.height)
 
     def set_scene(self, scene: Scene):
         """Changes and starts the active scene."""
@@ -44,8 +46,6 @@ class Engine:
         self.active_scene.screen_width = self.width
         self.active_scene.screen_height = self.height
         self.active_scene.start()
-        from .editor import LevelEditor
-        self.editor = LevelEditor(self.active_scene)
 
     @classmethod
     def switch_scene(cls, new_scene: Scene):
@@ -75,6 +75,19 @@ class Engine:
         # Update the input system
         Input._update_events(events)
 
+        # Developer console toggle (backquote ` / Turkish keyboard ")
+        if Input.get_key_down("BACKQUOTE") or Input.get_key_down("QUOTEDBL"):
+            self.console.toggle()
+
+        # While the console is open: pause the scene, only draw + console on top.
+        if self.console.active:
+            self.console.update(dt)
+            if self.active_scene:
+                self.active_scene.draw(self.screen)
+            self.console.draw(self.screen)
+            pygame.display.flip()
+            return
+
         # Language switch (T key)
         if Input.get_key_down("T"):
             from .i18n import I18n
@@ -89,11 +102,6 @@ class Engine:
             from .audio import SoundFX
             SoundFX.play("coin")
 
-        # Editor mode toggle (E key)
-        if Input.get_key_down("E"):
-            if self.editor:
-                self.editor.toggle()
-
         # Debug key (F3)
         if Input.get_key_down("F3"):
             self.show_debug_info = not self.show_debug_info
@@ -103,21 +111,14 @@ class Engine:
             self.is_running = False
 
         # 3. Update & Draw
-        if self.editor and self.editor.active:
-            # In editor mode game physics pauses; editor drawing/clicking keeps working
-            self.editor.update(dt)
-            self.active_scene.draw(self.screen)
-            self.editor.draw(self.screen)
-        else:
-            # Normal game mode
-            self.active_scene.update(dt)
-            self.active_scene.draw(self.screen)
-            # Apply 2D dynamic lighting
-            if self.lighting and self.active_scene.name not in ["Main Menu", "Zafer Ekrani", "Game Over"]:
-                self.lighting.render_lights(self.screen, self.active_scene, self.active_scene.render_camera)
+        self.active_scene.update(dt)
+        self.active_scene.draw(self.screen)
+        # Apply 2D dynamic lighting
+        if self.lighting and self.active_scene.name not in ["Main Menu", "Zafer Ekrani", "Game Over"]:
+            self.lighting.render_lights(self.screen, self.active_scene, self.active_scene.render_camera)
 
         # 4. Debug info overlay (FPS, object count, etc.)
-        if self.show_debug_info and (not self.editor or not self.editor.active):
+        if self.show_debug_info:
             self._draw_debug_overlay(dt)
 
         # 5. Flip the screen

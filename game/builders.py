@@ -1,6 +1,3 @@
-import os
-import shutil
-import sys
 from deep_engine import (
     Engine,
     GameObject,
@@ -20,7 +17,6 @@ from deep_engine import (
     SpawnIn,
     register_builder,
     register_extractor,
-    load_level,
 )
 
 
@@ -43,7 +39,7 @@ from .bosses import (
     CosmicBoss,
     ShieldBoss,
 )
-from .state import DEFAULT_LEVEL_PATH, campaign_state
+from .state import campaign_state
 from . import state
 from .ui import build_main_menu_scene, build_game_over_scene, build_victory_scene
 
@@ -257,10 +253,9 @@ def _build_powerup(scene, data):
 def _build_player(scene, data):
     x, y = data.get("x", 80), data.get("y", 300)
     w, h = data.get("w", 32), data.get("h", 32)
-    restart_path = data.get("restart_path")
 
-    def _restart_factory():
-        return build_custom_level(restart_path) if restart_path else build_main_menu_scene()
+    # Default restart: back to the main menu (real scenes override this factory).
+    _restart_factory = build_main_menu_scene
 
     # Standard UI for playability (score, health, goal, info, power-up label)
     score_obj = GameObject(name="ScoreUI", x=20, y=10)
@@ -297,12 +292,8 @@ def _build_player(scene, data):
     player.add_component(BoxCollider())
     player.add_component(ParticleEmitter())
     player.add_component(LightSource(radius=150, color=(100, 210, 255), intensity=0.95))
-    if restart_path:
-        player.add_component(Health(max_hp=3, is_player=True, iframe_duration=1.0,
-                                    on_death=lambda: Engine.switch_scene(build_game_over_scene(_restart_factory))))
-    else:
-        player.add_component(Health(max_hp=3, is_player=True, iframe_duration=1.0,
-                                    on_death=lambda: Engine.switch_scene(build_game_over_scene(build_main_menu_scene))))
+    player.add_component(Health(max_hp=3, is_player=True, iframe_duration=1.0,
+                                on_death=lambda: Engine.switch_scene(build_game_over_scene(_restart_factory))))
     ctrl = player.add_component(PlayerController(speed=260.0, jump_force=620.0, restart_scene_factory=_restart_factory))
     ctrl.score_text_obj = score_obj
     ctrl.health_text_obj = health_obj
@@ -514,7 +505,7 @@ def _extract_sniper(obj):
             "color": list(spr.color) if spr else [120, 200, 90]}
 
 
-def _finalize_custom_scene(scene):
+def _finalize_goal_ui(scene):
     """Writes the goal star count to the UI after the level is loaded."""
     coin_count = len(scene.find_all_by_tag("Coin"))
     player = scene.find_by_tag("Player")
@@ -525,86 +516,6 @@ def _finalize_custom_scene(scene):
         txt = ctrl.goal_text_obj.get_component(TextRenderer)
         if txt:
             txt.text = f"{I18n.t('remaining_stars')}: {coin_count} ({I18n.t('stars_goal_desc')})"
-
-
-# Goal hint key in C (custom level) mode: the portal sends the player back to spawn.
-_CUSTOM_GOAL_TEXT = "level_loop_goal"
-
-
-def _finalize_custom_plain(scene):
-    """C mode: turn the goal text into a 'portal loops back to start' hint."""
-    player = scene.find_by_tag("Player")
-    if not player:
-        return
-    ctrl = player.get_component(PlayerController)
-    if ctrl and ctrl.goal_text_obj:
-        txt = ctrl.goal_text_obj.get_component(TextRenderer)
-        if txt:
-            txt.text = I18n.t(_CUSTOM_GOAL_TEXT)
-
-
-def build_custom_level(path=DEFAULT_LEVEL_PATH):
-    """Reads a JSON level file and returns a playable Scene.
-
-    C (custom level) mode is the player's own design space:
-    - The default file (custom_level.json) starts as a clean template; the player
-      fills it in with the editor (E) and saves it. Every object here is playable
-      (including enemies/coins/boss — respecting the player's own design).
-    - The portal does NOT switch scenes; it teleports the player back to the
-      LEVEL'S SPAWN point (staying in the same level) — it gives no victory
-      screen and does NOT unlock endless mode.
-    """
-    scene = load_level(
-        path,
-        extra_builder_data={"restart_path": path},
-        finalize=_finalize_custom_plain,
-    )
-
-    # Portal -> teleport the player back to the spawn point (stays in the same level).
-    player = scene.find_by_tag("Player")
-    spawn_teleport = None
-    if player:
-        ctrl = player.get_component(PlayerController)
-        if ctrl is not None:
-            def _teleport_to_spawn(_ctrl=ctrl):
-                SoundFX.play("win")
-                _ctrl.respawn()  # returns to spawn_pos (checkpoint defaults to spawn)
-            spawn_teleport = _teleport_to_spawn
-    for portal in scene.find_all_by_tag("Portal"):
-        gp = portal.get_component(GoalPortal)
-        if gp is not None:
-            if spawn_teleport is not None:
-                # Have the portal teleport to spawn (stay in the level, no victory/boss).
-                # Regardless of the 'next' key, the scene never changes in C mode.
-                gp.next_scene_factory = spawn_teleport
-                gp.unlock()
-            else:
-                # If there's no player (unexpected), fail safe: return to the menu.
-                gp.next_scene_factory = build_main_menu_scene
-
-    # 3) The goal text is already turned into the flat-level hint by _finalize_custom_plain.
-    return scene
-
-
-def _ensure_custom_level():
-    """On first run, copies the default level bundled inside the package next to the exe."""
-    if os.path.exists(DEFAULT_LEVEL_PATH):
-        return
-    meipass = getattr(sys, "_MEIPASS", None)
-    if not meipass:
-        return
-    src = os.path.join(meipass, "custom_level.json")
-    if not os.path.exists(src):
-        return
-    try:
-        shutil.copyfile(src, DEFAULT_LEVEL_PATH)
-    except Exception as e:
-        print(f"[DerinEngine] Varsayilan seviye kopyalanamadi: {e}")
-        try:
-            from deep_engine.log import log as _l
-            _l.warn("_ensure_custom_level: varsayilan seviye kopyalanamadi: %r" % (e,))
-        except Exception:
-            pass
 
 
 def _register_level_builders():

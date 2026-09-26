@@ -12,7 +12,7 @@ def user_data_dir():
     - Packaged EXE: next to the exe (persistent, portable) -> sys.executable's dir.
     - Normal Python run: the code dir -> __file__'s dir.
     In a PyInstaller onefile build, __file__ points to the temporary _MEIPASS dir;
-    sys.executable always gives the exe's real location (so savegame/custom_level
+    sys.executable always gives the exe's real location (so savegame/level files
     are written next to the exe and not lost).
     """
     if getattr(sys, "frozen", False):
@@ -32,7 +32,7 @@ from .game_object import GameObject
 from .input import Input
 from .particles import ParticleEmitter, Particle
 from .audio import SoundFX
-from .editor import LevelEditor
+from .console import DevConsole
 from .i18n import I18n
 from .lighting import LightingEngine, LightSource
 from .parallax import ParallaxBackground, ParallaxLayer
@@ -94,7 +94,7 @@ __all__ = [
     "ParticleEmitter",
     "Particle",
     "SoundFX",
-    "LevelEditor",
+    "DevConsole",
     "I18n",
     "LightingEngine",
     "LightSource",

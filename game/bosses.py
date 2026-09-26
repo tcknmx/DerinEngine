@@ -17,6 +17,8 @@ from deep_engine import (
 )
 from deep_engine.components import _slow_dt, _AutoRemove
 
+from game.entities import PlayerController
+
 
 # (Boss classes use game logic independently of the engine.)
 

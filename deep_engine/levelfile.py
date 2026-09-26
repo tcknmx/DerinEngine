@@ -160,9 +160,8 @@ def load_level(path: str, extra_builder_data: dict = None, finalize=None):
     The scene metadata (name, background color, parallax theme) and all
     objects are rebuilt with the corresponding builder functions.
 
-    - extra_builder_data: common fields added to every object's data. For
-      example, passing {"restart_path": path} lets the game's Player builder
-      read it and set up the "restart" behavior.
+    - extra_builder_data: common fields added to every object's data (e.g. a
+      bool flag that builders can read while placing objects).
     - finalize: a function that applies final touches to the scene after
       loading (e.g. writing the star count to the UI). signature: finalize(scene)
     """

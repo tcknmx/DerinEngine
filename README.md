@@ -1,6 +1,6 @@
 ﻿# Star Collector Hero
 
-The first version of my game engine, written from scratch in Python + pygame (SDL), ships with a complete playable platformer: a procedural campaign, unique bosses, dynamic lighting and a built-in live level editor. The project is in active development.
+The first version of my game engine, written from scratch in Python + pygame (SDL), ships with a complete playable platformer: a procedural campaign, unique bosses, dynamic lighting, a browser level editor and an in-game dev console. The project is in active development.
 
 ## Features
 
@@ -17,8 +17,8 @@ The first version of my game engine, written from scratch in Python + pygame (SD
 - 3-heart health system with invulnerability (i-frames)
 - Multi-language UI — Turkish / English live toggle (T)
 - Persistent high score & language saving
-- Live Level Editor: undo, copy/paste, save & load JSON levels
-- Play user-levels from file (custom_level.json / [C])
+- Browser level editor (tools/webpanel.py): levels are named files in custom_levels/
+- In-game developer console (backquote ` / ") with hp, god, tp, respawn commands
 - Full gamepad support
 
 ## Controls
@@ -31,7 +31,6 @@ The first version of my game engine, written from scratch in Python + pygame (SD
 | Dash | LSHIFT (Gamepad: LB) |
 | Shoot | F or LEFT CLICK (Gamepad: X) |
 | Change Language (TR/EN) | T |
-| Toggle Level Editor | E |
 | Return to Main Menu | M |
 | Restart | R (Gamepad: A) |
 | FPS / Debug Panel | F3 |
@@ -39,15 +38,9 @@ The first version of my game engine, written from scratch in Python + pygame (SD
 
 ## Main Menu
 
-| [P] Campaign (procedural)  • [1] Forest  • [2] Lava Cave  • [4] Random Level |
+| [P] Campaign (procedural)  •  [4] Endless Mode  •  [T] Language |
 |---|
-| [3] Level + Editor  •  [C] Play saved level  •  [T] Language |
-
-## Editor Shortcuts
-
-| Left-Click = Place  •  Right-Click = Delete  •  [1-9] Tools |
-|---|
-| [Z] Undo  •  [C] Copy  •  [V] Paste  •  [S] Save  •  [L] Load |
+| In-game console: [ ` ] or [ " ] — try `help`, `god`, `tp 400 200` |
 
 ---
 
@@ -78,7 +71,7 @@ What's new since v0.1.0:
 
 ## About the Engine
 
-DerinEngine is the modular 2D game engine built from scratch for this project (`deep_engine/`): scene/object/component architecture, physics, collisions, tween/animation, particles, lighting, parallax, i18n, a level file format and the live editor. The game layer (`game/`) connects to the engine through its public API; the engine knows nothing about the game.
+DerinEngine is the modular 2D game engine built from scratch for this project (`deep_engine/`): scene/object/component architecture, physics, collisions, tween/animation, particles, lighting, parallax, i18n, a level file format, the dev console and the browser level editor (tools/webpanel.py). The game layer (`game/`) connects to the engine through its public API; the engine knows nothing about the game.
 
 ## Getting Started
 
@@ -121,9 +114,11 @@ deep_engine/            # DerinEngine core (game-independent)
   core.py               # Engine (game loop, window)
   scene.py, game_object.py, components.py, tween.py
   input.py, audio.py, particles.py, parallax.py, lighting.py
-  i18n.py, editor.py, levelfile.py, procedural.py, savegame.py, math2d.py
+  i18n.py, levelfile.py, procedural.py, savegame.py, math2d.py
 tools/deep-tool.py      # dev scan/checkup CLI tool (TR/EN)
-custom_level.json       # level file (format version: 1)
+tools/webpanel.py       # browser level editor (custom_levels/ folder)
+custom_levels/          # user levels: default.json template + named levels
+custom_level.json       # pristine template source (format version: 1)
 version.txt             # version history
 ```
 

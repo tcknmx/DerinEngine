@@ -8,6 +8,7 @@ class Input:
     _mouse_pos = (0, 0)
     _mouse_buttons = [False, False, False]
     _mouse_down = [False, False, False]
+    _typed_chars = []      # printable chars typed this frame (for text input)
 
     # --- Gamepad / Joystick ---
     _joystick = None          # first gamepad found
@@ -30,6 +31,8 @@ class Input:
         "SPACE": pygame.K_SPACE, "ENTER": pygame.K_RETURN, "ESCAPE": pygame.K_ESCAPE,
         "LEFT": pygame.K_LEFT, "RIGHT": pygame.K_RIGHT, "UP": pygame.K_UP, "DOWN": pygame.K_DOWN,
         "LSHIFT": pygame.K_LSHIFT, "RSHIFT": pygame.K_RSHIFT, "TAB": pygame.K_TAB,
+        "BACKSPACE": pygame.K_BACKSPACE, "KPENTER": pygame.K_KP_ENTER,
+        "BACKQUOTE": pygame.K_BACKQUOTE, "QUOTEDBL": pygame.K_QUOTEDBL,
         "F1": pygame.K_F1, "F2": pygame.K_F2, "F3": pygame.K_F3, "F4": pygame.K_F4, "F5": pygame.K_F5,
         "0": pygame.K_0, "1": pygame.K_1, "2": pygame.K_2, "3": pygame.K_3, "4": pygame.K_4,
         "5": pygame.K_5, "6": pygame.K_6, "7": pygame.K_7, "8": pygame.K_8, "9": pygame.K_9
@@ -42,7 +45,6 @@ class Input:
         "F": 2,                      # X button = shoot
         "LSHIFT": 4,                 # LB = dash
         "ESCAPE": 7,                 # Start = quit
-        "C": 9,                      # RS = custom level (in menu)
     }
 
     @classmethod
@@ -97,11 +99,15 @@ class Input:
         cls._keys_up.clear()
         cls._mouse_down = [False, False, False]
         cls._mouse_pos = pygame.mouse.get_pos()
+        cls._typed_chars = []
 
         for event in events:
             if event.type == pygame.KEYDOWN:
                 cls._keys_pressed.add(event.key)
                 cls._keys_down.add(event.key)
+                # Collect printable text (letters, digits, spaces, punctuation)
+                if event.unicode:
+                    cls._typed_chars.append(event.unicode)
             elif event.type == pygame.KEYUP:
                 cls._keys_pressed.discard(event.key)
                 cls._keys_up.add(event.key)
@@ -145,6 +151,15 @@ class Input:
             return True
         btn = cls.BUTTON_MAP.get(key_name.upper())
         return btn is not None and btn in cls._joy_buttons_up
+
+    @classmethod
+    def get_typed_text(cls) -> str:
+        """Returns the text typed since the last frame (letters/digits/space/punct).
+
+        Used by text-input UIs (e.g. the in-game console). This buffer is
+        cleared automatically at the start of the next frame.
+        """
+        return "".join(cls._typed_chars)
 
     # --- Analog axis helpers ---
     @classmethod

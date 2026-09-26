@@ -11,6 +11,9 @@ web-cache/
 savegame.json
 motor.log
 
+# Custom levels (user-created levels live here; default.json is created from the template)
+custom_levels/
+
 # Local tool state
 *.lnk
 _e.txt

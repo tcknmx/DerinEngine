@@ -424,9 +424,7 @@ class PlayerController(Component):
                 self.particles.burst(count=15, color=(80, 200, 255), speed_range=(30, 100), size_range=(3, 6), lifespan_range=(0.25, 0.5), gravity=0, origin_offset=(16, 16))
 
         # Shooting (F or Left Click)
-        engine = Engine.instance
-        is_editor_open = engine.editor.active if (engine and engine.editor) else False
-        if (Input.get_key_down("F") or (Input.get_mouse_button_down(0) and not is_editor_open)) and self.shoot_cooldown <= 0:
+        if (Input.get_key_down("F") or Input.get_mouse_button_down(0)) and self.shoot_cooldown <= 0:
             self.shoot_bullet()
 
         # If falling below the world: recover at the last safe ground position
@@ -578,8 +576,7 @@ class PlayerController(Component):
         and carries over scene transitions (entrance -> boss -> next sector). The
         displayed score = persistent base (previously completed sectors) + the
         in-sector total. In endless mode the score builds in a separate persistent
-        counter (endless_state) and survives the move to the next difficulty map;
-        custom (C) mode uses the classic single-level score."""
+        counter (endless_state) and survives the move to the next difficulty map."""
         if state.game_mode == "campaign":
             campaign_state["sector_score"] += amount
             self.score = campaign_state["score"] + campaign_state["sector_score"]
@@ -821,7 +818,7 @@ class GoalPortal(Component):
                 return
             next_scene = self.next_scene_factory()
             if next_scene is None:
-                # Custom (C) mode: the portal teleported the player to spawn, no scene change.
+                # No next scene provided -> do nothing.
                 return
             Engine.switch_scene(next_scene)
 

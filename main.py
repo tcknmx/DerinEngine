@@ -18,7 +18,7 @@ from deep_engine import (
     user_data_dir,
 )
 
-from game import build_main_menu_scene, _ensure_custom_level
+from game import build_main_menu_scene
 
 
 if __name__ == "__main__":
@@ -76,8 +76,6 @@ if __name__ == "__main__":
 
     _jlog("SoundFX.initialize...")
     SoundFX.initialize()
-    _jlog("_ensure_custom_level...")
-    _ensure_custom_level()
     _jlog("Engine olusturuluyor...")
     engine = Engine(title="Star Collector Hero", width=900, height=600, target_fps=60)
 
