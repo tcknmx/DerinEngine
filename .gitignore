@@ -10,6 +10,10 @@ web-cache/
 # Node packages (opencode tool deps) - regenerated with npm install
 **/node_modules/
 
+# Runtime data (rewritten every time the game runs - kept local only)
+savegame.json
+motor.log
+
 # Windows shortcuts / empty scratch file (local machine only)
 *.lnk
 _e.txt
