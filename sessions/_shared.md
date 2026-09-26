@@ -8,6 +8,15 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[ARAÇ] deep-tool arayüzü web paneline geçti (26.09.2026, `04_tools.md` madde 12).**
+  deep-tool'a **`--api` JSON modu** eklendi (`scan`/`find`/`new` → yapılandırılmış çıktı;
+  CLI davranışı aynı). Web panelindeki deep-tool sekmesi artık tam arayüz: 13 modül
+  çipi + "Tümünü tara", Bul (kelime→dosya:satır), Üret (script/dir, var olanı silmez),
+  Başlat (oyun veya .py). Yeni API'ler: `/api/scan`, `/api/find`, `/api/new`, `/api/run`.
+  **Etkilenen:** araç dışında kod/oyun YOK. Doğrulama: scan all 13 modül 0/0/0, tüm
+  route'lar py test ile OK, `--lang en all` regresyonu temiz. Not: 8765'te eski
+  webpanel süreci kalmıştı, kapatıldı — **sunucuyu kapatmak için Ctrl+C**.
+
 - **[ARAÇ] deep-tool alt-araçları hayata geçti (26.09.2026, `04_tools.md`).** Menüdeki
   "[yakında]" `new`/`find`/`run` gerçek oldu: **`new`** script şablonu veya dizin üretir
   (var olana dokunmaz), **`find`** kelime → dosya:satır bulur (salt okunur), **`run`**

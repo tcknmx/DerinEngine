@@ -45,6 +45,10 @@ import importlib.util
 import collections
 import io
 import subprocess
+import json
+
+# pygame'in sürüm satırı hem CLI hem --api JSON çıktısını kirletir; hep gizle.
+os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 
 # Source directory detection: deep-tool.py may sit in the root directory or under tools/.
 # The DerinEngine root is the directory containing the 'deep_engine/' and 'game/' folders.
@@ -492,6 +496,7 @@ def run_smoke(frames=20):
     import os as _os
     _os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     _os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+    _os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
     try:
         import pygame
         from deep_engine import Engine
@@ -1470,18 +1475,10 @@ def _search_files(folders=None):
     return sorted(out)
 
 
-def _do_find(interactive, cli_kw="", cli_folder=""):
-    """find: anahtar kelimeyi dosya/satir satirlarinda ara (salt okunur)."""
-    kw = cli_kw
-    if not kw:
-        try:
-            kw = input(t("find_prompt")).strip()
-        except EOFError:
-            return
-        if not kw or kw.lower() == "q":
-            return
+def _collect_find(kw, folder=""):
+    """find'in kalbi: dosya:satir:metin listesi dondurur (salt okunur)."""
     hits = []
-    for p in _search_files([cli_folder] if cli_folder else None):
+    for p in _search_files([folder] if folder else None):
         src = _read(p)
         if not src:
             continue
@@ -1492,6 +1489,42 @@ def _do_find(interactive, cli_kw="", cli_folder=""):
                     break
         if len(hits) >= 40:
             break
+    return hits
+
+
+def _perform_new(kind, path):
+    """new'in kalbi: sonucu dict olarak dondurur (var olan yola dokunmaz)."""
+    kind = (kind or "").strip().lower()
+    if kind not in ("script", "dir"):
+        return {"ok": False, "error": "kind script|dir olmali"}
+    path = (path or "").strip()
+    if not path:
+        return {"ok": False, "error": "bos yol"}
+    absp = path if os.path.isabs(path) else os.path.join(ROOT, path)
+    if os.path.exists(absp):
+        return {"ok": False, "exists": True, "path": path}
+    if kind == "dir":
+        os.makedirs(absp)
+        return {"ok": True, "kind": "dir", "path": path}
+    parent = os.path.dirname(absp)
+    if parent and not os.path.isdir(parent):
+        os.makedirs(parent)
+    with io.open(absp, "w", encoding="utf-8", newline="\n") as f:
+        f.write(_NEW_SCRIPT % {"name": os.path.basename(absp)})
+    return {"ok": True, "kind": "script", "path": path}
+
+
+def _do_find(interactive, cli_kw="", cli_folder=""):
+    """find: anahtar kelimeyi dosya/satir satirlarinda ara (salt okunur)."""
+    kw = cli_kw
+    if not kw:
+        try:
+            kw = input(t("find_prompt")).strip()
+        except EOFError:
+            return
+        if not kw or kw.lower() == "q":
+            return
+    hits = _collect_find(kw, cli_folder)
     if not hits:
         print(" " + t("find_no", kw=kw))
         return
@@ -1518,21 +1551,15 @@ def _do_new(interactive, cli_type="", cli_path=""):
             return
         if not path:
             return
-    absp = path if os.path.isabs(path) else os.path.join(ROOT, path)
-    if os.path.exists(absp):
-        print(" " + t("new_exists", p=path))
+    res = _perform_new(kind, path)
+    if not res.get("ok"):
+        if res.get("exists"):
+            print(" " + t("new_exists", p=res["path"]))
         return
-    if kind == "dir":
-        os.makedirs(absp)
-    else:
-        parent = os.path.dirname(absp)
-        if parent and not os.path.isdir(parent):
-            os.makedirs(parent)
-        with io.open(absp, "w", encoding="utf-8", newline="\n") as f:
-            f.write(_NEW_SCRIPT % {"name": os.path.basename(absp)})
-        print(" " + t("new_script_hint", p=path))
+    if res["kind"] == "script":
+        print(" " + t("new_script_hint", p=res["path"]))
         return
-    print(" " + t("new_created", p=path))
+    print(" " + t("new_created", p=res["path"]))
 
 
 def _do_run(interactive, cli_target=""):
@@ -1653,6 +1680,53 @@ def _check_menu_loop(interactive, press_enter):
                     pass
 
 
+def _api_scan(nums):
+    """Runs module numbers and returns structured results (no printing)."""
+    out = []
+    total = {"WARN": 0, "BUG": 0, "ERR": 0}
+    for num in nums:
+        if num not in MODULES:
+            continue
+        finds = []
+        run_module(num, lambda lvl, msg: finds.append((lvl, msg)))
+        out.append({"num": num, "name": MODULES[num],
+                    "findings": [{"lvl": l, "msg": m} for l, m in finds]})
+        for l, m in finds:
+            if l in total:
+                total[l] += 1
+    return {"ok": True, "modules": out, "totals": total}
+
+
+def _api_dispatch(mode, args):
+    """"--api" girisi: JSON-ayiklanabilir bir dict dondurur."""
+    if mode == "scan":
+        nums = []
+        for a in args:
+            if a == "all":
+                nums = sorted(MODULES)
+                break
+            try:
+                nums.append(int(a))
+            except ValueError:
+                pass
+        if not nums:
+            nums = sorted(MODULES)
+        return _api_scan(nums)
+    if mode == "find":
+        if not args:
+            return {"ok": False, "error": "find KEYWORD [FOLDER]"}
+        hits = _collect_find(args[0], args[1] if len(args) > 1 else "")
+        return {"ok": True, "keyword": args[0], "total": len(hits), "max": 40,
+                "hits": [{"file": p, "line": i, "text": s} for p, i, s in hits]}
+    if mode == "new":
+        if len(args) < 2:
+            return {"ok": False, "error": "new script|dir PATH"}
+        return _perform_new(args[0], args[1])
+    if mode == "run":
+        return {"ok": False, "error": "run API yok - web panel kendi alt-sureci kullanir"}
+    return {"ok": False, "error": "bilinmeyen --api modu: %s" % mode}
+
+
 def main(argv):
     global LANG
     args = list(argv)
@@ -1662,6 +1736,16 @@ def main(argv):
         if i + 1 < len(args):
             set_lang(args[i + 1])
             del args[i:i + 2]
+
+    # --api scan|find|new  (raw JSON output, used by tools/webpanel)
+    api = None
+    if "--api" in args:
+        i = args.index("--api")
+        api = args[i + 1] if i + 1 < len(args) else ""
+        del args[i:i + 2]
+    if api is not None:
+        print(json.dumps(_api_dispatch(api, args), ensure_ascii=False))
+        return 0
 
     # ===== COMMAND-LINE MODE (script/automation) =====
     # e.g.: deep-tool --lang tr 3   /   deep-tool --lang en all

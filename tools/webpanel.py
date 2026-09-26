@@ -5,7 +5,8 @@ Serves a small HTML page on http://127.0.0.1:8765:
   the custom_levels/ folder: every level is a named JSON file. "Farklı Kaydet"
   asks you for the level's name and saves it there. The pristine template
   (custom_levels/default.json) is never overwritten.
-- deep-tool: run the project scanner and show its report
+- deep-tool tab: full deep-tool UI — scan modules (1-13 / all) with a structured
+  report, find (keyword -> file:line), new (script template / dir), run (game or .py)
 - Log: tail motor.log (the engine's runtime log)
 - Script: run a short Python snippet and see its output
 - Game: launch main.py as a subprocess
@@ -313,15 +314,50 @@ PAGE = r"""<!DOCTYPE html>
   </div>
 </div>
 
-<!-- ============ SCAN ============ -->
+<!-- ============ DEEP-TOOL ============ -->
 <div class="panel" id="scan">
-  <div class="row">
-    <select id="scanLang"><option value="tr">Türkçe</option><option value="en">English</option></select>
-    <input id="scanArgs" placeholder="modül (boş = all)" size="12" style="background:#0b0d11;border:1px solid #2c313c;color:#dfe6f2;border-radius:8px;padding:8px">
-    <button class="run" onclick="runScan()">Tarama yap</button>
-    <span class="status" id="scanStatus"></span>
+  <div class="ed-panel" style="margin:0 0 10px 0">
+    <h3 style="margin:0 0 6px 0">1) Tarama &mdash; modüle tıkla veya hepsini çalıştır</h3>
+    <div class="ed-bar">
+      <select id="scanLang" style="width:auto"><option value="tr">Türkçe</option><option value="en">English</option></select>
+      <button class="run" onclick="runScan('all')">Tümünü tara (13 modül)</button>
+      <span class="status" id="scanStatus"></span>
+    </div>
+    <div id="scanMods" style="margin-top:6px"></div>
   </div>
-  <pre id="scanOut">Tarama henüz çalışmadı.</pre>
+  <pre id="scanOut" style="min-height:120px">Henüz taramadınız.</pre>
+
+  <div class="ed-panel" style="margin:10px 0">
+    <h3 style="margin:0 0 6px 0">2) Bul &mdash; kelime &rarr; dosya:satır listesi</h3>
+    <div class="ed-bar">
+      <input id="findKw" placeholder="arama kelimesi, ör. Rigidbody2D" style="flex:1">
+      <input id="findFolder" placeholder="klasör (boş = hepsi)" style="width:140px">
+      <button class="run" onclick="runFind()">Bul</button>
+      <span class="status" id="findStatus"></span>
+    </div>
+    <pre id="findOut" style="margin-top:6px;min-height:70px"></pre>
+  </div>
+
+  <div class="ed-panel" style="margin:0 0 10px 0">
+    <h3 style="margin:0 0 6px 0">3) Üret &mdash; script şablonu veya boş dizin</h3>
+    <div class="ed-bar">
+      <select id="newKind" style="width:auto"><option value="script">script</option><option value="dir">dir</option></select>
+      <input id="newPath" placeholder="ör. tools/deneme.py" style="flex:1">
+      <button class="run" onclick="runNew()">Üret</button>
+      <span class="status" id="newStatus"></span>
+    </div>
+    <div class="hint" style="margin-top:4px">Var olan bir yol <span class="err">silinmez</span> &mdash; koruma hatası verir.</div>
+  </div>
+
+  <div class="ed-panel">
+    <h3 style="margin:0 0 6px 0">4) Başlat &mdash; oyunu veya bir .py dosyasını çalıştır</h3>
+    <div class="ed-bar">
+      <button class="run" onclick="runFile('main.py')">Oyun (main.py)</button>
+      <input id="runPath" placeholder=".py yolu, ör. tools/webpanel.py" style="flex:1">
+      <button class="secondary" onclick="runFile(document.getElementById('runPath').value)">Çalıştır</button>
+    </div>
+    <pre id="runOut" style="margin-top:6px;min-height:70px"></pre>
+  </div>
 </div>
 
 <div class="panel" id="log">
@@ -757,17 +793,82 @@ async function postJson(url, body) {
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   return r.json();
 }
+const MODLIST = ['Motor Konsolu', 'Import Grafi', 'Builder/Extractor', 'i18n', 'Asset', 'Performans', 'AST & olu-kod', 'Motor Safligi', 'Regression', 'Gizli Bilgi', 'Olu Kod', 'Karmasiklik', 'Cokme Trendi'];
+function buildScanMods() {
+  const box = document.getElementById('scanMods');
+  MODLIST.forEach((name, i) => {
+    const ch = document.createElement('button');
+    ch.textContent = (i + 1) + '  ' + name;
+    ch.style.cssText = 'font-size:11px;padding:3px 8px;margin:2px;border-radius:6px;background:#0b0d11;border:1px solid #2c313c;color:#95a5c6;cursor:pointer';
+    ch.onclick = () => runScan(String(i + 1));
+    box.appendChild(ch);
+  });
+}
+buildScanMods();
 let scanId = 0;
-async function runScan() {
+async function runScan(nums) {
   const out = document.getElementById('scanOut');
   const st = document.getElementById('scanStatus');
   const my = ++scanId;
   out.textContent = 'Tarama sürüyor...';
   st.textContent = '';
-  const d = await postJson('/api/scan', { lang: document.getElementById('scanLang').value, args: document.getElementById('scanArgs').value });
+  const d = await postJson('/api/scan', { lang: document.getElementById('scanLang').value, mods: nums });
   if (my !== scanId) return;
-  out.textContent = d.stdout || d.stderr || '(çıktı yok)';
-  st.innerHTML = d.ok ? '<span class="ok">tamamlandı</span>' : '<span class="err">hata</span>';
+  if (!d.ok || !d.result) { out.textContent = 'HATA: ' + (d.error || 'sunucu yanıtı yok'); st.innerHTML = '<span class="err">hata</span>'; return; }
+  const res = d.result;
+  if (!res.ok) { out.textContent = 'deep-tool hatası: ' + (res.error || '?'); st.innerHTML = '<span class="err">hata</span>'; return; }
+  let txt = 'TOPLAM: ' + res.totals.WARN + ' WARN | ' + res.totals.BUG + ' BUG | ' + res.totals.ERR + ' ERR\n\n';
+  res.modules.forEach(m => {
+    txt += '\u2500\u2500 ' + m.name + ' \u2500\u2500\n';
+    if (!m.findings.length) { txt += '  (temiz)\n'; return; }
+    m.findings.forEach(f => {
+      const tag = f.lvl === 'ERR' ? ' E' : f.lvl === 'BUG' ? ' B' : f.lvl === 'WARN' ? ' W' : ' i';
+      txt += ' [' + tag + '] ' + f.msg + '\n';
+    });
+  });
+  out.textContent = txt;
+  st.innerHTML = '<span class="ok">bitti (' + res.totals.WARN + '/' + res.totals.BUG + '/' + res.totals.ERR + ')</span>';
+}
+let findId = 0;
+async function runFind() {
+  const out = document.getElementById('findOut');
+  const st = document.getElementById('findStatus');
+  const kw = document.getElementById('findKw').value.trim();
+  const my = ++findId;
+  if (!kw) { st.innerHTML = '<span class="err">kelime boş</span>'; return; }
+  out.textContent = 'Aranıyor...';
+  st.textContent = '';
+  const d = await postJson('/api/find', { kw: kw, folder: document.getElementById('findFolder').value.trim() });
+  if (my !== findId) return;
+  const res = d.result;
+  if (!d.ok || !res || !res.ok) { out.textContent = 'HATA: ' + ((res && res.error) || d.error || '?' ); st.innerHTML = '<span class="err">hata</span>'; return; }
+  if (!res.total) { out.textContent = 'Sonuç yok: ' + res.keyword; st.innerHTML = '<span class="err">0</span>'; return; }
+  st.innerHTML = '<span class="ok">' + res.total + ' eşleşme</span>';
+  out.textContent = res.hits.map(h => h.file + ':' + h.line + ': ' + h.text).join('\n');
+}
+async function runNew() {
+  const st = document.getElementById('newStatus');
+  const path = document.getElementById('newPath').value.trim();
+  const kind = document.getElementById('newKind').value;
+  if (!path) { st.innerHTML = '<span class="err">yol boş</span>'; return; }
+  st.textContent = '...';
+  const d = await postJson('/api/new', { kind: kind, path: path });
+  const res = d.result;
+  if (!d.ok || !res || !res.ok) {
+    st.innerHTML = '<span class="err">' + (((res && res.exists) ? 'zaten var (silinmedi): ' : '') + (path)) + '</span>';
+    return;
+  }
+  st.innerHTML = '<span class="ok">oluşturuldu: ' + res.path + '</span>';
+}
+let runId = 0;
+async function runFile(path) {
+  const out = document.getElementById('runOut');
+  const my = ++runId;
+  if (!path) return;
+  out.textContent = 'Çalışıyor: ' + path + ' ...';
+  const d = await postJson('/api/run', { path: path });
+  if (my !== runId) return;
+  out.textContent = (d.stdout || '') + (d.stderr ? '\n[stderr]\n' + d.stderr : '') || '(çıktı yok)';
 }
 async function loadLog() {
   const out = document.getElementById('logOut');
@@ -878,9 +979,50 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._send_json(200, {"ok": code == 0, "code": code, "stdout": out, "stderr": err})
         elif parsed.path == "/api/scan":
             lang = body.get("lang", "tr")
-            args = (body.get("args") or "").strip()
-            extra = args.split() if args else ["all"]
-            out, err, code = _run([PYTHON, "tools/deep-tool.py", "--lang", lang] + extra, timeout=120)
+            mods = body.get("mods") or "all"
+            if isinstance(mods, list):
+                extra = [str(m) for m in mods]
+            else:
+                extra = ["all"] if str(mods).lower() == "all" else [str(mods)]
+            try:
+                out, err, code = _run([PYTHON, "tools/deep-tool.py", "--lang", lang, "--api", "scan"] + extra, timeout=120)
+                result = json.loads(out)
+            except Exception as e:  # noqa: BLE001
+                result = {"ok": False, "error": "deep-tool yaniti JSON degil: %r\n%s" % (e, (err or out)[:400])}
+            self._send_json(200, {"ok": code == 0, "result": result})
+        elif parsed.path == "/api/find":
+            kw = (body.get("kw") or "").strip()
+            folder = (body.get("folder") or "").strip()
+            if not kw:
+                self._send_json(400, {"ok": False, "error": "kw bos"})
+                return
+            cmd = [PYTHON, "tools/deep-tool.py", "--api", "find", kw]
+            if folder:
+                cmd.append(folder)
+            try:
+                out, err, code = _run(cmd, timeout=60)
+                result = json.loads(out)
+            except Exception as e:  # noqa: BLE001
+                result = {"ok": False, "error": "deep-tool yaniti JSON degil: %r\n%s" % (e, (err or out)[:400])}
+            self._send_json(200, {"ok": code == 0, "result": result})
+        elif parsed.path == "/api/new":
+            kind = (body.get("kind") or "").strip()
+            path = (body.get("path") or "").strip()
+            if kind not in ("script", "dir") or not path:
+                self._send_json(400, {"ok": False, "error": "kind (script|dir) ve path gerekli"})
+                return
+            try:
+                out, err, code = _run([PYTHON, "tools/deep-tool.py", "--api", "new", kind, path], timeout=30)
+                result = json.loads(out)
+            except Exception as e:  # noqa: BLE001
+                result = {"ok": False, "error": "deep-tool yaniti JSON degil: %r\n%s" % (e, (err or out)[:400])}
+            self._send_json(200, {"ok": code == 0, "result": result})
+        elif parsed.path == "/api/run":
+            path = (body.get("path") or "").strip()
+            if not path.endswith(".py"):
+                self._send_json(400, {"ok": False, "error": "sadece .py dosyasi calistirilir"})
+                return
+            out, err, code = _run([PYTHON, path], timeout=120)
             self._send_json(200, {"ok": code == 0, "code": code, "stdout": out, "stderr": err})
         elif parsed.path == "/api/launch":
             out, err, code = _run([PYTHON, "main.py"], timeout=120)

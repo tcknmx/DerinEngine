@@ -77,6 +77,22 @@
     ölü `main_soon` çeviri anahtarları silindi. Doğrulama: find 25 eşleşme, new
     şablon+koruma, run subprocess — hepsi OK; `--lang en all` 13/13 modül
     **0 WARN, 0 BUG, 0 ERR**. Web paneli için SIRADA (kullanıcı söyleyince).
+12. **deep-tool tek programa bağlandı + tam arayüz web paneline taşındı** (26.09.2026):
+    (a) **`--api` JSON modu** — `scan` / `find` / `new` için yapılandırılmış çıktı
+    (`_api_dispatch` + `_api_scan`; `_do_find`/`_do_new` "hesapla/yazdır" diye
+    ayrıştırıldı: `_collect_find` + `_perform_new`); CLI davranışı değişmedi.
+    pygame sürüm satırı hem CLI hem JSON'u kirletiyordu → süreç başında
+    `PYGAME_HIDE_SUPPORT_PROMPT=1` (temiz çıktı). (b) **webpanel deep-tool sekmesi**
+    yenilendi: (1) Tarama — dil seçici + 13 modül çipi (tıkla=çalıştır) + "Tümünü
+    tara", yapılandırılmış bulgu raporu + TOPLAM özeti; (2) Bul — kelime+klasör →
+    dosya:satır; (3) Üret — script/dir seçici + koruma mesajı (var olan silinmez);
+    (4) Başlat — `main.py` veya keyfi `.py`. Yeni route'lar: `/api/scan`
+    (--api scan, JSON parse), `/api/find`, `/api/new`, `/api/run` (.py kısıtı).
+    Doğrulama (python urllib): scan11 0/0/0, scan-all 13 modül 0/0/0, find 16
+    eşleşme, new üret+exists koruması (içerik değişmiyor), run stdout OK,
+    `.pyx` reddi 400, sayfa yeni kimlikler içeriyor. Eski 8765 sürecinin eski kodla
+    ayakta olduğu fark edildi → kapatıldı, test güncel süreçle tekrarlandı.
+    `--lang en all` regresyonu: 0/0/0.
 
 ---
 
