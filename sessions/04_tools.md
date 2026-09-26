@@ -109,7 +109,7 @@
     = panel + otomatik tarayıcı. Doğrulama: py_compile + 17 uçtan uca test PASS
     (modules tr/en 13, scan11/all 0/0/0, find 16, run probe, log, `.pyx` 400,
     new üret+koruma), `--lang en all` 0/0/0. Eski 8765 süreçleri kapatılıp sunucu
-    yeni kodla yeniden başlatıldı. **COMMIT+PUŞ BEKLİYOR (madde 13 — kullanıcı onayı).**
+    yeni kodla yeniden başlatıldı. ✅ Commit+Pus: `5fb747f` (26.09.2026).
 
 ---
 
