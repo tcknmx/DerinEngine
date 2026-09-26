@@ -1,0 +1,23 @@
+[03:06:42] ERR EXCEPTION: Traceback (most recent call last):
+  File "C:\Users\token\Desktop\DerinEngine\main.py", line 107, in <module>
+    engine.run()
+    ~~~~~~~~~~^^
+  File "C:\Users\token\Desktop\DerinEngine\deep_engine\core.py", line 155, in run
+    self._frame(dt)
+    ~~~~~~~~~~~^^^^
+  File "C:\Users\token\Desktop\DerinEngine\deep_engine\core.py", line 128, in _frame
+    self.active_scene.update(dt)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^
+  File "C:\Users\token\Desktop\DerinEngine\deep_engine\scene.py", line 295, in update
+    obj.update(dt)
+    ~~~~~~~~~~^^^^
+  File "C:\Users\token\Desktop\DerinEngine\deep_engine\game_object.py", line 41, in update
+    comp.update(dt)
+    ~~~~~~~~~~~^^^^
+  File "C:\Users\token\Desktop\DerinEngine\game\bosses.py", line 430, in update
+    self._fire_beam(cx, cy, self._lock_x, self._lock_y, player)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\token\Desktop\DerinEngine\game\bosses.py", line 467, in _fire_beam
+    ctrl = player.get_component(PlayerController)
+                                ^^^^^^^^^^^^^^^^
+NameError: name 'PlayerController' is not defined

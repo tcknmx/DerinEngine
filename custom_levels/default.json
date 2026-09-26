@@ -1,0 +1,65 @@
+{
+  "meta": {
+    "name": "Custom Level",
+    "background_color": [
+      16,
+      24,
+      34
+    ],
+    "parallax_theme": "forest",
+    "format": "derinengine-level",
+    "version": 1
+  },
+  "objects": [
+    {
+      "tag": "Ground",
+      "name": "Platform",
+      "x": 0,
+      "y": 416,
+      "w": 2100,
+      "h": 40,
+      "color": [
+        60,
+        90,
+        130
+      ],
+      "shape": "rect"
+    },
+    {
+      "tag": "Ground",
+      "name": "Platform",
+      "x": 0,
+      "y": 456,
+      "w": 2100,
+      "h": 164,
+      "color": [
+        40,
+        70,
+        110
+      ],
+      "shape": "rect"
+    },
+    {
+      "tag": "Player",
+      "name": "Player",
+      "x": 280,
+      "y": 88,
+      "w": 392,
+      "h": 272
+    },
+    {
+      "tag": "Portal",
+      "name": "Portal",
+      "x": 1980,
+      "y": 356,
+      "w": 40,
+      "h": 60,
+      "color": [
+        70,
+        70,
+        90
+      ],
+      "shape": "rect"
+    }
+  ]
+}

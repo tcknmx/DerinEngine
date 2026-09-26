@@ -1,0 +1,235 @@
+# DerinEngine — Paylaşılan Bilgi (Çapraz-Oturum)
+
+Bu dosya, oturumlar arası "diğer oturumların da haberi olsun" kayıtlarını ve ortak
+bilgiyi tutar. Her oturuma başlarken **SON GELİŞMELER** bölümünü oku. Kendi oturumunun
+yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
+
+---
+
+## SON GELİŞMELER (kronolojik, en üstte en yeni)
+
+- **[OYUN + MOTOR + ARAÇ] Oyun içi "custom level" akışı TAMAMEN kaldırıldı (25.09.2026).**
+  Kullanıcı: "oyun içi C'yi de kaldır, costum level istemiyorum; oyunda sadece P
+  (kampanya) + 4 (Sonsuz) + T (dil) olacak; editör falan PANELDE kalacak." Yapılanlar:
+  **(a)** `game/ui.py`: menüdeki `[C] Özel Seviye` satırı (MC), `_dispatch_action`
+  "custom" dalı ve klavyedeki C kısayolu kaldırıldı; boşalan yere `[T] Dil` satırı
+  taşınmıştı (zaten) — menü şimdi P + 4 + T. Kullanılmayan `_start_mode` (fade'li
+  geçiş) silindi. **(b)** `game/builders.py` `build_custom_level` + portala spawn
+  ışınlama + `ensure_custom_levels_dir` + `_finalize_custom_plain` + `_CUSTOM_GOAL_TEXT`
+  silindi; `_finalize_custom_scene` → `_finalize_goal_ui` (prosedürel seviyelerin
+  hedef yıldız UI'ı) adına kavuştu. `_build_player` restart-artık menüye düşüyor
+  (gerçek senaryolar kendi factory'lerini override eder). **(c)** `game/state.py`:
+  `LEVELS_DIR`/`DEFAULT_LEVEL_PATH` + "custom" mod tanımı kaldırıldı; `scenes.py`
+  `restart_path=DEFAULT_LEVEL_PATH` geçişleri ve import temizlendi. **(d)**
+  `game/commands.py`: `levels` + `load` komutları silindi (14→12 komut); `main.py`
+  `ensure_custom_levels_dir` çağrısı kaldırıldı; i18n `menu_custom` (TR+EN, 62→61/61)
+  ve `deep_engine/input.py` gamepad "C" map'i temizlendi. **(e)** `tools/webpanel.py`
+  **işlevi aynen**; sadece "oyunda konsol: load X" ipuçları çıkarıldı (oyun artık
+  yüklemiyor — web panel kendi başına seviye tasarım aracı). README + AGENTS.md
+  kontrolleri güncellendi. Doğrulama: py_compile, headless boot (menü P→kampanya,
+  T dil), `start_campaign`/`build_endless_level`, 12 konsol komutu, i18n parity,
+  deep-tool 0 BUG, webpanel save/list/delete + `node --check` OK. **Oyun içi custom
+  seviye oynatma yolu artık YOK** — webpanelde yapılanlar oyunda görünmez; istenirse
+  yeni bir giriş (ör. menu seviye seçici) tartışılır.
+
+- **[OYUN + MOTOR + ARAÇ] Oyun içi editör tamamen kaldırıldı; seviyeler klasöre taşındı (25.09.2026).**
+  **(a)** `deep_engine/editor.py` (LevelEditor) SİLİNDİ; `core.py`'den editör oluşturma,
+  E tuşu toggle ve editör üzerinden giden update/draw/debug dalları temizlendi;
+  `__init__.py`'den `LevelEditor` çıkarıldı; `game/ui.py`'den menü öğesi ([3] Editör),
+  `_dispatch_action` "editor" kolu ve fade sonundaki `editor.toggle()` kaldırıldı;
+  `game/entities.py`'de fareyle ateş için `engine.editor.active` engeli silindi; i18n
+  `menu_editor`/`editor_*` anahtarları iki dilden de temizlendi. **(b)** Seviyeler artık
+  `custom_levels/` **klasöründe** birer dosya: `custom_levels/default.json` = hep sabit
+  "sıfır şablon" (asla ezilmez), diğerleri `<isim>.json`. `game/state.py`'ye `LEVELS_DIR`,
+  `builders.ensure_custom_levels_dir()` (klasör + default.json'u şablon kaynağından
+  üretir), konsola `levels` + `load <isim>.json` komutları eklendi. **(c)** `tools/webpanel.py`
+  sadece bu klasörde çalışıyor: seviye açma listesi + "Farklı Kaydet…" (isim verirsin,
+  `default.json` korunur) + seviye silme; "Oyuna Aktar"/publish kaldırıldı, `web_level.json`
+  silindi. Oynatma yolu: web'de kaydet → oyunda konsolu aç → `load benim_bolum.json`.
+  Doğrulama: py_compile + headless boot + konsol komut testleri + webpanel HTTP round-trip
+  (save/load/delete) OK. README + AGENTS.md kontrolleri güncellendi. **Etki:** motor 1.0.0'da
+  E tuşu artık yok; paketleme `--add-data custom_level.json` şablon kaynağı olarak duruyor.
+
+- **[OYUN] Boss ışın çökmesi düzeltildi (25.09.2026).** `game/bosses.py` içinde
+  `PlayerController` iki yerde kullanılıyordu (SniperBoss/CosmicBoss `_fire_beam`,
+  eski satır 467/599) ama hiç import edilmemişti → boss ışın saldırısı başlayınca
+  `NameError` ile oyun çöküyordu. `from game.entities import PlayerController`
+  eklendi (mutlak import). Doğrulama: her iki `_fire_beam` gerçek sahnede çağrıldı,
+  çökme yok. **Oynanış etkisi:** pandun/desert/sniper boss'ları artık sahada da
+  ışın atabilir.
+
+- **[MOTOR] Konsol toggle düzeltmesi (25.09.2026).** Konsol " ("BACKQUOTE /
+  QUOTEDBL) tuşuyla AÇILIYORDU ama aynı karede `console.update()` tuş basışını
+  hâlâ "kapat" sanıp kapatıyordu → konsol göz açıp kapayıncaya kadar açık kalıyordu
+  (kullanıcı "komut olmuyor" dedi). Çözüm: `console.update()`'te backquote/quote
+  kapatma kaldırıldı — tuş artık SADECE motor çekirdeğinde toggle (core.py);
+  konsol içinde kapatma yalnızca ESC ile. Açılış tuşunun yazı satırına girmemesi
+  için `Input._typed_chars` toggle'da temizleniyor. Uçtan-uca test (aç→yaz→komut
+  →kapat) OK.
+
+- **[ARAÇ + MOTOR + OYUN] Web editörü kendi dosyasında çalışıyor + oyun içi konsol (25.09.2026).**
+  **(a)** `tools/webpanel.py`: `custom_level.json` artık **dokunulmayan şablon**,
+  editör `web_level.json`'da çalışıyor. Butonlar: "Şablona Sıfırla" (`/api/level/reset`:
+  template → web_level kopyala) ve "Oyuna Aktar" (`/api/level/publish`: web_level →
+  custom_level). `web_level.json` `.gitignore`'a eklendi. Oyun içi editör (E) YİNE
+  `custom_level.json`'ı açar — web'de düzenlenen dosyayı GÖRMEZ (kullanıcı isteği).
+  **(b)** " ("BACKQUOTE) tuşu oyun içi komut satırını açar: `deep_engine/console.py`
+  (DevConsole + komut kayıt sistemi `register_command`), `input.py`'ye karakter
+  toplama (`get_typed_text`) + BACKQUOTE/BACKSPACE/KPENTER tuşları, `core.py`'ye
+  toggle+pause+draw (konsol açıkken oyun durur). `game/commands.py`: `help, clear,
+  version, hp, heal, god, coins, speed, jump, tp, respawn, list`. Motor saflığı
+  korundu (komutlar game tarafında kayıtlı). Doğrulama: py_compile OK, 12 komut
+  kaydı doğrulandı, webpanel HTTP round-trip (reset/publish) OK.
+
+- **[ARAÇ oturumu] Tarayıcı web paneli + mini editör (25.09.2026).** `tools/webpanel.py`
+  — Python **sadece stdlib**, 0 yeni paket. `http://127.0.0.1:8765` sekme paneli:
+  **Editor** (Godot/Unity-kıvamında basit seviye editörü: 14 nesnelik palet,
+  sürükle/taşı/yeniden boyutlandır, özellik + meta paneli, kaydet = `custom_level.json`
+  round-trip), deep-tool tarama, motor.log, Script, Oyun başlatıcı. **Kararlar:**
+  sayfa **gerçek Türkçe UTF-8** karakterlerle (ü/ş/İ/ç, `<meta charset>` +
+  `charset=utf-8`; WebClient bayt doğrulaması yapıldı). Önceki "yalnız ASCII" denemesi
+  kullanıcıya kötü geldi, iptal edildi. `PAGE` Python raw string (`r"""..."""` — JS
+  `\'` kaçışları aynen geçer), `setNum/setVal/setColor` inline handler'larla
+  `node --check` + runtime mock testi doğrulandı, zoom/cam çarpımı doğru.
+  Endpoint'ler: `/api/script` (cwd=ROOT — `deep_engine/` cwd'den `import deep_engine`
+  ÇALIŞMAZ), `/api/scan` (`deep-tool.py --lang tr/en [args]`). **Dosya bozulma
+  tuzağı:** bu dosyayı PowerShell `Get-Content -Raw`/`Set-Content` döngüsüyle
+  DÜZENLEME (ANSI okur, UTF-8'i bozar → `â€”`); UTF-8 editörle. Git'e henüz
+  eklenmedi (kullanıcı kararı bekliyor).
+
+- **[MOTOR + ARAÇ] Yorum/docstring çevirisi tüm depoya tamamlandı (23.09.2026).**
+  İzlenen TÜM `.py` dosyaları (motor core/servis/veri, game, tools) + `version.txt`
+  + `.gitignore` yorumları akıcı İngilizce'ye çevrildi (commit `dfdc9e5`, 29 dosya,
+  30. satırında tek commit). **Kritik koruma: i18n.py TRANSLATIONS TR/EN değerleri ve
+  deep-tool.py TR/EN menü sözlük değerleri AYNEN duruyor** (yalnız yorumları değişti) —
+  kod çıktıları ve oyun arayüzü (TR/EN) etkilenmedi. GitHub'a gidecek her şey artık
+  İngilizce; `sessions/`, `AGENTS.md`, `opencode.json` yerelde Türkçe kalmaya devam.
+  Not: depo 7 commit — GitHub push'u "gönder" deyince yapılır.
+
+- **[ARAÇ oturumu] AI izi temizliği + tek kök commit (23.09.2026).** GitHub'da görünen
+  tüm `.py` yorum/docstring'lerinden emojiler + ajan görev kodları (A1/B3/C5/D1) +
+  "Bug Checkup" üslubu temizlendi; `version.txt` doğal değişiklik günlüğüne çevrildi;
+  README AI üslubu (game juice/Mini-Godot/emoji) kaldırıldı. İz kalmadı (3 tur tarama).
+  Eski 9 commit bir kök commit'e (`a4fe0a6`) sıkıştırılıp force-push yapıldı —
+  GitHub geçmişi tek commit. Canlı oyun/i18n çevirileri (TR/EN menüler, HUD) AYNEN korundu.
+
+- **[ARAÇ oturumu] GitHub'a gönderildi (23.09.2026).** https://github.com/tcknmx/DerinEngine
+  (Public). `main` = 7 commit, 33 dosya. `sessions/`, `AGENTS.md`, `opencode.json` yerelde
+  kalıyor, depoda yok. Sonraki değişiklikler `git add -A && git commit -m "..."` +
+  `git push` ile güncellenir.
+
+- **[OYUN oturumu] Tüm yorum/docstring'ler İngilizce'ye çevrildi (23.09.2026).**
+  `game/*.py` + `main.py` (8 dosya, 328 yorum satırı) akıcı İngilizce'ye geçti.
+  Kod/i18n string literal'leri değişmedi (UI/editor çevirileri yerinde). MOTOR ve
+  ARAÇ kodu bu değişikliğe dahil değil; deep_engine/ ve tools/ kendi düzeninde.
+  Doğrulama: `py_compile` OK, Türkçe karakter kalıntısı yok.
+
+- **[ARAÇ oturumu] Yerel git deposu kuruldu (23.09.2026).** Git 2.55.0 kuruldu
+  (winget), kimlik `tcknmx` / `tcknmx@users.noreply.github.com` (global), kök dizinde
+  `main` dalında 2 commit (`5ddd5c2` ilk kayıt, `99722ff` gitignore). Hariç tutulanlar:
+  `__pycache__/`, `dist/`, `build/`, `web-cache/`, `savegame.json`, `motor.log`,
+  `.opencode/`, `*.lnk`, `_e.txt`. **GitHub'a push YAPILMADI** — sadece yerel.
+  Değişiklikler `git status` ile takip edilip commit'lenebilir; kayıt düzenimizde
+  "değişiklik diğer oturumu etkiliyorsa" notu artık commit mesajına yazılır.
+
+- **[STRATEJİ oturumu] GÖREV DÖNGÜSÜ kuralı getirildi (AGENTS.md kural 3):** her
+  görevde üç kayıt zorunlu — başlangıçta kendi oturum dosyasına `HEDEF` (neyi çözüyoruz,
+  doğrulama ne), yarım kalırsa `KALAN` (nereye kadar gidildiği: adım, dosya, sırada ne),
+  tamamlanınca kendi dosyasına kalıcı kayıt + diğer oturumları etkiliyor ise buraya
+  "SON GELİŞMELER" notu. **Tüm oturumlar uygular.**
+
+- **[ARAÇ oturumu] deep-tool tarama sonuçları devredildi.** `--lang tr all` → 95 WARN,
+  0 BUG/ERR. Sessiz `except` (Modül 1/7), kullanılmayan import (parallax `_m`), Modül 3
+  extractorsız tag (Coin/Player/Spikes) ve Modül 6 O(n²) incelemeleri bekliyor.
+  Dağıtım: deep_engine/ tarafı → `02_engine.md` "DEVİR GÖREVİ"; game/+main.py tarafı →
+  `03_game.md` "DEVİR GÖREVİ". Koda dokunulmadı.
+
+- **[OYUN oturumu] Spikes trigger+zıplama, Turret agresifliği, gömülme yönlendirmesi
+  (23.09.2026).** `_build_spikes` artık `BoxCollider(is_trigger=True)`; oyuncu dikene
+  "basıp duramaz", temasta bounce (vx=-220, vy=-330) + hitstop + shake alır,
+  `respawn` kaldırıldı. `TurretEnemy` range 600→460, wake_radius 420→330; turret ateş
+  aralığı kampanya difficulty<=1'de min 2.0s (altyapıda 1.75s idi), genel min 1.4s.
+  MOTOR etkilenmez (tüm değişiklikler `game/`). **02 oturumuna devir:** yüzeye gömülme
+  kök nedeni motor `deep_engine/scene.py` tek-yön çarpışma eşiği `<=4` + 2px ayak
+  sensörü + `Rigidbody2D` hız tavanı yokluğu — ayrıntı `03_game.md` → AÇIK RAPORLAR
+  #2. Bir sonraki motor çalışmasına kadar oyuncu hızlı düşüşlerde ince tek-yön
+  platformlardan geçebilir.
+
+- **[STRATEJİ oturumu] AGENTS.md standart tek dev dosyadan 4 oturum yapısına taşındı.**
+  Tüm geçmiş "maddeler", bug checkup'ları ve planlar ilgili oturum dosyalarına dağıtıldı:
+  `01_strategy.md` (yol haritası/kararlar), `02_engine.md` (deep_engine/),
+  `03_game.md` (game/), `04_tools.md` (deep-tool/paketleme/web). Bu dosya yeni ortak
+  bilgi merkezi. KODA DOKUNULMADI — oyun hâlâ aynı çalışıyor.
+
+- (Bir sonraki çapraz-etkili değişiklik buraya eklenir: ör. "MOTOR: scene.py çizim
+  sırası değişti — OYUN etkilenebilir", "OYUN: entity ekledi — ARAÇ extractor
+  kontrolü gerekebilir".)
+
+---
+
+## DÜNYA DURUMU (kim neyin sahibi)
+
+| Oturum | Sahip olduğu dosyalar | Kimi etkiler |
+|---|---|---|
+| STRATEJİ | `sessions/01_strategy.md` | Yön/kararlar; koda dokunmaz |
+| MOTOR | `deep_engine/*.py` | Tüm oturumlar (motor üstüne kurulu) |
+| OYUN | `game/*.py` , `main.py` | Oynanış; motor API'lerine bağımlı |
+| ARAÇ | `tools/deep-tool.py`, `deep-tool.bat`, paketleme (dist/build) | Denetim/bakım; kodu düzeltmez |
+
+Motor saflık kuralı: `deep_engine/` İÇİNDE `game`/`main` import YASAK (deep-tool Modül 8
+denetler). `game/*.py` ise motora `deep_engine.*` mutlak import ile bağlanır (göreli
+import `game/*` içinde ÇALIŞMAZ — paket dışındadırlar).
+
+---
+
+## SÜRÜM & VERİ DURUMU (herkese açık)
+
+- Motor sürümü **1.0.0**, oyun sürümü **0.1.19** (tek sürüm satırı fikri iptal edildi;
+  ikisi ayrı sayılır: motor 1.0.0, oyun 0.1.19). Kaynaklar:
+  `deep_engine/__init__.py → __version__`, `version.txt`.
+- `custom_level.json` içindeki `meta.version` AYRI bir şey: seviye **dosya biçimi**
+  sürümü (şu an 1).
+- `savegame.json` (normalde) temiz durumda: `{"lang":"tr","high_score":0}` — BOM'suz
+  (ilk bayt `{`). Yeni oyuncu deneyimi kararı gereği sıfır kurulum korunur.
+  - `endless_unlocked` yoksa Sonsuz Mod kilitlidir (kampanya bitince açılır).
+  - `tutorial_done` yoksa girişte eğitim gösterilir.
+- `user_data_dir()` frozen-safe + emscripten-safe: savegame/özel seviye her platformda
+  doğru yere yazılır.
+
+---
+
+## BİLİNEN TUZAKLAR (oturumdan bağımsız, hepsini ilgilendirir)
+
+1. **`game/*.py`'de göreli import yok**: `from .core import ...` ÇALIŞMAZ. Doğrusu
+   `from deep_engine.core import ...` (mutlak).
+2. **savegame JSON'u UTF-8 BOM ile yazarsan bozulur**: `SaveGame.load` `utf-8-sig`
+   kullanır (BOM'lu da okur) ama dosya BOM'suz `{` ile başlamalı. PowerShell
+   `Set-Content -Encoding UTF8` BOM ekler — dikkat.
+3. **`build/` paylaşılıyor**: PyInstaller (`build/StarCollectorHero/`) ile pygbag
+   (`build/web/`) AYNI klasörü kullanır. Temizlikte `build/web*` dışında bırak ya da
+   web çıktısını ayrı yere kopyala.
+4. **Yerel web testinde oyun başlamıyorsa**: `http://localhost:8000` kullanma —
+   pygbag dev mode'a girip wheel'i localhost'tan arar (404). `http://192.168.1.5:8000/`
+   (yerel IP) kullan, CDN'den iner ve çalışır. (Prod/itch.io etkilenmez.)
+5. **`Scene.draw` UI sırası**: normal yol = dünya (özellikle zoom'lu) → UI → vinyet en
+   son. Zoom'lu çizimde `world_surf` `background_color` ile doldurulmalı (yoksa parallax
+   üstü siyah kalır).
+6. **Asenkron tarayıcı**: web, `engine.run_async()` (`asyncio.run`), masaüstü
+   `engine.run()`. `_frame(dt)` tek karelik ortak gövdelerdir.
+7. **indirme/import taramasında sesler**: sentezlenen sesler için dosya-varlık kontrolü
+   istemli olarak yapılmaz (deep-tool Modül 5 bunları bilerek atlar).
+8. **Editör 9 aracı**: 1–9 = araçlar; Z geri al, C kopyala, V yapıştır; seçili nesnede
+   ok tuşları kaydırır, `[`/`]` boyut, R renk, DEL sil.
+
+---
+
+## ÇAPRAZ REFERANS (geçmiş maddelerin dağıtımı)
+
+Orijinal tek AGENTS.md'deki "madde N" kayıtları ilgili oturum dosyalarına dağıtıldı.
+Bir madde hem motoru hem oyunu etkilediyse ana kayıt baskın tarafta, ilgili tarafa kısa
+bir "ilişkili gelişme" satırı düşüldü:
+
+- Ağırlıklı MOTOR: 1,2,4,9,11,16,21(zaman),22(bileşen),23(zoom),26,31,32,33,34,35,36(log),38,43
+- Ağırlıklı OYUN: 3,6,7,8,14,15,17,18,19,20,21(karakter),22(boss),23(menü),25,27,29,30,40,41,42
+- Ağırlıklı ARAÇ: 36(konsol),37,39 + paketleme + web build + 404 tanısı
+- STRATEJİ (karar notları): marka taşıma (10), oturum yapısı, öncelik kararları

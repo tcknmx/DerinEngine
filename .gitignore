@@ -2,23 +2,14 @@
 __pycache__/
 *.py[cod]
 
-# Packaging outputs (PyInstaller / pygbag)
+# Packaging outputs (PyInstaller / pygbag) - regenerated with `deep-tool --package`
 dist/
 build/
 web-cache/
 
-# Runtime data (changes as the game runs)
-savegame.json
-motor.log
+# Node packages (opencode tool deps) - regenerated with npm install
+**/node_modules/
 
-# Custom levels (user-created levels live here; default.json is created from the template)
-custom_levels/
-
-# Local tool state
+# Windows shortcuts / empty scratch file (local machine only)
 *.lnk
 _e.txt
-deep-tool.bat
-StarCollectorHero.spec
-
-# Screenshot taken for repo preview (superseded)
-repo_preview.png
