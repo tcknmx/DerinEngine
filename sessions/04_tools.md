@@ -93,6 +93,23 @@
     `.pyx` reddi 400, sayfa yeni kimlikler içeriyor. Eski 8765 sürecinin eski kodla
     ayakta olduğu fark edildi → kapatıldı, test güncel süreçle tekrarlandı.
     `--lang en all` regresyonu: 0/0/0.
+13. **webpanel UX paketi (26.09.2026, kullanıcı çaydayken bağımsız yapıldı):**
+    (a) **`--api modules`** (deep-tool): gerçek TR/EN modül adlarını döndürür
+    (`t("menu_%d")` üzerinden, `[N]` ön eki atılır) → webpanel çipleri artık sabit
+    kaba listeden değil, deep-tool'dan canlı çekiliyor (`/api/modules?lang=` GET +
+    `loadMods()`; dil değişince onchange yeniler; `buildScanMods` artık num+gerçek
+    ad basar). (b) **Tarama çıktısı renklendi** (`runScan` → innerHTML + `esc()`;
+    W/B/E/i satır renkleri, modül başlığı, "(temiz)" yeşili; mesajlar escape = XSS
+    koruması). (c) **Tarayıcı otomatik açılıyor** (`webbrowser` + `threading.Timer
+    (0.4)`; `--no-open` bayrağı testler için); 8765 doluysa ikinci açış hata yerine
+    "zaten çalışıyor + tarayıcıyı açar" deyip kapanır (bunu test sırasında
+    gerçekten yaşamıştık). (d) **Log sekmesine "canlı izle" kutusu** (2 sn
+    `setInterval` → `loadLog`, toggle iptal ediyor). (e) `webpanel.bat` köke
+    eklendi (deep-tool.bat kalıbı: chcp 65001 + köke in + çalıştır) — çifte tık
+    = panel + otomatik tarayıcı. Doğrulama: py_compile + 17 uçtan uca test PASS
+    (modules tr/en 13, scan11/all 0/0/0, find 16, run probe, log, `.pyx` 400,
+    new üret+koruma), `--lang en all` 0/0/0. Eski 8765 süreçleri kapatılıp sunucu
+    yeni kodla yeniden başlatıldı. **COMMIT+PUŞ BEKLİYOR (madde 13 — kullanıcı onayı).**
 
 ---
 

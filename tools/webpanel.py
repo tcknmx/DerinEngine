@@ -23,7 +23,9 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import urllib.parse
+import webbrowser
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # The game's data folder (same folder the game writes next to the exe).
@@ -319,7 +321,7 @@ PAGE = r"""<!DOCTYPE html>
   <div class="ed-panel" style="margin:0 0 10px 0">
     <h3 style="margin:0 0 6px 0">1) Tarama &mdash; modüle tıkla veya hepsini çalıştır</h3>
     <div class="ed-bar">
-      <select id="scanLang" style="width:auto"><option value="tr">Türkçe</option><option value="en">English</option></select>
+      <select id="scanLang" style="width:auto" onchange="loadMods()"><option value="tr">Türkçe</option><option value="en">English</option></select>
       <button class="run" onclick="runScan('all')">Tümünü tara (13 modül)</button>
       <span class="status" id="scanStatus"></span>
     </div>
@@ -363,6 +365,7 @@ PAGE = r"""<!DOCTYPE html>
 <div class="panel" id="log">
   <div class="row">
     <button class="secondary" onclick="loadLog()">Yenile</button>
+    <label style="margin-left:10px;color:#95a5c6"><input type="checkbox" id="logAuto" onchange="toggleLogAuto()"> canlı izle (2 sn)</label>
     <span class="status">motor.log son 200 satır</span>
   </div>
   <pre id="logOut">Yükleniyor...</pre>
@@ -793,18 +796,26 @@ async function postJson(url, body) {
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   return r.json();
 }
-const MODLIST = ['Motor Konsolu', 'Import Grafi', 'Builder/Extractor', 'i18n', 'Asset', 'Performans', 'AST & olu-kod', 'Motor Safligi', 'Regression', 'Gizli Bilgi', 'Olu Kod', 'Karmasiklik', 'Cokme Trendi'];
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+let MODLIST = [];
 function buildScanMods() {
   const box = document.getElementById('scanMods');
-  MODLIST.forEach((name, i) => {
+  box.textContent = '';
+  MODLIST.forEach((m, i) => {
     const ch = document.createElement('button');
-    ch.textContent = (i + 1) + '  ' + name;
+    ch.textContent = m.num + '  ' + m.name;
+    ch.title = 'modül ' + m.num + ' tarar';
     ch.style.cssText = 'font-size:11px;padding:3px 8px;margin:2px;border-radius:6px;background:#0b0d11;border:1px solid #2c313c;color:#95a5c6;cursor:pointer';
-    ch.onclick = () => runScan(String(i + 1));
+    ch.onclick = () => runScan(String(m.num));
     box.appendChild(ch);
   });
 }
-buildScanMods();
+async function loadMods() {
+  const lang = document.getElementById('scanLang').value;
+  const d = await (await fetch('/api/modules?lang=' + lang)).json();
+  if (d.ok && d.result && d.result.ok) { MODLIST = d.result.modules; buildScanMods(); }
+}
+loadMods();
 let scanId = 0;
 async function runScan(nums) {
   const out = document.getElementById('scanOut');
@@ -817,17 +828,20 @@ async function runScan(nums) {
   if (!d.ok || !d.result) { out.textContent = 'HATA: ' + (d.error || 'sunucu yanıtı yok'); st.innerHTML = '<span class="err">hata</span>'; return; }
   const res = d.result;
   if (!res.ok) { out.textContent = 'deep-tool hatası: ' + (res.error || '?'); st.innerHTML = '<span class="err">hata</span>'; return; }
-  let txt = 'TOPLAM: ' + res.totals.WARN + ' WARN | ' + res.totals.BUG + ' BUG | ' + res.totals.ERR + ' ERR\n\n';
+  let txt = '';
+  const tota = res.totals;
+  txt += '<span style="color:#9fb4d9;font-weight:bold">TOPLAM: ' + tota.WARN + ' WARN | ' + tota.BUG + ' BUG | ' + tota.ERR + ' ERR</span>\n\n';
   res.modules.forEach(m => {
-    txt += '\u2500\u2500 ' + m.name + ' \u2500\u2500\n';
-    if (!m.findings.length) { txt += '  (temiz)\n'; return; }
+    txt += '<span style="color:#c9d6ef">\u2500\u2500 ' + esc(m.name) + ' \u2500\u2500</span>\n';
+    if (!m.findings.length) { txt += '  <span style="color:#6fbf73">(temiz)</span>\n'; return; }
     m.findings.forEach(f => {
+      const col = f.lvl === 'ERR' ? '#ff6b6b' : f.lvl === 'BUG' ? '#ffd166' : f.lvl === 'WARN' ? '#ffa94d' : '#7f8fa6';
       const tag = f.lvl === 'ERR' ? ' E' : f.lvl === 'BUG' ? ' B' : f.lvl === 'WARN' ? ' W' : ' i';
-      txt += ' [' + tag + '] ' + f.msg + '\n';
+      txt += ' <span style="color:' + col + '">[' + tag + ']</span> ' + esc(f.msg) + '\n';
     });
   });
-  out.textContent = txt;
-  st.innerHTML = '<span class="ok">bitti (' + res.totals.WARN + '/' + res.totals.BUG + '/' + res.totals.ERR + ')</span>';
+  out.innerHTML = txt;
+  st.innerHTML = '<span class="ok">bitti (' + tota.WARN + '/' + tota.BUG + '/' + tota.ERR + ')</span>';
 }
 let findId = 0;
 async function runFind() {
@@ -874,6 +888,12 @@ async function loadLog() {
   const out = document.getElementById('logOut');
   const d = await (await fetch('/api/log')).json();
   out.textContent = d.log;
+}
+let logTimer = null;
+function toggleLogAuto() {
+  const on = document.getElementById('logAuto').checked;
+  if (on) { loadLog(); logTimer = setInterval(loadLog, 2000); }
+  else { if (logTimer) clearInterval(logTimer); logTimer = null; }
 }
 async function runScript() {
   const out = document.getElementById('scriptOut');
@@ -935,6 +955,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._send_json(200, {"ok": True, "levels": _list_levels()})
         elif parsed.path == "/api/log":
             self._send_json(200, {"log": _tail_log()})
+        elif parsed.path == "/api/modules":
+            qs = urllib.parse.parse_qs(parsed.query)
+            lang = qs.get("lang", ["tr"])[0]
+            try:
+                out, _err, _code = _run([PYTHON, "tools/deep-tool.py", "--lang", lang, "--api", "modules"], timeout=30)
+                result = json.loads(out)
+            except Exception as e:  # noqa: BLE001
+                result = {"ok": False, "error": repr(e)}
+            self._send_json(200, {"ok": bool(result.get("ok")), "result": result})
         else:
             self._send_json(404, {"ok": False, "error": "not found"})
 
@@ -1033,10 +1062,43 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, *args):  # keep the console quiet
         pass
 
+    def handle_error(self, request, client_address):  # noqa: ARG002
+        # A browser sometimes closes the connection before the answer arrives
+        # (refresh, tab switch). That is not a server bug - stay quiet for it,
+        # but still print real unexpected errors.
+        tb = []
+        try:
+            import sys as _sys
+            import traceback as _tb
+            tb = ["".join(_tb.format_exception(*_sys.exc_info()))]
+        except Exception:  # noqa: BLE001
+            tb = []
+        if tb and any(n in tb[0] for n in
+                      ("ConnectionAbortedError", "ConnectionResetError", "BrokenPipeError")):
+            return
+        if tb:
+            print(tb[0], end="")
+
+
+def _open_browser():
+    url = "http://127.0.0.1:%d" % PORT
+    try:
+        threading.Timer(0.4, lambda: webbrowser.open(url)).start()
+    except Exception:  # noqa: BLE001 - no browser on this machine? keep serving.
+        pass
+
 
 def main():
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    try:
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    except OSError:
+        print("[webpanel] %d zaten acik - panel zaten calisiyor. Tarayicida adres: http://127.0.0.1:%d" % (PORT, PORT))
+        if "--no-open" not in sys.argv:
+            _open_browser()
+        return
     print("[webpanel] DerinEngine paneli: http://127.0.0.1:%d  (kapatmak için: Ctrl+C)" % PORT)
+    if "--no-open" not in sys.argv:
+        _open_browser()
     try:
         server.serve_forever()
     except KeyboardInterrupt:

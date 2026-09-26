@@ -8,6 +8,13 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[ARAÇ] webpanel UX paketi (26.09.2026, `04_tools.md` madde 13).** deep-tool'a
+  **`--api modules`** eklendi (gerçek TR/EN modül adları) → webpanel çipleri artık
+  canlı; tarama çıktısı renkli (W/B/E/i); tarayıcı otomatik açılıyor (çifte tık
+  için `webpanel.bat` eklendi); 8765 doluysa yumuşak davran; log sekmesi "canlı
+  izle". 17 test + `--lang en all` 0/0/0. **Etkilenen:** araç dışı kod yok; sunucu
+  yeni kodla yeniden başlatıldı (sayfa F5 yeterli). COMMIT+PUŞ bekliyor.
+
 - **[ARAÇ] deep-tool arayüzü web paneline geçti (26.09.2026, `04_tools.md` madde 12).**
   deep-tool'a **`--api` JSON modu** eklendi (`scan`/`find`/`new` → yapılandırılmış çıktı;
   CLI davranışı aynı). Web panelindeki deep-tool sekmesi artık tam arayüz: 13 modül

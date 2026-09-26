@@ -1718,6 +1718,10 @@ def _api_dispatch(mode, args):
         hits = _collect_find(args[0], args[1] if len(args) > 1 else "")
         return {"ok": True, "keyword": args[0], "total": len(hits), "max": 40,
                 "hits": [{"file": p, "line": i, "text": s} for p, i, s in hits]}
+    if mode == "modules":
+        return {"ok": True,
+                "modules": [{"num": n, "name": t("menu_%d" % n).split("]", 1)[-1].strip()}
+                            for n in sorted(MODULES)]}
     if mode == "new":
         if len(args) < 2:
             return {"ok": False, "error": "new script|dir PATH"}
