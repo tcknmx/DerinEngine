@@ -8,6 +8,14 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[ARAÇ] deep-tool alt-araçları hayata geçti (26.09.2026, `04_tools.md`).** Menüdeki
+  "[yakında]" `new`/`find`/`run` gerçek oldu: **`new`** script şablonu veya dizin üretir
+  (var olana dokunmaz), **`find`** kelime → dosya:satır bulur (salt okunur), **`run`**
+  bilinen script'leri başlatır (`game`/`webpanel`/`tool` veya .py yolu). CLI: `deep-tool
+  find KW [klasor]`, `deep-tool new script yeni.py`, `deep-tool run game`. **Etkilenen:**
+  kod ve oyun davranışı YOK — sadece araç yetenekleri eklendi. Web paneli aynı
+  özellikleri alacak (kullanıcı söylediğinde).
+
 - **[ARAÇ] dead-code modülü yanlış sinyalleri temizlendi (26.09.2026).** `[11] Olu kod`
   ilk sürümü "2 referans" olanları da şüpheli listeliyordu; çıktıda 18 giriş oldu ve
   HEPİSİ aslında kullanılıyordu: `tween.ease_*` → `_EASING` kayıt sözlüğü,

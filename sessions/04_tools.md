@@ -66,6 +66,17 @@
    temizlendi. İlk gerçek bulgu: `levelfile.save_scene_to_path` hiç çağrılmıyordu
    (`save_level`'in geri-uyumluluk takma adı) — kullanıcı onayıyla **silindi**.
    Doğrulama: `deep-tool --lang en all` → 13/13 modül **0 WARN, 0 BUG, 0 ERR**.
+11. **deep-tool alt-araçları gerçekleştirildi: `find` / `new` / `run`** (26.09.2026):
+    artık "[yakında]" değil. (a) **`find`** — anahtar kelime dosya/satır arar
+    (salt okunur; .py/.md/.json/.txt/.html/.js; build/dist/.git hariç; tepe giriş
+    + isteğe bağlı klasör filtresi; CLI: `deep-tool find KW [klasor]`); (b) **`new`** —
+    `script` (standart docstring + main girişli şablon) veya `dir` üretir; var olan
+    yola DOKUNMAZ; CLI: `deep-tool new script tools/x.py`; (c) **`run`** — bilinen
+    script'leri başlatır (`game`=main.py, `webpanel`=127.0.0.1:8765, `tool`=deep-tool)
+    veya keyfi `.py` yolu; CLI: `deep-tool run game`. TR/EN çevirileri eklendi,
+    ölü `main_soon` çeviri anahtarları silindi. Doğrulama: find 25 eşleşme, new
+    şablon+koruma, run subprocess — hepsi OK; `--lang en all` 13/13 modül
+    **0 WARN, 0 BUG, 0 ERR**. Web paneli için SIRADA (kullanıcı söyleyince).
 
 ---
 
@@ -190,7 +201,6 @@ korundu (komutlar game katmanında kayıtlı). Doğrulama: py_compile OK, `impor
 
 ## ARAÇ KALAN (bekleyen araç işleri)
 
-- **`new` / `find` / `run` alt-araçlarını gerçekleştirme** (deep-tool). Yalnız adlandı.
 - **Modül 7 kullanılmayan import WARN temizliği** (`game/*.py`) — manuel, kullanıcı.
 - **tarayıcı interaktif playtest** (kullanıcıya bırakıldı).
 - **web paneli: katıştırılmış oyun sekmesi** (pygbag iframe) — aday.

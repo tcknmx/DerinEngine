@@ -26,9 +26,12 @@ Scan modules (selected from the menu):
   [20] SCAN ALL        : runs all of the above consecutively
 
 Usage:
-  python deep-tool.py                 -> interactive menu: choose language + module
-  python deep-tool.py --lang en all   -> English, all modules (direct)
+  python deep-tool.py                 -> interactive menu: language + main menu
+  python deep-tool.py --lang en all   -> English, all scan modules (direct)
   python deep-tool.py --lang tr 1 4   -> Turkish, modules 1 and 4
+  python deep-tool.py find <kw>       -> locate file/line by keyword (read-only)
+  python deep-tool.py new script <p>  -> generate a script template ('dir' for folders)
+  python deep-tool.py run <target>    -> run a known script ('game'/'webpanel'/'tool' or .py)
 ===============================================================================
 """
 
@@ -40,6 +43,8 @@ import time
 import traceback
 import importlib.util
 import collections
+import io
+import subprocess
 
 # Source directory detection: deep-tool.py may sit in the root directory or under tools/.
 # The DerinEngine root is the directory containing the 'deep_engine/' and 'game/' folders.
@@ -126,7 +131,18 @@ EN = {
     "main_quit": "q       - quit",
     "main_prompt": "Your choice (check / new / find / run / q): ",
     "main_unknown": "Unknown tool, try again.",
-    "main_soon": "[coming soon] '{tool}' is not implemented yet.",
+    "find_prompt": "Keyword to search (empty = back): ",
+    "find_no": "no match for '{kw}'",
+    "find_n": "{n} total matches (showing up to {max}):",
+    "new_type": "Create type (script / dir, empty = back): ",
+    "new_path": "New {kind} path (project-relative or absolute): ",
+    "new_exists": "already exists - nothing created: {p}",
+    "new_created": "created: {p}",
+    "new_script_hint": "script template written to {p}",
+    "run_list": "Available scripts:",
+    "run_which": "Which script (game / webpanel / tool) or a .py path (q = back): ",
+    "run_bad": "not found / unknown: {s}",
+    "run_start": "starting: {cmd}",
     # check (module) menu
     "check_menu_title": "Select scan/check module:",
     "menu_7": "[7] AST / dead-code analysis",
@@ -233,7 +249,18 @@ _TR_DATA = {
     "main_quit": "q       - cikis",
     "main_prompt": "Seciminiz (check / new / find / run / q): ",
     "main_unknown": "Bilinmeyen alt-arac, tekrar deneyin.",
-    "main_soon": "[yakinda] '{tool}' henuz uygulanmadi.",
+    "find_prompt": "Aranacak kelime (bos = geri): ",
+    "find_no": "'{kw}' icin sonuc yok",
+    "find_n": "Toplam {n} eslesme (en fazla {max} gosteriliyor):",
+    "new_type": "Uretim turu (script / dir, bos = geri): ",
+    "new_path": "Yeni {kind} yolu (projeye goreli veya tam yol): ",
+    "new_exists": "zaten var - hicbir sey uretilmedi: {p}",
+    "new_created": "olusturuldu: {p}",
+    "new_script_hint": "script sablonu yazildi: {p}",
+    "run_list": "Calistirilabilir scriptler:",
+    "run_which": "Hangi script (game / webpanel / tool) veya .py yolu (q = geri): ",
+    "run_bad": "bulunamadi / bilinmiyor: {s}",
+    "run_start": "baslatiliyor: {cmd}",
     # check (module) menu
     "check_menu_title": "Tarama/check modulunu secin:",
     "menu_7": "[7] AST / olu-kod analizi",
@@ -1395,6 +1422,150 @@ MODULES = {
 }
 
 
+# ===========================================================================
+#  SUB-TOOLS: FIND / NEW / RUN
+# ===========================================================================
+_SCRIPT_RUN = {
+    "game": ("main.py", "Oyunu baslat (main.py)"),
+    "webpanel": ("tools/webpanel.py", "Tarayici editoru (127.0.0.1:8765)"),
+    "tool": ("tools/deep-tool.py", "deep-tool (bu aracin kendisi)"),
+}
+
+_NEW_SCRIPT = (
+    '"""\n'
+    '  %(name)s - DerinEngine\n'
+    '"""\n'
+    '\n'
+    '\n'
+    'def main():\n'
+    '    """Gecici giris noktasi."""\n'
+    '    pass\n'
+    '\n'
+    '\n'
+    'if __name__ == "__main__":\n'
+    '    main()\n'
+)
+
+_SEARCH_SKIP = ("build", "dist", "__pycache__", ".git", "node_modules")
+
+
+def _search_files(folders=None):
+    """Project text files (.py/.md/.json/.txt/.html/.js), skip build junk."""
+    ext = (".py", ".md", ".json", ".txt", ".html", ".js")
+    roots = [ROOT]
+    if folders:
+        roots = [os.path.join(ROOT, f) for f in folders if f]
+    out = []
+    for root in roots:
+        if not os.path.isdir(root):
+            continue
+        for dp, dns, fns in os.walk(root):
+            dns[:] = [d for d in dns if d not in _SEARCH_SKIP]
+            for fn in fns:
+                if fn.endswith(ext):
+                    p = os.path.join(dp, fn)
+                    if os.path.basename(p) == "deep-tool.py":
+                        continue
+                    out.append(p)
+    return sorted(out)
+
+
+def _do_find(interactive, cli_kw="", cli_folder=""):
+    """find: anahtar kelimeyi dosya/satir satirlarinda ara (salt okunur)."""
+    kw = cli_kw
+    if not kw:
+        try:
+            kw = input(t("find_prompt")).strip()
+        except EOFError:
+            return
+        if not kw or kw.lower() == "q":
+            return
+    hits = []
+    for p in _search_files([cli_folder] if cli_folder else None):
+        src = _read(p)
+        if not src:
+            continue
+        for i, line in enumerate(src.splitlines(), 1):
+            if kw in line:
+                hits.append((_rel(p), i, line.strip()[:80]))
+                if len(hits) >= 40:
+                    break
+        if len(hits) >= 40:
+            break
+    if not hits:
+        print(" " + t("find_no", kw=kw))
+        return
+    print(" " + t("find_n", n=len(hits), max=40))
+    for p, i, line in hits:
+        print("   %s:%d: %s" % (p, i, line))
+
+
+def _do_new(interactive, cli_type="", cli_path=""):
+    """new: script sablonu veya dizin olustur (var olan yola dokunmaz)."""
+    kind = cli_type.strip().lower()
+    if kind not in ("script", "dir"):
+        try:
+            kind = input(t("new_type")).strip().lower()
+        except EOFError:
+            return
+        if kind not in ("script", "dir"):
+            return
+    path = cli_path.strip()
+    if not path:
+        try:
+            path = input(t("new_path", kind=kind)).strip()
+        except EOFError:
+            return
+        if not path:
+            return
+    absp = path if os.path.isabs(path) else os.path.join(ROOT, path)
+    if os.path.exists(absp):
+        print(" " + t("new_exists", p=path))
+        return
+    if kind == "dir":
+        os.makedirs(absp)
+    else:
+        parent = os.path.dirname(absp)
+        if parent and not os.path.isdir(parent):
+            os.makedirs(parent)
+        with io.open(absp, "w", encoding="utf-8", newline="\n") as f:
+            f.write(_NEW_SCRIPT % {"name": os.path.basename(absp)})
+        print(" " + t("new_script_hint", p=path))
+        return
+    print(" " + t("new_created", p=path))
+
+
+def _do_run(interactive, cli_target=""):
+    """run: tanimli bir script'i veya verilen .py yolunu calistir."""
+    target = cli_target
+    if not target:
+        print(" " + t("run_list"))
+        for name, (rel, desc) in sorted(_SCRIPT_RUN.items()):
+            print("   %-9s %-24s %s" % (name, rel, desc))
+        try:
+            target = input(t("run_which")).strip().lower()
+        except EOFError:
+            return
+        if not target or target == "q":
+            return
+    if target in _SCRIPT_RUN:
+        rel = _SCRIPT_RUN[target][0]
+    elif target.endswith(".py"):
+        rel = target
+    else:
+        print(" " + t("run_bad", s=target))
+        return
+    absp = rel if os.path.isabs(rel) else os.path.join(ROOT, rel)
+    if not os.path.isfile(absp):
+        print(" " + t("run_bad", s=target))
+        return
+    print(" " + t("run_start", cmd=_rel(absp)))
+    try:
+        subprocess.call([sys.executable, absp])
+    except Exception as e:
+        print(" " + t("run_bad", s="%s" % e))
+
+
 _MAIN_TOOLS = ("check", "new", "find", "run")
 
 
@@ -1509,6 +1680,21 @@ def main(argv):
         _run_selected(cli_nums)
         return 0
 
+    # ===== SUB-TOOL CLI: find / new / run =====
+    if not cli_nums and args:
+        sub = args[0].lower()
+        if sub in ("find", "new", "run"):
+            _print_banner()
+            arg1 = args[1] if len(args) > 1 else ""
+            arg2 = args[2] if len(args) > 2 else ""
+            if sub == "find":
+                _do_find(False, arg1, arg2)
+            elif sub == "new":
+                _do_new(False, arg1, arg2)
+            else:
+                _do_run(False, arg1)
+            return 0
+
     # ===== INTERACTIVE MODE (language -> main menu -> check) =====
     _print_banner()
     interactive = True
@@ -1537,8 +1723,12 @@ def main(argv):
             quitting = True
         elif tool == "check":
             quitting = _check_menu_loop(interactive, press_enter=True)
-        elif tool in ("new", "find", "run"):
-            print(" " + t("main_soon", tool=tool))
+        elif tool == "find":
+            _do_find(interactive)
+        elif tool == "new":
+            _do_new(interactive)
+        elif tool == "run":
+            _do_run(interactive)
         elif tool == "":
             continue
         else:
