@@ -8,6 +8,11 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[ARAÇ] menü düzeltmesi (26.09.2026).** Check menüsü ekranında `[10]` iki kez
+  çıkıyor, `[20] TÜMÜNÜ TARA` kayıptı: `_check_menu_loop`'ta sabit `print(t("menu_10"))`
+  satırı eski "Scan ALL" için kalmış, modül eklerken güncellenmemişti →
+  `menu_20`'ye çevrildi. Doğrulandı: `[10]` tek, `[20]` mevcut.
+
 - **[ARAÇ] deep-tool'a +4 tarama modülü (10-13) eklendi (26.09.2026, `04_tools.md`).**
   Kullanıcı isteğiyle: **[10] Gizli bilgi taraması** (anahtar/token/şifre + `.env`),
   **[11] Ölü kod** (çağrılmayan üst-seviye def/class'lar), **[12] Karmaşıklık özeti**

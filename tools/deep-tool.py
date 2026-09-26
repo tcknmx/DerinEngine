@@ -1451,7 +1451,7 @@ def _check_menu_loop(interactive, press_enter):
         print(t("check_menu_title"))
         for k in sorted(MODULES):
             print(t("menu_%d" % k))
-        print(t("menu_10"))
+        print(t("menu_20"))
         print(t("menu_b"))
         print(t("menu_q"))
         try:
