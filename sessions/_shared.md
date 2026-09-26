@@ -13,11 +13,12 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
   Oyuncunun ince tek-yön platforma hızlı düşüşte altına gömülmesi MOTOR'da çözüldü:
   `Rigidbody2D.max_fall_velocity=1800` + tek-yön eşiği kalınlık-bilinçli
   (`<= max(4, h+6)`) + derin nüfuzda merkez kuralı. Turret yoğunluğu motor formülüyle
-  seyreldi (`count=randint(1,1+difficulty)`) ve `difficulty<=1`'de mor düşman hiç
-  çıkmıyor (ilk iki sektör sakin; 3. sektörden itibaren var). Etki: sarsıntı/tünel
-  bug'ı giderildi; ilk seviyeler kolaylaştı. Doğrulamalar `02_engine.md` madde 22'de;
-  OYUN tarafı değişkenlik gerekmedi (düşman/FPS hissi aynı kaldı). Özellikle MOTOR
-  oturumları bu fizik/üretici koduna dokunmadan önce o raporu okusun.
+  seyreldi (`count=randint(1,1+difficulty)`) ve mor düşman girişi kademeli: 1. boss
+  öncesi hiç yok, 1. boss sonrası (d2) seyrek (~%40 chunk), 2. boss sonrası (d3+)
+  tam ağırlık. Etki: sarsıntı/tünel bug'ı giderildi; ilk seviyeler sakin, mor düşman
+  yavaşça tanıtılıyor. Doğrulamalar `02_engine.md` madde 22'de; OYUN tarafı
+  değişkenlik gerekmedi. Özellikle MOTOR oturumları bu fizik/üretici koduna
+  dokunmadan önce o raporu okusun.
 
 - **[OYUN + MOTOR + ARAÇ] Oyun içi "custom level" akışı TAMAMEN kaldırıldı (25.09.2026).**
   Kullanıcı: "oyun içi C'yi de kaldır, costum level istemiyorum; oyunda sadece P

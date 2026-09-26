@@ -143,12 +143,12 @@ dokunan kısımlar için `03_game.md`'ye bak.
       dinamik merkez kuralı (`rect1.centery < rect2.centery` → üste çek; altta kalan
       doğal düşer). Oyuncu 1px'lik boşluktan vy 2600 ile inse bile üste oturuyor.
     - `procedural._place_chunk_enemies`: `count = rng.randint(1, 1 + difficulty)`
-      (eski `1..2+difficulty`) ve `difficulty<=1` iken havuzdan Turret çıkarıldı
-      (ilk iki sektörde mor düşman yok; 3. sektörden itibaren gelir).
+      (eski `1..2+difficulty`); mor düşman girişi kademeli (kullanıcı isteği): d<=1
+      yok, d=2 seyrek (~%40 chunk), d>=3 tam ağırlık.
     - Doğrulama: `_sink_repro` A/B/C (vy 2600/1500/300; 1-8px boşluk) → gömülme 0,
-      oyuncu platform üstü (156.0), `is_grounded=True`; üretim ölçümü 25 seed:
-      d0=0.47 düşman/chunk (turret 0), d1=0.71 (turret 0), d2=0.98 (turret ağırlığı
-      korunuyor); kampanya giriş sahnesi 90 kare headless hatasız.
+      oyuncu platform üstü (156.0), `is_grounded=True`; üretim ölçümü 25 seed
+      (kademe): d1=0.71 düşman/chunk turret 0 / d2=0.95 turret 17 / d3=1.18 turret 60
+      / d4=1.49 turret 70; kampanya giriş sahnesi 90 kare headless hatasız.
 
 Doğrulama alışkanlığı (bu oturumda): headless dummy SDL + gerçek Engine kullanılır,
 bozuk dosyalar için `py_compile`, her değişiklikte "oyun X sn çökmeden boot" kontrolü.

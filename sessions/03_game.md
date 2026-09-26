@@ -240,7 +240,8 @@ kalıyordu; şimdi `grounded=False, vy=-283` (bounce).
 **3. Mor düşman (Turret) yoğunluğu + ilk seviye saldırganlığı — ÇÖZÜLDÜ (motor+oyun,
 26.09.2026).** Oyun tarafı (range 460, wake 330, min fire_interval 1.4s/2.0s) +
 MOTOR (`02_engine.md` madde 22): `_place_chunk_enemies` `count = randint(1, 1+difficulty)`
-(eski `1..2+difficulty`) ve `difficulty<=1` iken havuzdan Turret çıkarıldı (ilk iki
-sektörde mor düşman hiç yok; 3. sektörden itibaren gelir). Ölçüm (25 seed, 8 chunk):
-d0 → 0.47 düşman/chunk, turret 0; d1 → 0.71, turret 0; d2 → 0.98, turret ağırlığı
-korunuyor.
+(eski `1..2+difficulty`) ve mor düşman girişi KADEMELİ (kullanıcı isteği, 26.09):
+difficulty<=1 (1. boss öncesi) → hiç yok; difficulty=2 (1. boss sonrası) → chunk'ın
+~%40'ı turret çekebilir (seyrek, yığılmaz); difficulty>=3 (2. boss sonrası) → tam
+ağırlık. Ölçüm (25 seed, 8 chunk): d1 → 0.71 düşman/chunk, turret **0**; d2 → 0.95,
+turret 17; d3 → 1.18, turret 60; d4 → 1.49, turret 70.

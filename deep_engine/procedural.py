@@ -244,10 +244,17 @@ def _push(objects, tag, x, y, w, h, color, **extra):
 
 def _place_chunk_enemies(objects, rng, cx0, cx1, ground_y, b, difficulty=0, safe_max_x=0):
     pool = b["enemy_pool"]
-    # Early biomes stay gentle: the crowd-control Turret (sentry) only appears
-    # from the third sector onward, so the first levels never feel turret-heavy.
+    # Sentries (Turret) are introduced gradually across the campaign:
+    #   - difficulty <= 1 (before the 1st boss):  none at all
+    #   - difficulty   2 (after the 1st boss):    only ~40% of chunks may roll
+    #     a Turret -> they start to trickle in, never stacking
+    #   - difficulty >= 3 (after the 2nd boss):   full weight returns
     if difficulty <= 1:
         pool = [t for t in pool if t != "Turret"]
+    elif difficulty == 2:
+        pool = [t for t in pool if t != "Turret"]
+        if rng.random() < 0.40:
+            pool.append("Turret")
     # More enemies as difficulty rises
     count = rng.randint(1, 1 + difficulty)
     # As difficulty rises, enemies are faster / fire more often
