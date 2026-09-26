@@ -229,26 +229,18 @@ kampanya giriş/boss 60–90 kare `_frame` hatasız); savegame test sonrası tem
 Doğrulama: `_spike_repro` senaryo B → eskiden oyuncu spike topunda grounded
 kalıyordu; şimdi `grounded=False, vy=-283` (bounce).
 
-**2. Yüzeye gömülme (hâlâ) — TEŞHİS EDİLDİ, MOTOR (02) YÖNLENDİRMESİ.** Repro
-(`_sink_repro`) birebir göstermiştir: **tek-yön (one-way) ada platformu** (24px
-kalın) üzerine vy>=1200 ile düşen oyuncu, platformun ALTINA gömülüyor (sıkışıp
-kalıyor). Kök nedenler (ikisi de `deep_engine/scene.py` ve `components.py`):
-  1. `_resolve_solid_collision` tek-yön dalı: `(rect1.bottom - rect2.top) <= 4`
-     eşiği — hızlı inişte nüfuz >4px ise iniş KABUL EDİLMİYOR (yy>240 px/s yeterli!).
-  2. "Stabil zemin" sensörü sadece 2px'lik ayak bandına bakıyor; oyuncu
-     24px platformun tamamen içine gömüldüğünde ayağı alt kenara dayanıyor →
-     yakalamıyor.
-  - `Rigidbody2D` hız sınırı (clamp) yok; gravity 1400 + fall boost 550 → vy
-    2000+ ulaşınca tek karede 24px'i aşan tünel açılıyor (düşük FPS'te daha kolay).
-  ÖNERİ (02): tek-yön eşiğini kalınlık bilinçli yap (örn. `<= max(4, hatch)`) veya
-  düşüşü güvenli aşan substep/swept çözüm; oyuncu hız tavanı da oyun hissini
-  bozmadan konabilir. OYUN tarafı BÜLLEMEDİ (motor saflığı).
+**2. Yüzeye gömülme — ÇÖZÜLDÜ (MOTOR 02, 26.09.2026).** Motor tarafında kapatıldı
+   (bkz. `02_engine.md` madde 22): tek-yön eşiği kalınlığa bilinçli
+   (`<= max(4, rect2.height+6)`), derin nüfuzda merkez kuralı (dinamik merkez platform
+   üst yarısındaysa üste çek), `Rigidbody2D.max_fall_velocity=1800` (tünel açan tek
+   kare adımını engeller; fall boost hissi korunur). Doğrulama: repro A (vy 2600,
+   1px üstten) → oyuncu platform üstü 156.0, grounded, gömülme 0; B (vy 1500) ve
+   C (vy 300) de üste oturdu. Kampanya giriş sahnesi 90 kare headless hatasız.
 
-**3. Mor düşman (Turret) yoğunluğu + ilk seviye saldırganlığı — KISMI ÇÖZÜM (oyun
-23.09.2026).** Agresiflik OYUN tarafında dengelendi: `TurretEnemy` `range` 600→460,
-`wake_radius` 420→330; `_build_turret` kampanya `difficulty<=1` iken ateş aralığını
-en az 2.0s'ye çekti (altyapıda 1.75s), genel minimum 1.4s. Chunk başına düşman
-SAYISI hâlâ motor formülü (`deep_engine/procedural.py`: `1 + randint(0,1+difficulty)`
-≈ ilk biyomda ~1.3 turret/ekran). Yoğunluk hâlâ rahatsız ederse 02'ye opsiyonel
-denge isteği: `count = rng.randint(1, 1 + difficulty)` ve/veya düşük zorlukta
-ağırlıklı havuz (turret nadir). "İlk ekran temiz" ilkesi zaten safe_zone ile korunuyor.
+**3. Mor düşman (Turret) yoğunluğu + ilk seviye saldırganlığı — ÇÖZÜLDÜ (motor+oyun,
+26.09.2026).** Oyun tarafı (range 460, wake 330, min fire_interval 1.4s/2.0s) +
+MOTOR (`02_engine.md` madde 22): `_place_chunk_enemies` `count = randint(1, 1+difficulty)`
+(eski `1..2+difficulty`) ve `difficulty<=1` iken havuzdan Turret çıkarıldı (ilk iki
+sektörde mor düşman hiç yok; 3. sektörden itibaren gelir). Ölçüm (25 seed, 8 chunk):
+d0 → 0.47 düşman/chunk, turret 0; d1 → 0.71, turret 0; d2 → 0.98, turret ağırlığı
+korunuyor.

@@ -8,6 +8,17 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[MOTOR + OYUN] Hata Avı: yüzeye gömülme fix + turret yoğunluğu dengesi (26.09.2026 —_
+   MOTOR 02 (madde 22) + OYUN (rapor 2/3 kapanışı).** Kullanıcının seçtiği dönem işi.
+  Oyuncunun ince tek-yön platforma hızlı düşüşte altına gömülmesi MOTOR'da çözüldü:
+  `Rigidbody2D.max_fall_velocity=1800` + tek-yön eşiği kalınlık-bilinçli
+  (`<= max(4, h+6)`) + derin nüfuzda merkez kuralı. Turret yoğunluğu motor formülüyle
+  seyreldi (`count=randint(1,1+difficulty)`) ve `difficulty<=1`'de mor düşman hiç
+  çıkmıyor (ilk iki sektör sakin; 3. sektörden itibaren var). Etki: sarsıntı/tünel
+  bug'ı giderildi; ilk seviyeler kolaylaştı. Doğrulamalar `02_engine.md` madde 22'de;
+  OYUN tarafı değişkenlik gerekmedi (düşman/FPS hissi aynı kaldı). Özellikle MOTOR
+  oturumları bu fizik/üretici koduna dokunmadan önce o raporu okusun.
+
 - **[OYUN + MOTOR + ARAÇ] Oyun içi "custom level" akışı TAMAMEN kaldırıldı (25.09.2026).**
   Kullanıcı: "oyun içi C'yi de kaldır, costum level istemiyorum; oyunda sadece P
   (kampanya) + 4 (Sonsuz) + T (dil) olacak; editör falan PANELDE kalacak." Yapılanlar:

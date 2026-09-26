@@ -235,10 +235,22 @@ class Scene:
         # It supports the character while landing (moving downward); from below
         # or the sides the character can pass through.
         if getattr(static_col, "one_way", False):
-            if rb.velocity.y >= 0 and (rect1.bottom - rect2.top) <= 4:
-                dyn_obj.position.y = rect2.top - dyn_obj.size.y
-                rb.velocity.y = 0
-                rb.is_grounded = True
+            if rb.velocity.y >= 0:
+                # Snap to the top when the penetration is at most the platform
+                # thickness (plus a small tolerance). A fast fall can sink 20-30px
+                # into a thin 24px board in a single frame; the old fixed <=4px
+                # threshold rejected that landing and let the player sink below it.
+                if (rect1.bottom - rect2.top) <= max(4.0, rect2.height + 6.0):
+                    dyn_obj.position.y = rect2.top - dyn_obj.size.y
+                    rb.velocity.y = 0
+                    rb.is_grounded = True
+                elif rect1.centery < rect2.centery:
+                    # Deep penetration but the dynamic body's center is still in the
+                    # platform's upper half: it hit the top, so snap it up instead of
+                    # letting it tunnel through.
+                    dyn_obj.position.y = rect2.top - dyn_obj.size.y
+                    rb.velocity.y = 0
+                    rb.is_grounded = True
             return
 
         # Compute the overlap amounts

@@ -215,16 +215,24 @@ class BoxCollider(Component):
 
 class Rigidbody2D(Component):
     """Component that adds gravity, velocity and physical movement."""
-    def __init__(self, gravity=980.0, use_gravity=True):
+    def __init__(self, gravity=980.0, use_gravity=True, max_fall_velocity=1800.0):
         super().__init__()
         self.velocity = Vector2(0, 0)
         self.gravity = gravity
         self.use_gravity = use_gravity
         self.is_grounded = False
+        # Ceils fall speed so a single frame cannot tunnel through a thin
+        # one-way platform (24px board) and sink the player below it.
+        self.max_fall_velocity = max_fall_velocity
 
     def update(self, dt: float):
         if self.use_gravity and not self.is_grounded:
             self.velocity.y += self.gravity * dt
+
+        # Harden the fall: keep the "fall boost" feel but never let one frame
+        # move further than the platform thickness (prevents tunneling).
+        if self.velocity.y > self.max_fall_velocity:
+            self.velocity.y = self.max_fall_velocity
 
         # Update position
         self.game_object.position.x += self.velocity.x * dt

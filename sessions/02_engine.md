@@ -133,6 +133,22 @@ dokunan kısımlar için `03_game.md`'ye bak.
     (3 uçlu keskin ucgen + koyu taban + parlak uç çizgisi); üreticide coin-diken tam
     ortaşmada coin `-75` yüksekte (dikenin belirgin üstü), spring-diken <55px çakışan
     diken atlanır.
+22. **Hata Avı: yüzeye gömülme fix + turret yoğunluğu dengesi** (26.09.2026,
+    `03_game.md` AÇIK RAPOR 2+3): 
+    - `components.Rigidbody2D` → `max_fall_velocity=1800.0` (varsayılan); `update`'te
+      `velocity.y` pozitif yönde clamp — gravity+fall boost'un tek karede 24px tünel
+      açmasını engelliyor (piksel havası korunur).
+    - `scene._resolve_solid_collision` tek-yön dalı: nüfuz eşiği kalınlık bilinçli
+      `(rect1.bottom - rect2.top) <= max(4.0, rect2.height + 6.0)`; derin nüfuzda
+      dinamik merkez kuralı (`rect1.centery < rect2.centery` → üste çek; altta kalan
+      doğal düşer). Oyuncu 1px'lik boşluktan vy 2600 ile inse bile üste oturuyor.
+    - `procedural._place_chunk_enemies`: `count = rng.randint(1, 1 + difficulty)`
+      (eski `1..2+difficulty`) ve `difficulty<=1` iken havuzdan Turret çıkarıldı
+      (ilk iki sektörde mor düşman yok; 3. sektörden itibaren gelir).
+    - Doğrulama: `_sink_repro` A/B/C (vy 2600/1500/300; 1-8px boşluk) → gömülme 0,
+      oyuncu platform üstü (156.0), `is_grounded=True`; üretim ölçümü 25 seed:
+      d0=0.47 düşman/chunk (turret 0), d1=0.71 (turret 0), d2=0.98 (turret ağırlığı
+      korunuyor); kampanya giriş sahnesi 90 kare headless hatasız.
 
 Doğrulama alışkanlığı (bu oturumda): headless dummy SDL + gerçek Engine kullanılır,
 bozuk dosyalar için `py_compile`, her değişiklikte "oyun X sn çökmeden boot" kontrolü.

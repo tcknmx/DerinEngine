@@ -244,8 +244,12 @@ def _push(objects, tag, x, y, w, h, color, **extra):
 
 def _place_chunk_enemies(objects, rng, cx0, cx1, ground_y, b, difficulty=0, safe_max_x=0):
     pool = b["enemy_pool"]
+    # Early biomes stay gentle: the crowd-control Turret (sentry) only appears
+    # from the third sector onward, so the first levels never feel turret-heavy.
+    if difficulty <= 1:
+        pool = [t for t in pool if t != "Turret"]
     # More enemies as difficulty rises
-    count = rng.randint(1, 2 + difficulty)
+    count = rng.randint(1, 1 + difficulty)
     # As difficulty rises, enemies are faster / fire more often
     speed_bonus = difficulty * 25.0
     fire_penalty = max(0.5, 2.0 - difficulty * 0.25)
