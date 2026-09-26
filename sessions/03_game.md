@@ -245,3 +245,9 @@ difficulty<=1 (1. boss öncesi) → hiç yok; difficulty=2 (1. boss sonrası) �
 ~%40'ı turret çekebilir (seyrek, yığılmaz); difficulty>=3 (2. boss sonrası) → tam
 ağırlık. Ölçüm (25 seed, 8 chunk): d1 → 0.71 düşman/chunk, turret **0**; d2 → 0.95,
 turret 17; d3 → 1.18, turret 60; d4 → 1.49, turret 70.
+
+**14. Güvenli temizlik — oyun tarafı** (26.09.2026): `entities.py` (4), `scenes.py` (2),
+`ui.py` (2) içindeki bilinçli `except...: pass` fallback'lerine `# noqa: bilinçli`
+etiketi kondu (davranış değişmedi; sadece "bilinçli" koddan okunur oldu). entities.py
+(1457 satır) bölünmedi — kullanıcı kararı (risk yüksek, satır-fayda oturum değeri
+düşük). Diğer ayrıntı: TAMAMLANAN 14'e ek; ayrıca `_shared.md` SON GELİŞMELER.

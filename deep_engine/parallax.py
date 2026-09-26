@@ -109,7 +109,6 @@ class ParallaxBackground:
         """Draws cosmic elements (ringed planet, nebula clouds, bright star clusters)
         on the astro background. They scroll very slowly with the camera;
         positions are deterministic."""
-        import math as _m
         w, h = surface.get_width(), surface.get_height()
         # Very slow scroll (deep-space feel): speed ~0.02
         sx = -int(camera_offset.x * 0.02)

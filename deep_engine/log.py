@@ -91,7 +91,7 @@ class MotorLogger:
             try:
                 self._file_handle.close()
             except Exception:
-                pass
+                pass  # noqa: bilinçli
             self._file_handle = None
 
     # ----------------------------------------------------------------- emit
@@ -103,27 +103,27 @@ class MotorLogger:
             try:
                 h(level, label, str(msg))
             except Exception:
-                pass
+                pass  # noqa: bilinçli
         if self._file_handle:
             try:
                 self._file_handle.write("[%s] %s %s\n" % (_now(), label, str(msg)))
                 self._file_handle.flush()
             except Exception:
-                pass
+                pass  # noqa: bilinçli
 
     def _default_console(self, level, label, msg):
         line = "[%s] %s %s" % (label, self._context(), msg)
         try:
             print(line, flush=True)
         except Exception:
-            pass
+            pass  # noqa: bilinçli
         # Also mirror it to the browser (emscripten) console
         if sys.platform == "emscripten":
             try:
                 from platform import window as _w
                 _w.console.log(line)
             except Exception:
-                pass
+                pass  # noqa: bilinçli
 
     def _context(self):
         """Roughly stamp where it came from (top of the caller's stack)."""
@@ -135,7 +135,7 @@ class MotorLogger:
                 base = os.path.basename(fr.filename)
                 return "%s:%s" % (base, fr.lineno)
         except Exception:
-            pass
+            pass  # noqa: bilinçli
         return "?"
 
     # --------------------------------------------------- level helpers

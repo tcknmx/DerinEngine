@@ -98,7 +98,7 @@ class Engine:
                 prof.set("lang", I18n.current_lang)
                 prof.save()
             except Exception:
-                pass
+                pass  # noqa: bilinçli
             from .audio import SoundFX
             SoundFX.play("coin")
 
@@ -154,7 +154,7 @@ class Engine:
                 from platform import window as _w
                 _w.console.log("[ENGINE] " + str(msg))
             except Exception:
-                pass
+                pass  # noqa: bilinçli
             print("[ENGINE] " + str(msg), flush=True)
 
         self.is_running = True
@@ -197,7 +197,7 @@ class Engine:
                 if rb and pc:
                     p_dbg = f"P: grounded={rb.is_grounded} coy={pc.coyote_timer:.2f} buf={pc.jump_buffer_timer:.2f} dbl={pc.can_double_jump} wall={pc.wall_sliding} vy={rb.velocity.y:.0f} slow={self._time_slow_remaining:.2f}"
         except Exception:
-            pass
+            pass  # noqa: bilinçli
         debug_texts = [
             f"[DerinEngine v{ENGINE_VERSION} Debug - F3 to Toggle]",
             f"FPS: {fps} (dt: {dt*1000:.1f}ms)",

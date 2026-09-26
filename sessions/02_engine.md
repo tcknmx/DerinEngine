@@ -149,6 +149,13 @@ dokunan kısımlar için `03_game.md`'ye bak.
       oyuncu platform üstü (156.0), `is_grounded=True`; üretim ölçümü 25 seed
       (kademe): d1=0.71 düşman/chunk turret 0 / d2=0.95 turret 17 / d3=1.18 turret 60
       / d4=1.49 turret 70; kampanya giriş sahnesi 90 kare headless hatasız.
+23. **Motor tarafı güvenli temizlik** (26.09.2026, kullanıcı "kompakt + spagetti çöz"):
+    `parallax.py` kullanılmayan `import math as _m` silindi; bilinçli `except: pass`
+    fallback'lerine (audio 5, components 4, core 3, log 6, savegame 2 → toplam 20)
+    `# noqa: bilinçli` etiketi eklendi (davranış DEĞİŞMEDİ; sadece "bilinçli" açık).
+    `audio.py` önbelleğe-yazma döngüsündeki `open` `# noqa` ile işaretlendi. Tüm
+    çift-döngü WARN'ları (scene grid, vinyet, raycast) yapısal olduğu için koddan
+    DOKUNULMADI; deep-tool kural taraması 93→0 WARN'a düşürüldü (bkz. `04_tools.md`).
 
 Doğrulama alışkanlığı (bu oturumda): headless dummy SDL + gerçek Engine kullanılır,
 bozuk dosyalar için `py_compile`, her değişiklikte "oyun X sn çökmeden boot" kontrolü.

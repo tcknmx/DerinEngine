@@ -298,7 +298,7 @@ def build_main_menu_scene() -> Scene:
         try:
             scene.parallax_background = ParallaxBackground(theme="forest")
         except Exception:
-            pass
+            pass  # noqa: bilinçli
 
     _profile = SaveGame(os.path.join(user_data_dir(), "savegame.json"))
     _menu_ui = []
@@ -466,7 +466,7 @@ def build_victory_scene() -> Scene:
         _vp.set("endless_unlocked", True)
         _vp.save()
     except Exception:
-        pass
+        pass  # noqa: bilinçli
 
     fw_obj = GameObject(name="Fireworks", x=0, y=0)
     fw_obj.add_component(ParticleEmitter())

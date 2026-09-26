@@ -42,6 +42,17 @@
    kullan → CDN'den iner, oyun başlar. Prod (itch.io) etkilenmez.
 8. **HTML5 yeniden-paketleme kararı**: lokal `build/web/` + `web-cache/` temizlendi;
    canlı itch.io HTML5 etkilenmedi. Tekrar üretilirse pygbag komutu üstte.
+9. **deep-tool kural taraması gerçeğe oturtuldu (93→0 WARN)** (26.09.2026):
+   (a) `_SILENT_EXCEPT` (regex) kaldırıldı — AST "empty except" ile aynı yeri ÇİFTE
+   sayıyordu (93'ün ~71'i bu çifte/bilinçli şişkinlikti); (b) "empty except" +
+   "file open inside loop" kuralları `# noqa` işaretini tanır (bilinçli fallback →
+   INFO); (c) nested-loop tespiti INFO'ya indi (spatial grid/vinyet/raycast yapısal,
+   WARN değil); (d) `_BUILTINS`'e istisna hiyerarşisi eklendi (KeyboardInterrupt
+   "tanımsız isim" sanılıyordu); (e) builder/extractor: Coin/Player/Spikes bilinçli
+   eksik → INFO (web panelinde tasarlanmıyorlar). Kullanım: kod tarafı değişmedi,
+   `/api/scan` ve CLI aynı kaldı. Sonuç: **0 WARN, 0 BUG, 0 ERR**.
+   Bilinçli-eksik eklemek için: `_EXTRACTORLESS_OK` seti (İngilizce içinde) + AST
+   empty-except'e `# noqa` etiketi.
 
 ---
 

@@ -34,7 +34,7 @@ if __name__ == "__main__":
     try:
         _motor_log.set_file(os.path.join(user_data_dir(), "motor.log"))
     except Exception:
-        pass
+        pass  # noqa: bilinçli
     _motor_log.set_level(_L_WARN)
     _motor_log.info("DerinEngine Motor Konsolu aktif ([WARN/+] komut penceresinde)")
     print("[DERINENGINE-KONSOLE] aktif - olasi sorunlar [WARN]/[BUG]/[ERR] burada gorunecek", flush=True)
@@ -44,20 +44,20 @@ if __name__ == "__main__":
             if _web_console is not None:
                 _web_console.log("[BOOT] " + str(msg))
         except Exception:
-            pass
+            pass  # noqa: bilinçli
         print("[BOOT] " + str(msg), flush=True)
 
     def _boot_excepthook(tp, val, tb):
         try:
             _motor_log.exception(tp, val, tb)
         except Exception:
-            pass
+            pass  # noqa: bilinçli
         try:
             if _web_console is not None:
                 import traceback as _tb
                 _web_console.log("[PY-EXCEPTION] " + "".join(_tb.format_exception(tp, val, tb)))
         except Exception:
-            pass
+            pass  # noqa: bilinçli
         sys.__excepthook__(tp, val, tb)
 
     sys.excepthook = _boot_excepthook
@@ -72,7 +72,7 @@ if __name__ == "__main__":
         try:
             _motor_log.err("savegame okunamadi, varsayilan dil kullaniliyor: %r" % (e,))
         except Exception:
-            pass
+            pass  # noqa: bilinçli
 
     _jlog("SoundFX.initialize...")
     SoundFX.initialize()

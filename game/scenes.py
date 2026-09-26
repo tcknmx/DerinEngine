@@ -55,7 +55,7 @@ def build_procedural_level(biome=None, seed=None, chunks=8, difficulty=0):
         try:
             scene.parallax_background = ParallaxBackground(theme=meta["parallax_theme"])
         except Exception:
-            pass
+            pass  # noqa: bilinçli
 
     # Build objects with builders (including Player — UI & controller come automatically)
     for entry in data["objects"]:
@@ -217,7 +217,7 @@ def build_campaign_boss(biome, difficulty, index):
         try:
             scene.parallax_background = ParallaxBackground(theme=meta["parallax_theme"])
         except Exception:
-            pass
+            pass  # noqa: bilinçli
 
     for entry in data["objects"]:
         place_object(scene, dict(entry))

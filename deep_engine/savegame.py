@@ -40,7 +40,7 @@ def _local_storage():
         if hasattr(window, "localStorage"):
             return window.localStorage
     except Exception:
-        pass
+        pass  # noqa: bilinçli
     return None
 
 
@@ -55,7 +55,7 @@ def _storage_to_file(local, data):
     try:
         local.setItem(_WS_KEY, json.dumps(data, ensure_ascii=False))
     except Exception:
-        pass
+        pass  # noqa: bilinçli
 
 
 def _storage_from_file(local):

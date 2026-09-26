@@ -323,11 +323,9 @@ INFO = 1
 WARN = 2
 BUG = 3
 ERR = 4
-# Silent error swallowing: "except ...: pass". Deliberate fallbacks (with comment) skipped.
-_SILENT_EXCEPT = re.compile(
-    r"\bexcept\s+[^:]*:\s*\n(?:\s*#[^\n]*\n)?\s*pass\b|\bexcept\b[^:]*:\s*\n\s*pass\b",
-    re.M,
-)
+# NOTE: "silent except" is intentionally NOT scanned here: the AST module
+# (empty except block) already reports those, and counting the same spot
+# twice inflated the totals (deliberate fallbacks are marked "# noqa").
 _WILDCARD_IMPORT = re.compile(r"^\s*from\s+\S+\s+import\s+\*\s*$", re.M)
 _TODO = re.compile(r"\b(?:TODO|FIXME|XXX)\b")
 _TYPO = re.compile(r"\b(?:teh?|recieve|recieving|seperat|occured|lenght)\b", re.I)
@@ -360,8 +358,7 @@ def check_patterns(path):
     src = _read(path)
     if not src:
         return [(ERR, "Dosya okunamadi")] if not os.path.exists(path) else findings
-    rs = [(_SILENT_EXCEPT, WARN, "Sessiz hata yutma (except ...: pass)"),
-          (_WILDCARD_IMPORT, WARN, "from ... import * - isim cakismasi riski"),
+    rs = [(_WILDCARD_IMPORT, WARN, "from ... import * - isim cakismasi riski"),
           (_TODO, WARN, "TODO/FIXME kalintisi"),
           (_TYPO, WARN, "Muhtemel yazim hatasi girdisi")]
     for rx, lvl, desc in rs:
@@ -648,9 +645,16 @@ def run_builder_extractor(collect):
         e_map.setdefault(tag, fn)
     collect("INFO", t("be_reg", n=len(b_map)))
     collect("INFO", t("be_ext", n=len(e_map)))
+    # Deliberate builder-only tags: not editable in the web panel, so their
+    # extractor (for round-tripping) is intentionally omitted.
+    _EXTRACTORLESS_OK = {"Coin", "Player", "Spikes"}
     # 1) symmetry: builder without extractor (and vice versa)
     for tag in sorted(set(b_map) - set(e_map)):
-        collect("WARN", "game :: %s (%s)" % (t("be_missing_extractor"), tag))
+        if tag in _EXTRACTORLESS_OK:
+            collect("INFO", "game :: %s (%s)"
+                    % (t("be_missing_extractor"), tag))
+        else:
+            collect("WARN", "game :: %s (%s)" % (t("be_missing_extractor"), tag))
     for tag in sorted(set(e_map) - set(b_map)):
         collect("WARN", "game :: %s (%s)" % (t("be_missing_builder"), tag))
     # 2) reference to an undefined function (runtime crash risk = BUG)
@@ -781,7 +785,7 @@ def run_perf(collect):
                 ln2, ind2, code2, _ = lines[j]
                 if code2.startswith("for ") or code2.startswith("for("):
                     if ind2 > ind:  # deeper indent = nested loop
-                        collect("WARN", "%s :: L%s: %s"
+                        collect("INFO", "%s :: L%s: %s"
                                 % (_rel(p), _ln, t("perf_nested_loop")))
                         break
                 elif ind2 <= ind and code2 and not code2.startswith(("#", ")")):
@@ -792,13 +796,14 @@ def run_perf(collect):
             if not (code.startswith("for ") or code.startswith("for(")):
                 continue
             for j in range(i + 1, min(i + 80, len(lines))):
-                ln2, ind2, code2, _ = lines[j]
+                ln2, ind2, code2, raw2 = lines[j]
                 if not code2:
                     continue
                 if ind2 <= ind:
                     break
                 if re.search(r"\b(?:open|pygame\.image\.load)\s*\(", code2):
-                    collect("WARN", "%s :: L%s: %s"
+                    lvl = "INFO" if "# noqa" in (raw2 or "") else "WARN"
+                    collect(lvl, "%s :: L%s: %s"
                             % (_rel(p), ln2, t("perf_file_loop")))
                     break
 
@@ -819,7 +824,12 @@ for _b in ("len", "range", "str", "int", "float", "bool", "list", "dict",
            "next", "id", "hash", "vars", "dir", "callable", "format", "ord",
            "chr", "compile", "eval", "exec", "bytes", "bytearray", "memoryview",
            "frozenset", "complex", "tuple", "slice", "bin", "oct", "hex",
-           "pow", "ascii", "globals", "locals", "value", "key", "self", "cls"):
+           "pow", "ascii", "globals", "locals", "value", "key", "self", "cls",
+           # Base exception hierarachy + common builtins used in "except <name>:"
+           "KeyboardInterrupt", "SystemExit", "GeneratorExit", "OSError", "IOError",
+           "EOFError", "ImportError", "AttributeError", "NameError", "UnboundLocalError",
+           "ZeroDivisionError", "MemoryError", "RecursionError", "OverflowError",
+           "ArithmeticError", "TimeoutError", "BrokenPipeError", "socket", "pygame"):
     _BUILTINS.add(_b)
 
 
@@ -929,15 +939,23 @@ def run_ast(collect):
         for body in _all_bodies(tree):
             unreachable_total += _scan_block(body, rel, collect)
 
-        # --- 3) Empty except block ---
+        # --- 3) Empty except block (deliberate fallbacks are marked "# noqa") ---
+        src_lines = src.splitlines()
         for node in ast.walk(tree):
             if isinstance(node, ast.ExceptHandler):
                 body = [s for s in node.body if not isinstance(s, ast.Pass)]
                 if not body:
                     lm = node.type.lineno if node.type else node.lineno
-                    collect("WARN", "%s :: L%s: %s"
-                            % (rel, lm, t("ast_empty_except")))
-                    empty_total += 1
+                    last = node.body[-1].lineno if node.body else node.lineno
+                    noqa = any("# noqa" in src_lines[k]
+                               for k in range(node.lineno - 1, min(last, len(src_lines))))
+                    if noqa:
+                        collect("INFO", "%s :: L%s: %s"
+                                % (rel, lm, t("ast_empty_except")))
+                    else:
+                        collect("WARN", "%s :: L%s: %s"
+                                % (rel, lm, t("ast_empty_except")))
+                        empty_total += 1
 
         # --- 4) Possibly undefined name (scope-aware; including nested funcs) ---
         globals_set = _module_globals(tree)

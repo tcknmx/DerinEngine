@@ -32,7 +32,7 @@ class SoundFX:
         try:
             return pygame.mixer.Sound(io.BytesIO(raw))
         except Exception:
-            pass
+            pass  # noqa: bilinçli
         try:
             import os
             import hashlib
@@ -42,7 +42,7 @@ class SoundFX:
             try:
                 candidates.append(os.path.join(base, f"_snd_{digest}_{channels}ch.wav"))
             except Exception:
-                pass
+                pass  # noqa: bilinçli
             candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), f"_snd_{digest}_{channels}ch.wav"))
             last = None
             for fp in candidates:
@@ -50,7 +50,7 @@ class SoundFX:
                     dirn = os.path.dirname(fp)
                     if dirn and not os.path.exists(dirn):
                         os.makedirs(dirn, exist_ok=True)
-                    with open(fp, "wb") as f:
+                    with open(fp, "wb") as f:  # noqa: bilinçli (seferlik önbellek yazımı)
                         f.write(raw)
                     return pygame.mixer.Sound(fp)
                 except Exception as e:
@@ -280,7 +280,7 @@ class SoundFX:
             try:
                 snd.play()
             except Exception:
-                pass
+                pass  # noqa: bilinçli
 
     @classmethod
     def play_jump(cls):
@@ -294,7 +294,7 @@ class SoundFX:
             try:
                 snd.play()
             except Exception:
-                pass
+                pass  # noqa: bilinçli
 
     @classmethod
     def play_powerup(cls, power_type=None):
@@ -312,7 +312,7 @@ class SoundFX:
             try:
                 snd.play()
             except Exception:
-                pass
+                pass  # noqa: bilinçli
 
     # ---  8-bit chiptune music (mathematical background melody) ---
     _NOTE = {

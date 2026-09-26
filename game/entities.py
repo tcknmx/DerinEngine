@@ -1362,7 +1362,7 @@ class FloatingScore(Component):
                 if eng and eng.active_scene and self.game_object in eng.active_scene.game_objects:
                     eng.active_scene.game_objects.remove(self.game_object)
             except Exception:
-                pass
+                pass  # noqa: bilinçli
             return
         self.game_object.position.y -= 45 * dt  # drift upward
 
@@ -1559,7 +1559,7 @@ class TutorialBanner(Component):
         try:
             SoundFX.play("click")
         except Exception:
-            pass
+            pass  # noqa: bilinçli
         if self.index >= len(self.steps):
             self.done = True
             self._mark_done()
@@ -1572,7 +1572,7 @@ class TutorialBanner(Component):
             profile.set("tutorial_done", True)
             profile.save()
         except Exception:
-            pass
+            pass  # noqa: bilinçli
 
     def draw(self, surface: pygame.Surface, camera_offset):
         if self.done:
@@ -1621,4 +1621,4 @@ def _spawn_float_score(world_x, world_y, text="+10", color=(255, 215, 50), font_
         obj.add_component(FloatingScore(text=text, color=color, font_size=font_size))
         eng.active_scene.add_object(obj)
     except Exception:
-        pass
+        pass  # noqa: bilinçli

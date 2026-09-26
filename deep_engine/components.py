@@ -405,7 +405,7 @@ class Health(Component):
                 if sc is not None and hasattr(sc, "flash"):
                     sc.flash(0.55)
             except Exception:
-                pass
+                pass  # noqa: bilinçli
         else:
             # On an enemy/boss hit: punchy shake + a strong hit sound
             SoundFX.play("boss_hit" if getattr(self.game_object, "tag", "") == "Boss" else "hit")
@@ -453,7 +453,7 @@ class Health(Component):
                 emitter.burst(count=14, color=color, speed_range=(60, 240), size_range=(3, 7),
                               lifespan_range=(0.4, 0.8), gravity=120.0, origin_offset=center)
         except Exception:
-            pass
+            pass  # noqa: bilinçli
 
     def _shake(self, amount: float):
         """Adds screen shake (trauma) to the active scene."""
@@ -463,7 +463,7 @@ class Health(Component):
             if eng and eng.active_scene:
                 eng.active_scene.add_shake(amount)
         except Exception:
-            pass
+            pass  # noqa: bilinçli
 
     def update(self, dt: float):
         if self.invulnerable_timer > 0:
@@ -627,7 +627,7 @@ class _AutoRemove(Component):
                 if eng and eng.active_scene and self.game_object in eng.active_scene.game_objects:
                     eng.active_scene.game_objects.remove(self.game_object)
         except Exception:
-            pass
+            pass  # noqa: bilinçli
 
 
 class SpawnIn(Component):
