@@ -8,6 +8,16 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[ARAÇ] deep-tool'a +4 tarama modülü (10-13) eklendi (26.09.2026, `04_tools.md`).**
+  Kullanıcı isteğiyle: **[10] Gizli bilgi taraması** (anahtar/token/şifre + `.env`),
+  **[11] Ölü kod** (çağrılmayan üst-seviye def/class'lar), **[12] Karmaşıklık özeti**
+  (en büyük dosya/yapılar), **[13] Çökme trendi** (motor.log tekrar eden traceback'ler).
+  Menü **20 = TÜMÜNÜ TARA** oldu; eski/etkisiz `menu_7 "Scan ALL"` kopyaları silindi.
+  İlk gerçek bulgu: `levelfile.save_scene_to_path` (2 satırlık geri-uyumluluk takma adı)
+  hiç çağrılmıyordu → kullanıcı onayıyla **silindi** (`save_level` geçerli tek API).
+  Doğrulama: `deep-tool --lang en all` → **13/13 modül 0 WARN, 0 BUG, 0 ERR**.
+  **Etkilenen:** hiçbir oyun/motor davranışı; sadece araç + ölü motor fonksiyonu.
+
 - **[ARAÇ] deep-tool olgunlaştırıldı: 93 WARN → 0 (26.09.2026, `04_tools.md`).** Kod
   tarafı DOKUNULMADAN sadece kural taraması gerçeğe oturtuldu: (a) `_SILENT_EXCEPT`
   (regex) kaldırıldı — AST "empty except" ile ÇİFTE sayıyordu; (b) "empty except" +

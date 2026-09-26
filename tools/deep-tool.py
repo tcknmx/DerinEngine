@@ -16,7 +16,14 @@ Scan modules (selected from the menu):
                          config) present on disk
   [6] PERFORMANCE      : O(n^2) double loops, in-loop asset loading and other
                          costly-pattern warnings
-  [7] SCAN ALL         : runs all of the above consecutively
+  [7] AST / DEAD-CODE : AST-based scan (unreachable/unused, dead literals)
+  [8] ENGINE PURITY    : deep_engine -> game leak (forbidden imports)
+  [9] REGRESSION       : seed determinism / data / WARN trend
+  [10] SECRET SCAN     : credentials / api keys / tokens / .env
+  [11] DEAD CODE       : top-level functions/classes defined but never called
+  [12] COMPLEXITY      : biggest files and longest structures (cleanup compass)
+  [13] CRASH TREND     : recurring traceback functions in motor.log
+  [20] SCAN ALL        : runs all of the above consecutively
 
 Usage:
   python deep-tool.py                 -> interactive menu: choose language + module
@@ -32,6 +39,7 @@ import ast
 import time
 import traceback
 import importlib.util
+import collections
 
 # Source directory detection: deep-tool.py may sit in the root directory or under tools/.
 # The DerinEngine root is the directory containing the 'deep_engine/' and 'game/' folders.
@@ -63,7 +71,6 @@ EN = {
     "menu_4": "[4] i18n key check (tr/en parity)",
     "menu_5": "[5] Asset/media existence",
     "menu_6": "[6] Performance / costly patterns",
-    "menu_7": "[7] Scan ALL",
     "menu_q": "[Q] Quit",
     "menu_prompt": "Your choice (comma-separated, e.g. 1,4 or 7): ",
     "invalid": "Invalid choice, try again.",
@@ -125,7 +132,11 @@ EN = {
     "menu_7": "[7] AST / dead-code analysis",
     "menu_8": "[8] Engine purity (deep_engine -> game leak)",
     "menu_9": "[9] Regression (seed determinism / data / WARN trend)",
-    "menu_10": "[10] Scan ALL",
+    "menu_10": "[10] Secret scan (keys / tokens / credentials)",
+    "menu_11": "[11] Dead code (defined but never called)",
+    "menu_12": "[12] Complexity snapshot (biggest files / functions)",
+    "menu_13": "[13] Crash trend (motor.log)",
+    "menu_20": "[20] Scan ALL",
     "menu_b": "[b] Back to main menu",
     "menu_prompt": "Your choice (comma-separated, e.g. 1,4 / 10 / b / q): ",
     "tbc": "[coming soon] module {n} is a placeholder, not implemented yet.",
@@ -167,7 +178,6 @@ _TR_DATA = {
     "menu_4": "[4] i18n anahtar denetimi (tr/en parity)",
     "menu_5": "[5] Asset/medya varlık kontrolü",
     "menu_6": "[6] Performans / maliyetli kalıplar",
-    "menu_7": "[7] HEPSINI TARA",
     "menu_q": "[Q] Cikis",
     "menu_prompt": "Seciminiz (virgulle ayirin, or. 1,4 veya 7): ",
     "invalid": "Gecersiz secim, tekrar deneyin.",
@@ -229,7 +239,11 @@ _TR_DATA = {
     "menu_7": "[7] AST / olu-kod analizi",
     "menu_8": "[8] Motor safligi (deep_engine -> game sizintisi)",
     "menu_9": "[9] Regression (seed determinizm / veri / WARN trendi)",
-    "menu_10": "[10] TUMUNU TARA",
+    "menu_10": "[10] Gizli bilgi taramasi (anahtar/token/sifre)",
+    "menu_11": "[11] Olu kod (tanimli ama cagrilmayan)",
+    "menu_12": "[12] Karmasiklik ozeti (en buyuk dosya/fonksiyon)",
+    "menu_13": "[13] Cokme trendi (motor.log)",
+    "menu_20": "[20] TUMUNU TARA",
     "menu_b": "[b] Ana menuye geri don",
     "menu_prompt": "Seciminiz (virgullu, orn. 1,4 / 10 / b / q): ",
     "tbc": "[yakinda] {n} numarali modul yer tutucu, henuz uygulanmadi.",
@@ -1196,6 +1210,120 @@ def run_regression(collect):
 
 
 # ===========================================================================
+#  MODULES 10-13: SECRET / DEAD CODE / COMPLEXITY / CRASH TREND
+# ===========================================================================
+_SECRET_VALUE = re.compile(
+    r"(?i)\b(?:api[_-]?key|api[_-]?secret|secret|passwd|password|auth[_-]?token)"
+    r"\s*[=:]\s*[\"'][^\"']{6,}[\"']"
+)
+_SECRET_TOKEN = re.compile(
+    r"ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|ghu_[A-Za-z0-9]{20,}|"
+    r"xox[baprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|"
+    r"sk-(?:live|test)-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{35}|"
+    r"-----BEGIN [A-Z ]*PRIVATE KEY-----|"
+    r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{5,}"
+)
+
+
+def run_secrets(collect):
+    """[10] Sifre/anahtar/token gibi gizli bilgi desenlerini tara."""
+    hits = 0
+    for p in _py_project_files():
+        src = _read(p)
+        if not src:
+            continue
+        for rx, desc in ((_SECRET_VALUE, "literal deger atanmis"),
+                         (_SECRET_TOKEN, "gercek token/anahtar formati")):
+            for m in rx.finditer(src):
+                ln = src[: m.start()].count("\n") + 1
+                snip = " ".join(m.group(0).split())[:60]
+                collect("WARN", "%s :: L%d Gizli bilgi olabilir (%s): %s"
+                        % (_rel(p), ln, desc, snip))
+                hits += 1
+    if os.path.isfile(os.path.join(ROOT, ".env")):
+        collect("WARN", ".env dosyasi diskte bulundu - repo disinda tut (gitignore).")
+        hits += 1
+    if not hits:
+        collect("INFO", "Sifre/anahtar/token deseni bulunamadi (temiz).")
+
+
+def run_deadcode(collect):
+    """[11] Tanimli ama hic cagrilmayan (ust-seviye) fonksiyon/class adaylari."""
+    files = [p for p in _py_project_files() if os.path.isfile(p)]
+    allsrc = "\n".join(_read(p) or "" for p in files)
+    seen = set()
+    cands = []
+    for p in files:
+        src = _read(p)
+        if not src:
+            continue
+        for m in re.finditer(r"^(?:def|class)\s+(\w+)", src, re.M):
+            name = m.group(1)
+            if name.startswith("_") or name in seen:
+                continue
+            seen.add(name)
+            refs = len(re.findall(r"\b%s\b" % re.escape(name), allsrc))
+            if 0 < refs <= 2:
+                cands.append((refs, _rel(p), src[: m.start()].count("\n") + 1, m.group(0)))
+    if not cands:
+        collect("INFO", "Tum ust-seviye fonksiyon/class'lara kodda basvuruluyor (olu aday yok).")
+        return
+    for refs, path, lnum, decl in sorted(cands):
+        note = "hic baska referans yok (kesin aday)" if refs == 1 \
+            else "az referans (kontrol edilmeli)"
+        collect("INFO", "%s :: %s (L%d) - %d referans, %s"
+                % (path, decl, lnum, refs, note))
+
+
+def run_complexity(collect):
+    """[12] En buyuk dosyalar + en uzun yapilar (temizlik pusulasi)."""
+    sizes = []
+    structs = []
+    for p in _py_project_files():
+        src = _read(p)
+        if not src:
+            continue
+        lines = src.splitlines()
+        sizes.append((len(lines), _rel(p)))
+        decls = [(m.start(), m.group(0)) for m in
+                 re.finditer(r"^(?:def|class)\s+\w+", src, re.M)]
+        for i, (start, decl) in enumerate(decls):
+            nxt = len(lines)
+            if i + 1 < len(decls):
+                nxt = src[: decls[i + 1][0]].count("\n") + 1
+            structs.append((nxt - src[: start].count("\n"), _rel(p),
+                            src[: start].count("\n") + 1, decl))
+    collect("INFO", "En buyuk 5 dosya (satir):")
+    for n, path in sorted(sizes, reverse=True)[:5]:
+        collect("INFO", "  %-4d %s" % (n, path))
+    collect("INFO", "En uzun 5 yapi (satir):")
+    for n, path, lnum, decl in sorted(structs, reverse=True)[:5]:
+        collect("INFO", "  %-4d %s :: %s (L%d)" % (n, path, decl, lnum))
+
+
+def run_crashtrend(collect):
+    """[13] motor.log'daki tekrar eden traceback fonksiyon sayilari."""
+    path = os.path.join(ROOT, "motor.log")
+    if not os.path.isfile(path):
+        collect("INFO", "motor.log yok - cokme trendi raporlanamadi.")
+        return
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            txt = f.read()
+    except Exception as e:
+        collect("WARN", "motor.log okunamadi: %s" % e)
+        return
+    frames = re.findall(r'File "([^"]+)", line \d+, in (\w+)', txt)
+    if not frames:
+        collect("INFO", "motor.log'da traceback satiri yok (kayitli cokme bulunmadi).")
+        return
+    cnt = collections.Counter("%s::%s" % (os.path.basename(f), fn) for f, fn in frames)
+    for key, n in cnt.most_common(8):
+        collect("INFO", "  %3dx  %s" % (n, key))
+    collect("INFO", "Toplam traceback kare satiri: %d" % len(frames))
+
+
+# ===========================================================================
 #  REPORTER / MENU
 # ===========================================================================
 def _print_result(name, findings):
@@ -1242,6 +1370,14 @@ def run_module(num, collect):
         run_engine_purity(collect)
     elif num == 9:
         run_regression(collect)
+    elif num == 10:
+        run_secrets(collect)
+    elif num == 11:
+        run_deadcode(collect)
+    elif num == 12:
+        run_complexity(collect)
+    elif num == 13:
+        run_crashtrend(collect)
 
 
 MODULES = {
@@ -1254,6 +1390,10 @@ MODULES = {
     7: "AST / dead-code",
     8: "Engine purity",
     9: "Regression",
+    10: "Secret scan",
+    11: "Dead code",
+    12: "Complexity snapshot",
+    13: "Crash trend",
 }
 
 
@@ -1326,7 +1466,7 @@ def _check_menu_loop(interactive, press_enter):
             return True          # quit (entire app)
         if first == "b":
             return False         # return to main menu
-        if first == "10" or first == "all":
+        if first == "20" or first == "all":
             _run_selected(sorted(MODULES))
             continue
         picks = []

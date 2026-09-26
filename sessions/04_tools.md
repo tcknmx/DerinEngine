@@ -53,6 +53,17 @@
    `/api/scan` ve CLI aynı kaldı. Sonuç: **0 WARN, 0 BUG, 0 ERR**.
    Bilinçli-eksik eklemek için: `_EXTRACTORLESS_OK` seti (İngilizce içinde) + AST
    empty-except'e `# noqa` etiketi.
+10. **deep-tool +4 tarama modülü (10-13) + ölü kod silindi** (26.09.2026, kullanıcı
+   isteği): (a) **[10] Gizli bilgi** — anahtar/token/şifre literal'leri + gerçek
+   token formatları (GitHub/Stripe/AWS/Google/PRIVATE KEY/JWT) + diskte `.env`
+   varlığı; (b) **[11] Ölü kod** — üst-seviye def/class isimlerinin proje çapında
+   referans sayımı (1 ref = kesin aday, 2 ref = kontrol); (c) **[12] Karmaşıklık**
+   — en büyük dosyalar + en uzun yapılar (temizlik pusulası); (d) **[13] Çökme
+   trendi** — motor.log traceback fonksiyon sayıları. Menü **20 = TÜMÜNÜ TARA** oldu
+   (eski "10") ve ölü `menu_7: "[7] Scan ALL"` / `"[7] HEPSINI TARA"` kopya satırları
+   temizlendi. İlk gerçek bulgu: `levelfile.save_scene_to_path` hiç çağrılmıyordu
+   (`save_level`'in geri-uyumluluk takma adı) — kullanıcı onayıyla **silindi**.
+   Doğrulama: `deep-tool --lang en all` → 13/13 modül **0 WARN, 0 BUG, 0 ERR**.
 
 ---
 

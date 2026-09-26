@@ -208,8 +208,3 @@ def load_level(path: str, extra_builder_data: dict = None, finalize=None):
         finalize(scene)
 
     return scene
-
-
-def save_scene_to_path(scene, path):
-    """Short alias for 'save_level' (backwards-compatible helper)."""
-    return save_level(scene, path)
