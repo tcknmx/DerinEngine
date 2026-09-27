@@ -6,10 +6,87 @@
 
 ---
 
+## GÖREV HEDEFİ (27.09.2026 — motor özellikleri 2–5 + slopes)
+
+Kullanıcı: "hepsine başla, 1-1,5 saat dışarıdayken çal." Sıra:
+**2) Çokgen çarpışma** (PolygonCollider/CircleCollider + SAT + segment testleri),
+**3) Sahne ağacı + SceneManager** (parent/child hiyerarşisi),
+**4) Keyframe animasyon** (tween tabanlı, SpriteRenderer/property üstünde),
+**5) Tilemap + katman + render sırası + kamera fx**,
+**2D v1 alan 1: Slopes/eğik zemin.**
+Doğrulama: py_compile + headless boot smoke + çarpışma testleri + `deep-tool --lang en all`.
+KALAN kalırsa aşağıya yazılır.
+**TAMAMLANDI (27.09.2026):** özellik 2–5 + slopes uygulandı ve doğrulandı
+(bkz. TAMAMLANAN bölümü başındaki 5 yeni kayıt). Oyun tarafına bağlama (oyuncunun
+bu yeni motor yeteneklerini kullanması) ayrı görevdir → `03_game.md` KALAN'a eklendi.
+
+---
+
 ## TAMAMLANAN MOTOR ÇALIŞMALARI (kronolojik; orijinal "madde N" referanslı)
 
 Aşağıdakiler baskın olarak **deep_engine/** tarafına dokunan işlerdir. Oyun tarafına
 dokunan kısımlar için `03_game.md`'ye bak.
+
+6. **Slopes/eğik zemin — motor (27.09.2026):** `scene.py`'ye `_polygon_surface_y(poly, x)`
+   (bir poligonun dünya-x hizasındaki en üst yüzey y değeri; rampaların zemin
+   seviyesi buradan okunur). `_resolve_solid_collision` poligon statik çarpışmada
+   kutu-itiş yerine yüzey çözümü kullanır: karakter merkezindeki yüzeye uysa (dikey
+   bant toleransı) yukarı oturur + `is_grounded`. Foot-rect zemin taraması da poligon
+   için AABB tepesi yerine `_polygon_surface_y` kullanır (üçgen tepe noktasına sıçrama
+   yok). Doğrulama: rampa (0,128)-(128,0) üzerinde oyuncu x=32→(40,72.0) grounded;
+   sağa yürüyüş x=100 y=4.0 grounded kalarak yokuş çıkma; rampa kenarından düşünce
+   grounded kaybı. Oyun tarafı kullanımı ayrı görev (03_game.md).
+
+5. **Tilemap + katman + render sırası + kamera fx — motor (27.09.2026):**
+   - YENİ `deep_engine/tilemap.py`: `Tilemap(Component)` — ızgara tabanlı gerçek tile
+     haritası: `tile_size`, `set_tile_set` (id→renk, None=hava), `add_layer` (üst üste
+     katmanlar, z_index sıralar), `get/set_tile`, `place_at_world` (dünya koordinatıyla
+     hücre koyma), `solid_at`; çizim **ekran kesme (culling)** ile sadece görünür
+     hücreleri çizer (büyük haritalar hızlı). Tilemap collider DEĞİL — solid istiyorsa
+     oyun katmanı ayrı BoxCollider/PerTile usağı kurar.
+   - `scene.py`: `zoom_to` (yumuşak zoom) + YENİ `zoom_punch(amount, duration)` — anlık
+     "şut vuruşu" zoom (0.5sn'de taban hedefe geri döner; `_zoom_punch_timer/base`).
+   - Doğrulama: 2 katmanlı harita (yeşil zemin, içi boş, gri, altın üst katman) doğru
+     piksellerde; zoom punch 1.4→0.5sn sonra hedef 1.0'a.
+
+4. **Keyframe animasyon — motor (27.09.2026):** `components.py`'ye YENİ
+   `KeyframeAnimator(Component)` (tween tabanlı, `tween.EASING` eğrilerini kullanır):
+   `animate("position.x", [(0,0.0),(300,1.0)], ease="linear")`; `play/pause/stop`,
+   `loop`. Hedef bir sayı, renk tuple'ı ya da Vector2 olabilir. Path çözümünde alias:
+   `sprite.color`, `sprite.scale`, `animator.*` (GameObject'lerde component doğrudan
+   node olarak aranır). `_mix_value` arayüz fonksiyonu eklenip Satır-araya karışım
+   yapıldı. Doğrulama: 0.5s → x≈150/300, renk ortası ~128; loop=False bitince
+   `playing` False. `__init__.py` export edildi.
+
+3. **Sahne ağacı + parent/child hiyerarşisi + SceneManager — motor (27.09.2026):**
+   - `game_object.py`: `parent`/`children` listesi, `z_index`; `add_child(local_offset)`
+     (çocuk konumu **lokal** saklanır, `world_position` zinciri toplar — parent
+     taşınınca çocuk dünyada kayar), `remove_child`, `find_child`, `_subtree_active`
+     (parent aktifse çocuklar da çalışır). `update`/`draw` çocukları işler; `draw`
+     `origin` parametresiyle parent zincirini kamera offsetinden düşer (root objeler
+     için davranış birebir aynı — mevcut oyun kırılmadı). `z_index` kardeş sıralaması.
+   - YENİ `scenemanager.py`: `SceneManager` — `register`, `switch_to`, `push` (üst üste
+     overlay, alttaki `scene.active=False`), `pop` (alttaki tekrar aktif), `attach`,
+     `scene`, `has`, `names`, `current_name`. `core.py` → `Engine.scene_manager`.
+   - `scene.py`: `Scene.active` eklendi (pasif sahne `update` atlar); top-level draw
+     z-sıralaması. `__init__.py` export edildi.
+   - Doğrulama: `SCENE_TREE_OK` — SceneManager push/pop active döngüsü; parent
+     (100,100)+child lokali (5,10)→dünya (105,110); parent taşıyınca 205,110; çizimde
+     child doğru ekran yerinde; parent inactive → çocuk da inactive.
+
+2. **Çokgen/daire/segment çarpışma — motor (27.09.2026):**
+   - `math2d.py`: `point_in_polygon`, `point_segment_dist`, `segments_intersect`,
+     `polygons_overlap` (SAT — eksen izdüşümü), `polygon_intersection` (genişletilmiş
+     çakışım), `circle_circle_overlap`, `circle_polygon_overlap`, `circle_aabb_overlap`;
+     `Vector2.derivative()`, `Vector2.dot()` eklendi.
+   - `components.py`: `BoxCollider.overlap_check` her türle kesin çakışma (genel
+     arayüz), YENİ `CircleCollider` (get_center/get_radius/overlap_check), YENİ
+     `PolygonCollider` (dünya noktaları, SAT). `scene.py` çarpışma hattı **generic**
+     hale getirildi: `_get_collider()` her üç türü toplar, `get_aabb` (broad phase) +
+     `overlap_check` (kesin) üzerinden; spatial grid aynı kaldı (hor tekdüze).
+   - Doğrulama: `COLLIDER_MATH_OK` (SAT çokgen-çokgen, daire-çokgen, daire-AABB,
+     segment kesişimi, GameObject sarmalayıcıları); endless level 58 obje 60-frame sim
+     hatasız. `__init__.py` export edildi.
 
 2. **Oyun içi custom akışının motor yankısı temizlendi (25.09.2026):** oyun tarafında
    C modu kaldırılınca (bkz. `03_game.md` 43) motor/yorum düzeyi: `i18n.py`
@@ -164,13 +241,15 @@ bozuk dosyalar için `py_compile`, her değişiklikte "oyun X sn çökmeden boot
 
 ## MOTOR KALAN (bekleyen motor işleri, sıra kullanıcıyla)
 
-- **Çokgen çarpışma (motor özelliği 2)** — SIRADA: BoxCollider → disk/çokgen/segment
-  çarpışmaları; segment testleri (3D brush temasının 2D habercisi).
-- Sahne ağacı + hiyerarşi + SceneManager (motor özelliği 3).
-- Keyframe animasyon (motor özelliği 4) — tween altyapısı hazır.
-- Tilemap + katman + render sırası + kamera fx (motor özelliği 5).
-- Slopes/eğik zemin (2D v1 plan alanı 1).
-- Müzik tema bağlama derinliği (seviye geçişinde daha merkezi).
+- Müzik tema bağlama derinliği (seviye geçişinde daha merkezi). — **TAMAMLANDI**
+  (oyun `scenes._play_theme` merkezi; yukarıya 27.09 kaydı bak).
+- (Bekliyor) motor özelliği 6 — **veri katmanı**: tilemap verilerini dosyaya
+  serileştirip geri yükleme (`.map` köprüsü: tilegrid → sınır segmentleri/custom
+  geometry). İlk adım: `Tilemap.to_data/from_data` + dolu hücrelerden çevre
+  segmentleri üreten `to_segments()`.
+- (Bekliyor) motor özelliği 7 — **motor-UI kiti**: `deep_engine/ui.py` içinde
+  Panel/Button/ScrollContainer + temalar (mouse/klavye/gamepad etkileşimi); mevcut
+  oyun menüsü/HUD bileşenleri zamanla bu kit'e taşınır. Oyun kullanımı `03_game.md`.
 - (Bekliyor) motor özelliği 1 (Event+Tween) sonrası temizlik: docs/tests.
 
 ---

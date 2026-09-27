@@ -1,9 +1,14 @@
+import math
+import pygame
 from deep_engine import (
     Engine,
+    Component,
     GameObject,
     SpriteRenderer,
     Animator,
+    KeyframeAnimator,
     BoxCollider,
+    PolygonCollider,
     Rigidbody2D,
     TextRenderer,
     BouncePad,
@@ -73,6 +78,47 @@ def _build_platform(scene, data):
             speed=data.get("move_speed", 75.0),
             vertical=data.get("move_vertical", False)))
     return plat
+
+
+class RampVisual(Component):
+    """Game-side triangle drawer for a Ramp (PolygonCollider) object.
+
+    Draws a filled triangle matching the collider shape so the slanted surface
+    is actually visible (SpriteRenderer only draws axis-aligned rectangles).
+    """
+    def __init__(self, points, color, edge_color=None):
+        super().__init__()
+        self.points = points
+        self.color = tuple(color)
+        self.edge_color = tuple(edge_color) if edge_color else tuple(max(0, c - 40) for c in self.color)
+
+    def draw(self, surface, camera_offset):
+        ox, oy = self.game_object.position.x, self.game_object.position.y
+        pts = [(int(ox + px - camera_offset.x), int(oy + py - camera_offset.y)) for px, py in self.points]
+        pygame.draw.polygon(surface, self.color, pts)
+        pygame.draw.polygon(surface, self.edge_color, pts, width=2)
+
+
+def _build_ramp(scene, data):
+    """Builds an inclined ramp as a PolygonCollider (the engine resolves slopes).
+
+    `slope` == 1  -> rises from left (base on the ground) to the right (top edge).
+    `slope` == -1 -> rises from right to left.
+    The collider is a triangle; the visual is drawn by RampVisual to match it.
+    """
+    x, y = data.get("x", 0), data.get("y", 0)
+    w, h = data.get("w", 96), data.get("h", 48)
+    slope = int(data.get("slope", 1))
+    if slope >= 0:
+        pts = [(0, h), (w, 0), (w, h)]
+    else:
+        pts = [(0, 0), (0, h), (w, h)]
+    ramp = GameObject(name="Ramp", x=x, y=y, width=w, height=h, tag="Ground")
+    ramp.add_component(PolygonCollider(points=pts))
+    color = data.get("color", [60, 90, 130])
+    ramp.add_component(RampVisual(pts, color))
+    scene.add_object(ramp)
+    return ramp
 
 
 def _build_coin(scene, data):
@@ -150,6 +196,13 @@ def _build_flyer(scene, data):
     enemy.add_component(Health(max_hp=data.get("hp", 20), is_player=False))
     enemy.add_component(FlyerEnemy(patrol_distance=data.get("patrol_distance", 160.0),
                                    speed=data.get("speed", 55.0)))
+    # Gentle bobbing via the engine's keyframe animator (position.y 3-point loop).
+    # Period matches the classic bob_speed (rad/s): T = 2*pi / bob_speed.
+    bob_amp = data.get("bob_amplitude", 14.0)
+    bob_speed = data.get("bob_speed", 2.2)
+    period = max(0.3, 2 * math.pi / bob_speed)
+    kf = enemy.add_component(KeyframeAnimator(loop=True, autoplay=True))
+    kf.animate("position.y", [(y, 0.0), (y - bob_amp, period * 0.5), (y, period)], ease="in_out", duration=period)
     enemy.add_component(LightSource(radius=70, color=(80, 230, 200), intensity=0.6))
     enemy.add_component(SpawnIn(duration=0.6))
     scene.add_object(enemy)
@@ -339,8 +392,27 @@ def _build_boss(scene, data):
         boss.active = False
         SoundFX.play("explosion")
         eng = Engine.instance
+        # Victory slow-mo: a short dramatic slowdown of every non-player entity
+        # (enemies, enemy bullets, subsequent bosses) via the engine time layer.
+        # The player keeps full control so movement still feels good.
+        eng._time_slow_remaining = 0.9
+        eng._time_slow_factor = 0.28
         if eng and eng.active_scene:
             eng.active_scene.add_shake(0.9)
+            # Big multi-burst explosion at the boss's position whenever it dies.
+            if boss.game_object:
+                emitter = boss.game_object.get_component(ParticleEmitter)
+                if emitter:
+                    center = (boss.game_object.size.x / 2, boss.game_object.size.y / 2)
+                    for _ in range(3):
+                        emitter.burst(
+                            count=14, color=(255, 160, 60), speed_range=(70, 220),
+                            size_range=(5, 10), lifespan_range=(0.5, 1.0), gravity=140.0,
+                            origin_offset=center)
+                        emitter.burst(
+                            count=10, color=(255, 240, 200), speed_range=(40, 160),
+                            size_range=(3, 7), lifespan_range=(0.35, 0.7), gravity=0,
+                            origin_offset=center)
         # Look up the portal dynamically: everything is built once the boss dies.
         # CAUTION: the boss may share the same scene_key (its next target) and comes
         # before the portal in the object list; so we only search for tag="Portal".
@@ -417,6 +489,17 @@ def _extract_enemy(obj):
             "hp": hp.max_hp if hp else 25}
 
 
+def _extract_ramp(obj):
+    kf = obj.get_component(KeyframeAnimator)
+    coll = obj.get_component(PolygonCollider)
+    pts = coll.points if coll else [(0, 0), (32, 0), (32, 32)]
+    w = int(max(p[0] for p in pts))
+    h = int(max(p[1] for p in pts))
+    left_low = pts[0][0] == 0 and pts[0][1] == h
+    return {"w": w, "h": h, "slope": 1 if left_low else -1,
+            "color": list(obj.get_component(SpriteRenderer).color) if obj.get_component(SpriteRenderer) else [60, 90, 130]}
+
+
 def _extract_platform(obj):
     comp = obj.get_component(PatrolPlatform)
     data = {}
@@ -472,8 +555,19 @@ def _extract_portal(obj):
 def _extract_flyer(obj):
     comp = obj.get_component(FlyerEnemy)
     hp = obj.get_component(Health)
+    kf = obj.get_component(KeyframeAnimator)
+    anim = kf.animations.get("position.y") if kf else None
+    nodes = anim["nodes"] if anim else []
+    amp = 14.0
+    if len(nodes) >= 2:
+        amp = abs(nodes[0][0] - nodes[1][0])
+    speed = 2.2
+    if anim and anim.get("length"):
+        speed = 2 * math.pi / anim["length"]
     return {"patrol_distance": comp.distance if comp else 160.0,
             "speed": comp.speed if comp else 55.0,
+            "bob_amplitude": amp,
+            "bob_speed": speed,
             "hp": hp.max_hp if hp else 20}
 
 
@@ -522,6 +616,7 @@ def _register_level_builders():
     # Placement (read) builders
     register_builder("Platform", _build_platform)
     register_builder("Ground", _build_platform)
+    register_builder("Ramp", _build_ramp)
     register_builder("Breakable", _build_breakable)
     register_builder("Coin", _build_coin)
     register_builder("Spring", _build_spring)
@@ -543,6 +638,7 @@ def _register_level_builders():
     register_extractor("SniperEnemy", _extract_sniper)
     register_extractor("Platform", _extract_platform)
     register_extractor("Ground", _extract_platform)
+    register_extractor("Ramp", _extract_ramp)
     register_extractor("Breakable", _extract_breakable)
     register_extractor("Spring", _extract_spring)
     register_extractor("PowerUp", _extract_powerup)

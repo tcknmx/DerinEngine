@@ -134,25 +134,48 @@
 
 ## OYUN KALAN (bekleyen oyun işleri, sıra kullanıcıyla)
 
-- **Biyoma özel fizik** — her biyomun kendine has hissiyat/yörekdiligi (UX paketinin
-  4. ve son maddesi).
+- **Yeni motor yeteneklerini oyuna bağlamak (27.09.2026 eklendi, motor özellikleri 2–5
+  `02_engine.md`'de hazır):** seviye/builder tarafında `Tilemap` (gerçek ızgara zeminleri
+  + katman) ve `PolygonCollider` ile **eğimli rampalar / çokgen platformlar** kullanılabilir;
+  `SceneManager` overlay sahne (menü üstünde pause katmanı), `KeyframeAnimator` (UI/boss
+  animasyonları, tween tabanlı), `Camera.zoom_punch` (boss vuruş anı). > RAMPA + düşman
+  keyframe animasyonu + biyom fiziği TAMAMLANDI (aşağıya kayıt düşüldü). Kalan: tilemap
+  zeminleri, overlay pause sahnesi, zoom_punch burst bağlaması (oyun oturumunda sırada).
 - **deneyim_iyilestirmeleri 5–8** (aşağıda, bu dosyaya taşındı — orijinal dosya silindi):
-  1. (1–4 zaten uygulandı; liste 5–8'de devam ediyor.)
+  1. (1–4 zaten uygulandı; 5 TAMAMLANDI, 6–7 uygulandı; 8 TAMAMLANDI — aşağıya bak.)
 
-### Deneyim iyileştirmeleri 5–8 (bekliyor)
+### Deneyim iyileştirmeleri 5–8
 - **5. Dash after-image**: dash süresince arkada yarı-saydam oyuncu kopyası izi
   (dash_timer'ın sonucu; her ~2 kaybolan kopya, `_AutoRemove`). Hız arttıkça iz daha
-  geniş/sık. (dash ramp + kamera kick zaten var, görsel iz eksik.)
+  geniş/sık. (TAMAMLANDI — `entities.py` PlayerController dash after-image.)
 - **6. Boss ölümü + zafer anı slow-mo ve enrage görsel evresi**: boss yenilince kısa
-  ağır çekim + büyük patlama; HP <%50 (enrage) iken görsel evre (renk/kıvılcım) — şu
-  an yalnız fire_interval*0.75 ile daha hızlı ateş var, görsel fark yok.
+  ağır çekim + büyük patlama; HP <%50 (enrage) iken görsel evre — artık `_draw_enrage_aura`
+  (tüm boss'lara `_draw_boss_bar` içinden otomatik) + ölüm slow-mo. (TAMAMLANDI —
+  BOSSFX_OK testi.)
 - **7. Uzun düşüşlerde hız çizgileri**: vy eşik (~900+) + düşme süresiyle ekran üst/
-  alt kenarına inen çizgiler; vy normale dönünce kaybol. (fall boost + dust zaten var.)
+  alt kenarına inen çizgiler; vy normale dönünce kaybol. (TAMAMLANDI — `entities.py`
+  PlayerController.draw hız çizgileri.)
 - **8. Menüde kampanya ilerleme haritası**: geçilen biyom rozetleri; her boss yenilince
-  menüde "tamamlandı"; savegame'a tamamlanan biyom listesi (kalıcı).
+  menüde "tamamlandı"; savegame'a tamamlanan biyom listesi (kalıcı). (TAMAMLANDI —
+  `ui.py` `BiomeProgress` rozet bileşeni, `scenes._campaign_sector_commit(biome)` ile
+  savegame `completed_biomes` listesi; `i18n.py` `campaign_progress` + `biome_*` adları;
+  testler: COMMIT_SAVE_OK + MENU_BOOT_OK.)
 
-- Diğer bekleyen adaylar: kamera menü/hit degrade ince ayarları (büyük kısmı A2'de
-  bitti), düşman doğuş gecikmesi ince ayarı, i-frame ince ayarı.
+### OYUN TAMAMLANANLAR (27.09.2026 — motor özellikleri 2–5 + kemik oturumu)
+
+- **Müzik tema bağlama derinliği**: `scenes.py`'de merkezi `_play_theme(biome, is_boss=False,
+  fallback="level")`; procedural, boss (`is_boss=True`) ve endless (`fallback="level"`)
+  artık tek yerden tema seçiyor; ui.py victory yerinde. py_compile OK.
+- **Sessiz-except / kullanılmayan import temizliği (DEVİR)**: deep-tool 3 WARN → **0 WARN,
+  0 BUG, 0 ERR.** `builders.on_boss_death` boş `except AttributeError` kaldırıldı (doğrudan
+  set), `_extract_ramp` eklendi, `_extract_platform` kazara bozulup düzeltildi,
+  `tilemap.py` unused `Vector2` silindi.
+- **Biyoma özel fizik (deneyim 4”üncü maddesi, TAMAMLANDI)**: `PlayerController`’ye
+  `biome`/`biome_gravity`/`biome_jump`/`biome_grip`/`biome_wind` + `apply_biome(biome)`;
+  gravity 1400×çarpan, zıplama `jump_force×biome_jump`, kayganlık `biome_grip` (velo
+  blend) ve `biome_wind` (sürekli itiş) uygulanıyor; `build_procedural_level` oyuncuya
+  `data["biome"]` ile bağlıyor. Değerler: ice(1.0/1.12/0.55/0), cave(1.25/0.9/0.85/0),
+  desert(1.0/1.0/0.8/1.15), astro(0.6/1.15/0.9/0). Test: BIOME_PHYS_OK.
 
 ---
 

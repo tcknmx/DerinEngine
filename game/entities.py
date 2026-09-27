@@ -54,6 +54,12 @@ class PlayerController(Component):
         self.dash_momentum = 0.0         # remaining forward momentum after the dash (weight feel)
         self.shoot_cooldown = 0.0
 
+        # Dash after-image (deneyim 5): semi-transparent copies trailing the dash.
+        self._afterimage_timer = 0.0
+        self._afterimages = []      # each: (sx, sy, w, h, age) in screen space
+        # Fall streaks (deneyim 7): continuous fall time above the speed threshold.
+        self.fall_streak_time = 0.0
+
         # Procedural Animation (Squish & Stretch)
         self.scale_x = 1.0
         self.scale_y = 1.0
@@ -66,6 +72,14 @@ class PlayerController(Component):
         self.COAYOTE_TIME = 0.06       # seconds (0.10 felt too generous -> endless airborne feel)
         self.JUMP_BUFFER = 0.06        # seconds
         self.gravity_scale = 1.0       # extra gravity while falling (heavier landing)
+
+        # Biome-feel physics (biyoma özel fizik): each biome tweaks movement
+        # so every world feels different. Set by apply_biome() at build time.
+        self.biome = "forest"
+        self.biome_gravity = 1.0       # multiplier on Rigidbody2D.gravity
+        self.biome_jump = 1.0          # multiplier on jump_force
+        self.biome_grip = 1.0          # horizontal grip: 1.0 = instant, <1.0 = slippery
+        self.biome_wind = 0.0          # constant sideways push (desert gusts)
 
         # Hit-stop: a tiny 'freeze' when the player takes damage
         self.hitstop_timer = 0.0       # while >0 the player is briefly locked
@@ -198,6 +212,15 @@ class PlayerController(Component):
                 self.scale_y = 1.4
 
         # ---  Grass/dust particles (run puffs + landing dust) ---
+        # Fall streak accumulation (deneyim 7): rises while falling fast enough,
+        # resets the moment the player lands (used to draw speed lines).
+        if self.rb.velocity.y >= 900.0 and not self.rb.is_grounded:
+            self.fall_streak_time += dt
+        elif self.rb.is_grounded:
+            self.fall_streak_time = 0.0
+        else:
+            self.fall_streak_time = max(0.0, self.fall_streak_time - dt)
+
         # Landing: a small dust burst at the feet when touching the ground from the
         # air (weighty landing feel).
         if not self.was_grounded and self.rb.is_grounded:
@@ -279,6 +302,18 @@ class PlayerController(Component):
             self.rb.velocity.x = self.direction_dash * self.speed * self.dash_speed
             if self.particles and random.random() < 0.5:
                 self.particles.burst(count=2, color=(100, 220, 255), speed_range=(10, 30), size_range=(3, 5), lifespan_range=(0.2, 0.4), gravity=0)
+            # After-image: snapshot every ~0.03s while dashing (faster dash -> tighter ghosts)
+            self._afterimage_timer -= dt
+            if self._afterimage_timer <= 0:
+                self._afterimage_timer = 0.03 / max(1.0, self.dash_speed)
+                self._afterimages.append([
+                    self.game_object.position.x, self.game_object.position.y,
+                    self.scale_x, self.scale_y, 0.0])
+                if len(self._afterimages) > 6:
+                    self._afterimages.pop(0)
+            # Age existing ghosts
+            for g in self._afterimages:
+                g[4] += dt
             if self.dash_timer <= 0:
                 # Dash over: leave some momentum (weight/deceleration feel)
                 self.dash_momentum = self.direction_dash * self.speed * 1.6
@@ -300,7 +335,14 @@ class PlayerController(Component):
             if abs(self.dash_momentum) < 20.0:
                 self.dash_momentum = 0.0
         else:
-            self.rb.velocity.x = move_x * self.speed * speed_mult
+            # Biome-feel: `grip` blends horizontal velocity toward the input target
+            # (1.0 = instant, lower = slippery/floaty); `wind` adds a light gust push.
+            target_x = move_x * self.speed * speed_mult + self.biome_wind
+            if self.biome_grip >= 1.0:
+                self.rb.velocity.x = target_x
+            else:
+                blend = (self.biome_grip + 0.5)
+                self.rb.velocity.x += (target_x - self.rb.velocity.x) * min(dt * (6.0 if not self.rb.is_grounded else 14.0) * blend, 1.0)
 
         # --- Coyote Time & Jump Buffer (jump forgiveness) ---
         # Allows jumping "as if grounded" for a short time after leaving a platform.
@@ -357,7 +399,7 @@ class PlayerController(Component):
                     wx = self.game_object.position.x + (0 if self.wall_dir < 0 else self.game_object.size.x)
                     self.particles.burst(count=12, color=(220, 225, 245), speed_range=(40, 120), size_range=(3, 5), lifespan_range=(0.25, 0.5), gravity=20.0, origin_offset=(wx - self.game_object.position.x, self.game_object.size.y - 6))
             elif self.rb.is_grounded or self.coyote_timer > 0:
-                self.rb.velocity.y = -self.jump_force
+                self.rb.velocity.y = -self.jump_force * self.biome_jump
                 self.rb.is_grounded = False
                 self.coyote_timer = 0.0
                 self.jump_buffer_timer = 0.0
@@ -369,7 +411,7 @@ class PlayerController(Component):
                 if self.particles:
                     self.particles.burst(count=8, color=(200, 220, 255), speed_range=(20, 70), size_range=(2, 4), lifespan_range=(0.2, 0.4), gravity=40.0, origin_offset=(16, 30))
             elif self.can_double_jump:
-                self.rb.velocity.y = -self.jump_force * 0.9
+                self.rb.velocity.y = -self.jump_force * 0.9 * self.biome_jump
                 self.can_double_jump = False
                 self.jump_buffer_timer = 0.0
                 self.scale_x = 1.45
@@ -729,6 +771,35 @@ class PlayerController(Component):
                         if txt:
                             txt.text = f"{I18n.t('remaining_stars')}: {len(remaining)} ({I18n.t('stars_goal_desc')})"
 
+    def apply_biome(self, biome):
+        """Biome feel: each world tunes movement slightly differently.
+
+        Presets are subtle but noticeable and safe (never lock the player):
+          - forest: neutral reference.
+          - ice:    slippery but snappy (low grip = less friction), slightly
+                    higher jump (vaulting over slick ground).
+          - cave:   heavier gravity + weaker jump -> dense, weighty landing.
+          - desert: constant light gust pushes the player (wind); normal jump.
+          - astro:  low gravity + stronger jump -> floaty, high arcs.
+        A light 'directional wind' (biome_wind) pushes horizontally, giving the
+        desert an extra identity without ever being escapable.
+        """
+        self.biome = biome or "forest"
+        if biome == "ice":
+            self.biome_gravity, self.biome_jump, self.biome_grip, self.biome_wind = 1.0, 1.12, 0.55, 0.0
+        elif biome == "cave":
+            self.biome_gravity, self.biome_jump, self.biome_grip, self.biome_wind = 1.25, 0.9, 0.85, 0.0
+        elif biome == "desert":
+            self.biome_gravity, self.biome_jump, self.biome_grip, self.biome_wind = 1.0, 1.0, 0.8, 1.15
+        elif biome == "astro":
+            self.biome_gravity, self.biome_jump, self.biome_grip, self.biome_wind = 0.6, 1.15, 0.9, 0.0
+        else:
+            self.biome_gravity, self.biome_jump, self.biome_grip, self.biome_wind = 1.0, 1.0, 1.0, 0.0
+        rb = self.game_object.get_component(Rigidbody2D)
+        # Player's base gravity is 1400 (see _build_player); biomes only scale it.
+        if rb is not None:
+            rb.gravity = 1400.0 * self.biome_gravity
+
     def draw(self, surface: pygame.Surface, camera_offset: Vector2):
         if self.health and self.health.is_invulnerable():
             if int(self.health.flash_timer * 15) % 2 == 0:
@@ -742,6 +813,41 @@ class PlayerController(Component):
 
         sx = int(self.game_object.position.x - camera_offset.x - (anim_w - base_w) / 2)
         sy = int(self.game_object.position.y - camera_offset.y - (anim_h - base_h))
+
+        # Fall speed lines (deneyim 7): the longer the fast-fall, the more lines
+        # converge on the player from the top edge — reads as 'terminal velocity'.
+        if self.fall_streak_time > 0.12 and self.rb and self.rb.velocity.y >= 900.0:
+            intensity = min(1.0, (self.fall_streak_time - 0.12) / 0.5 + 0.3)
+            n = int(4 + 4 * intensity)
+            w, h = surface.get_size()
+            px = sx + int(anim_w / 2)
+            line_color = (210, 225, 255)
+            for i in range(n):
+                t = (pygame.time.get_ticks() * 0.020 + i * 0.31) % 1.0
+                lx = int(w * (0.12 + 0.76 * t))
+                ln = 26 + int(46 * intensity)
+                pygame.draw.line(surface, line_color,
+                                 (lx, -2), (lx, ln), 1)
+                pygame.draw.line(surface, line_color,
+                                 (lx, h + 2), (lx, h - ln), 1)
+
+        # Dash after-image ghosts (drawn BEHIND the player): semi-transparent
+        # copies that fade out. They snapshot the position/scale during the dash
+        # and use the camera offset from this frame, so they trail naturally.
+        for gx, gy, gscx, gscy, age in self._afterimages:
+            if gscx <= 0 or gscy <= 0:
+                continue
+            gw = base_w * gscx
+            gh = base_h * gscy
+            ix = int(gx - camera_offset.x - (gw - base_w) / 2)
+            iy = int(gy - camera_offset.y - (gh - base_h))
+            alpha = max(0, int(110 * (1.0 - age / 0.18)))
+            if alpha <= 0:
+                continue
+            ghost = pygame.Surface((int(gw), int(gh)), pygame.SRCALPHA)
+            ghost.fill((80, 190, 245, alpha))
+            pygame.draw.rect(ghost, (80, 190, 245, alpha), ghost.get_rect(), border_radius=6)
+            surface.blit(ghost, (ix, iy))
 
         #  If the speed powerup is active, the character glows yellow
         if self.powerup_speed > 0:
@@ -958,18 +1064,15 @@ class PatrolEnemy(Component):
 
 class FlyerEnemy(Component):
     """Flying enemy that glides through the air (no gravity, horizontal patrol, gentle bobbing)."""
-    def __init__(self, patrol_distance=160.0, speed=55.0, bob_amplitude=14.0, bob_speed=2.2, wake_radius=400.0):
+    def __init__(self, patrol_distance=160.0, speed=55.0, wake_radius=400.0):
         super().__init__()
         self.distance = patrol_distance
         self.speed = speed
-        self.bob_amplitude = bob_amplitude
-        self.bob_speed = bob_speed
         self.wake_radius = wake_radius
         self._awake = False
         self.start_x = 0.0
         self.base_y = 0.0
         self.direction = 1
-        self.time = 0.0
         self.stun_timer = 0.0  # Stun dash
 
     def start(self):
@@ -987,12 +1090,11 @@ class FlyerEnemy(Component):
             if self._sprite:
                 self._sprite.color = (255, 235, 80) if self.stun_timer > 0 else self._base_color
             return
-        self.time += dt
         self.game_object.position.x += self.speed * self.direction * dt
         if abs(self.game_object.position.x - self.start_x) >= self.distance:
             self.direction *= -1
-        # Gently bob in the air
-        self.game_object.position.y = self.base_y + math.sin(self.time * self.bob_speed) * self.bob_amplitude
+        # Vertical bobbing is driven by the engine's KeyframeAnimator
+        # (attached by the level builder), keeping this component pure-motion.
 
 
 class HopperEnemy(Component):

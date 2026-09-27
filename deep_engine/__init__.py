@@ -51,7 +51,10 @@ from .components import (
     Component,
     SpriteRenderer,
     Animator,
+    KeyframeAnimator,
     BoxCollider,
+    CircleCollider,
+    PolygonCollider,
     Rigidbody2D,
     TextRenderer,
     BouncePad,
@@ -67,6 +70,8 @@ from .tween import (
     Tweener,
     EASING,
 )
+from .scenemanager import SceneManager
+from .tilemap import Tilemap
 from .log import log, MotorLogger, WARN, BUG, ERR, INFO, DEBUG
 
 __all__ = [
@@ -78,7 +83,11 @@ __all__ = [
     "Component",
     "SpriteRenderer",
     "Animator",
+    "KeyframeAnimator",
     "BoxCollider",
+    "CircleCollider",
+    "PolygonCollider",
+    "Tilemap",
     "Rigidbody2D",
     "TextRenderer",
     "BouncePad",
@@ -91,6 +100,7 @@ __all__ = [
     "TweenComponent",
     "Tweener",
     "EASING",
+    "SceneManager",
     "ParticleEmitter",
     "Particle",
     "SoundFX",

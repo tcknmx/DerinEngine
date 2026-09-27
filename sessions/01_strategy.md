@@ -160,11 +160,11 @@ spike etkisi, bloğa gömülme (kök neden büyük olasılıkla **motor fiziği*
 gerekebilir), mor düşman yoğunluğu/saldırganlığı. Bunlar yeni özellikten önce.
 
 **MOTOR (02):**
-- Çokgen çarpışma (motor özelliği 2) — BoxCollider'dan disk/çokgen/segment'e 2D ayak;
-  3D brush temasının 2D habercisi. (Sıradaki büyük motor özelliği.)
-- Sahne ağacı + SceneManager (motor özelliği 3), Keyframe animasyon (4),
-  Tilemap + katman + kamera fx (5).
-- Slopes/eğik zemin (2D v1 plan alanı 1).
+- ~~Çokgen çarpışma (motor özelliği 2)~~ **TAMAM (27.09.2026):** PolygonCollider/CircleCollider
+  + SAT; genel çarpışma hattı. Detay: `02_engine.md`.
+- ~~Sahne ağacı + SceneManager (3), Keyframe animasyon (4), Tilemap+katman+kamera fx (5),
+  Slopes/eğik zemin~~ **TAMAM (27.09.2026):** hepsi uygulandı ve doğrulandı. Detay: `02_engine.md`.
+- Sıradaki büyük motor özelliği: tilemap üzerine veri katmanı / motor-UI kiti (3D köprüsü).
 
 **OYUN (03):**
 - Biyoma özel fizik (UX paketi son madde) — her biyomun kendine has hissiyatı.
@@ -191,9 +191,15 @@ gerekebilir), mor düşman yoğunluğu/saldırganlığı. Bunlar yeni özellikte
 
 ---
 
-## NOT (veri): Antigravity sohbet geçmişi
+## NOT (veri): Antigravity/opencode sohbet geçmişi
 
 Oyun motoru geliştirme geçmişi (eski) Antigravity CLI'de:
 `C:\Users\token\.gemini\antigravity-cli\conversations\232081c3-423b-4137-8c1a-9bbe2fe3d08b.db`
 ("oyun motoru yapımı" başlığı; protobuf bloblardan okunur). Yarım kalma nedeni: sunucu
 yeniden başlatıldı. Son yarım kalan görev (8. madde) daha sonra tamamlandı.
+İkinci oturum `antigravity\4b6c7137-...` (Editör Crash Düzeltme + Motor Kapasitesi),
+`implementation_plan.md` planını içeriyordu: (1) circular import düzeltmesi, (2) kamera
+sarsıntısı, (3) sprite animasyon, (4) TriggerZone/Event sistemi, (5) component
+serializasyonu. **Hepsi DerinEngine'e taşındı/tamamlandı** (saflık kuralı, scene shake,
+Animator, Event/Tween, builders JSON): kayıp bilgi yok. 2026-09-27'de `.gemini`
+arşivlendi/temizlendi — bu sohbetler silinmiş olabilir; bu tarihçe notu referanstır.

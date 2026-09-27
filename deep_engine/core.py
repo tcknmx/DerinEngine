@@ -39,6 +39,8 @@ class Engine:
         self.lighting = LightingEngine(ambient_darkness=130)
         from .console import DevConsole
         self.console = DevConsole(self.width, self.height)
+        from .scenemanager import SceneManager
+        self.scene_manager = SceneManager(self)
 
     def set_scene(self, scene: Scene):
         """Changes and starts the active scene."""

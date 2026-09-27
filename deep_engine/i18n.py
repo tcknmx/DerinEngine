@@ -28,6 +28,13 @@ class I18n:
             "campaign_defeated": "CANAVAR DEVİRİLDİ! ÇIKIŞ PORTALINA GİR!",
             "campaign_boss_name": "CANAVAR",
             "campaign_stage": "Bölüm {index}/{total}",
+            "campaign_progress": "Kampanya İlerlemesi",
+
+            "biome_forest": "Orman",
+            "biome_cave": "Mağara",
+            "biome_ice": "Buz",
+            "biome_desert": "Çöl",
+            "biome_astro": "Uzay",
 
             "boss_forest": "ORMAN DEVİ",
             "boss_cave": "KARANLIK KOLÜSSÜS",
@@ -100,6 +107,13 @@ class I18n:
             "campaign_defeated": "BOSS DEFEATED! ENTER THE EXIT PORTAL!",
             "campaign_boss_name": "BOSS",
             "campaign_stage": "Stage {index}/{total}",
+            "campaign_progress": "Campaign Progress",
+
+            "biome_forest": "Forest",
+            "biome_cave": "Cave",
+            "biome_ice": "Ice",
+            "biome_desert": "Desert",
+            "biome_astro": "Space",
 
             "boss_forest": "FOREST TITAN",
             "boss_cave": "DARK COLOSSUS",

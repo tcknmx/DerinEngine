@@ -208,9 +208,282 @@ class BoxCollider(Component):
             int(self.game_object.size.y)
         )
 
+    def get_aabb(self) -> pygame.Rect:
+        """Axis-aligned bounding box of the collider (for the spatial grid + broad phase)."""
+        return self.get_rect()
+
     def check_collision(self, other_collider: 'BoxCollider') -> bool:
         """Checks whether the two boxes touch each other (AABB)."""
         return self.get_rect().colliderect(other_collider.get_rect())
+
+    def overlap_check(self, other) -> bool:
+        """Generic precise overlap test with ANY other collider type."""
+        from .math2d import circle_aabb_overlap, polygons_overlap
+        oaabb = other.get_aabb()
+        if not self.get_aabb().colliderect(oaabb):
+            return False
+        if isinstance(other, CircleCollider):
+            c = other.get_center()
+            r = other.get_radius()
+            x, y = self.game_object.position.x, self.game_object.position.y
+            return circle_aabb_overlap(c.x, c.y, r, x, y, self.game_object.size.x, self.game_object.size.y)
+        if isinstance(other, PolygonCollider):
+            return polygons_overlap(self._as_poly(), other.get_world_points())
+        return self.check_collision(other)
+
+    def _as_poly(self):
+        x, y = self.game_object.position.x, self.game_object.position.y
+        w, h = self.game_object.size.x, self.game_object.size.y
+        return [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+
+
+class CircleCollider(Component):
+    """2D Circle (disk) Collision component.
+
+    The circle lives inside the object's box (size) and is centered in it, using
+    the smaller axis so it always stays inside the sprite's rect.
+    """
+    def __init__(self, is_trigger=False, radius=None):
+        super().__init__()
+        self.is_trigger = is_trigger
+        self._radius = radius   # None -> auto from object size
+
+    def get_radius(self):
+        if self._radius is not None:
+            return float(self._radius)
+        return min(self.game_object.size.x, self.game_object.size.y) / 2.0
+
+    def get_center(self):
+        obj = self.game_object
+        from .math2d import Vector2
+        return Vector2(obj.position.x + obj.size.x / 2.0,
+                       obj.position.y + obj.size.y / 2.0)
+
+    def get_aabb(self) -> pygame.Rect:
+        c = self.get_center()
+        r = self.get_radius()
+        return pygame.Rect(int(c.x - r), int(c.y - r), int(r * 2), int(r * 2))
+
+    def check_collision(self, other_collider) -> bool:
+        return self.overlap_check(other_collider)
+
+    def overlap_check(self, other) -> bool:
+        from .math2d import circle_circle_overlap, circle_polygon_overlap, circle_aabb_overlap
+        oaabb = other.get_aabb()
+        if not self.get_aabb().colliderect(oaabb):
+            return False
+        c = self.get_center()
+        r = self.get_radius()
+        if isinstance(other, CircleCollider):
+            oc = other.get_center()
+            return circle_circle_overlap(c.x, c.y, r, oc.x, oc.y, other.get_radius())
+        if isinstance(other, BoxCollider):
+            x, y = other.game_object.position.x, other.game_object.position.y
+            return circle_aabb_overlap(c.x, c.y, r, x, y,
+                                       other.game_object.size.x, other.game_object.size.y)
+        if isinstance(other, PolygonCollider):
+            return circle_polygon_overlap(c.x, c.y, r, other.get_world_points())
+        return False
+
+
+class PolygonCollider(Component):
+    """2D Convex Polygon collider.
+
+    Points are stored in LOCAL space (relative to the object's top-left corner).
+    The world position is computed from the object's current position, so the
+    polygon moves with the object automatically.
+    """
+    def __init__(self, points=None, is_trigger=False, one_way=False):
+        super().__init__()
+        self.is_trigger = is_trigger
+        self.one_way = one_way
+        self.points = [tuple(p) for p in (points or [(0, 0), (32, 0), (32, 32), (0, 32)])]
+
+    def get_world_points(self):
+        obj = self.game_object
+        ox, oy = obj.position.x, obj.position.y
+        return [(ox + px, oy + py) for px, py in self.points]
+
+    def get_aabb(self) -> pygame.Rect:
+        xs = [p[0] for p in self.get_world_points()]
+        ys = [p[1] for p in self.get_world_points()]
+        x, y = min(xs), min(ys)
+        return pygame.Rect(int(x), int(y), int(max(xs) - x), int(max(ys) - y))
+
+    def check_collision(self, other_collider) -> bool:
+        return self.overlap_check(other_collider)
+
+    def overlap_check(self, other) -> bool:
+        from .math2d import polygons_overlap, circle_polygon_overlap
+        oaabb = other.get_aabb()
+        if not self.get_aabb().colliderect(oaabb):
+            return False
+        wp = self.get_world_points()
+        if isinstance(other, PolygonCollider):
+            return polygons_overlap(wp, other.get_world_points())
+        if isinstance(other, CircleCollider):
+            c = other.get_center()
+            return circle_polygon_overlap(c.x, c.y, other.get_radius(), wp)
+        if isinstance(other, BoxCollider):
+            return polygons_overlap(wp, other._as_poly())
+        return False
+
+
+def _collider_overlap(a, b):
+    """Generic overlap test between any two collider components."""
+    return a.overlap_check(b)
+
+
+def _mix_value(a, b, t):
+    """Linearly interpolates two values (numbers, tuple/list colors or Vector2)."""
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return a + (b - a) * t
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        mixed = [a[i] + (b[i] - a[i]) * t for i in range(min(len(a), len(b)))]
+        return type(a)(round(v) if isinstance(a[i], int) else v for i, v in enumerate(mixed))
+    from .math2d import Vector2
+    if isinstance(a, Vector2) and isinstance(b, Vector2):
+        return Vector2(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
+    return b if t >= 0.5 else a
+
+
+class KeyframeAnimator(Component):
+    """Tween-based keyframe animation over object properties.
+
+    Unlike Animator (which cycles SpriteRenderer colors), this component plays a
+    timed list of keyframes and interpolates the target property smoothly between
+    them (using the engine's easing curves). Any attribute path can be animated:
+    position/size/rotation on the object, or SpriteRenderer color, etc.
+
+    Usage:
+        kf = obj.add_component(KeyframeAnimator(loop=True, autoplay=True))
+        kf.animate("position.x", [(0, 0.0)], [(300, 1.0)], ease="in_out")   # nodes list
+        kf.animate("size", [(32, 32)])          # or add keyframes then set duration
+        kf.play(); kf.pause(); kf.stop()
+
+    The easing names match the tween module: 'linear', 'in', 'out', 'in_out',
+    'in_back', 'out_back', etc. (see tween.EASING).
+    """
+    def __init__(self, loop=True, autoplay=False, fps=60):
+        super().__init__()
+        self.loop = loop
+        self.autoplay = autoplay
+        self.fps = fps
+        self.animations = {}      # attr_path -> {'nodes':[(value,time),...], 'ease':...}
+        self._tracks = {}         # state per playing track
+        self._time = 0.0
+        self._playing = False
+
+    def _ease_fn(self, name):
+        from .tween import EASING, ease_linear
+        fn = EASING.get(name, ease_linear)
+        return fn
+
+    def animate(self, attr_path: str, nodes, ease="linear", duration=None):
+        """Registers/restarts a keyframe track.
+
+        `nodes` is a list of `(value, at_time)` keyframes, sorted by time.
+        `duration` overrides the total time from the last keyframe. `value` can be
+        a number, a color tuple (for sprite color), or a (x, y) Vector2 target.
+        """
+        ordered = sorted(nodes, key=lambda n: n[1])
+        total = duration if duration else ordered[-1][1]
+        self.animations[attr_path] = {"nodes": ordered, "ease": ease, "length": max(total, 0.001)}
+        self._tracks[attr_path] = {"pos": 0.0, "from": None, "to": None, "seg": 0, "t": 0.0}
+        if self.autoplay:
+            self._playing = True
+        return self
+
+    def play(self):
+        """Starts (or resumes) all registered tracks from the beginning."""
+        self._time = 0.0
+        self._playing = True
+        self._tracks.clear()
+        for path, anim in self.animations.items():
+            self._tracks[path] = {"pos": 0.0, "seg": 0, "t": 0.0}
+        return self
+
+    def pause(self):
+        self._playing = False
+        return self
+
+    def stop(self):
+        self._playing = False
+        self._time = 0.0
+        return self
+
+    @property
+    def playing(self):
+        return self._playing
+
+    def _get_path(self, obj, path):
+        """Resolves a dotted attribute path (e.g. 'position.x', 'sprite.color').
+
+        Aliases let the animation target common components without a reference:
+        'sprite' -> SpriteRenderer, 'animator' -> Animator, 'transform' -> obj.
+        """
+        node = obj
+        parts = path.split(".")
+        # First segment may be a component alias.
+        aliases = {"sprite": SpriteRenderer, "animator": Animator}
+        if parts and parts[0] in aliases:
+            comp = obj.get_component(aliases[parts[0]])
+            if comp is None:
+                return None, None, None
+            node = comp
+            parts = parts[1:]
+        if not parts:
+            return None, None, None
+        cur = node
+        for i, p in enumerate(parts):
+            if not hasattr(cur, p):
+                return None, None, None
+            if i == len(parts) - 1:
+                return cur, p, None
+            cur = getattr(cur, p)
+        return cur, parts[-1], None
+
+    def _set_path(self, obj, path, value):
+        cur, name, _ = self._get_path(obj, path)
+        if cur is None:
+            return
+        setattr(cur, name, value)
+
+    def update(self, dt: float):
+        if not self._playing or not self.animations:
+            return
+        # Current time is driven by dt (frames), not per-track.
+        step = dt
+        self._time += step
+
+        for path, anim in self.animations.items():
+            track = self._tracks.get(path)
+            if track is None:
+                continue
+            nodes = anim["nodes"]
+            if len(nodes) < 2:
+                continue
+            # Find the segment [a, b) that currently brackets the time.
+            seg = 0
+            for i in range(len(nodes) - 2, -1, -1):
+                if self._time >= nodes[i][1]:
+                    seg = i
+                    break
+            a_val, a_time = nodes[seg]
+            b_val, b_time = nodes[seg + 1]
+            span = max(b_time - a_time, 0.001)
+            t = min(1.0, max(0.0, (self._time - a_time) / span))
+            eased = self._ease_fn(anim["ease"])(t)
+            val = _mix_value(a_val, b_val, eased)
+            self._set_path(self.game_object, path, val)
+
+        # Loop / finish
+        max_t = max((anim["nodes"][-1][1] for anim in self.animations.values()), default=0.0)
+        if self._time >= max_t:
+            if self.loop:
+                self._time -= max_t
+            else:
+                self._playing = False
 
 
 class Rigidbody2D(Component):

@@ -1,7 +1,39 @@
 import pygame
 from .math2d import Vector2
 from .game_object import GameObject
-from .components import BoxCollider, Rigidbody2D
+from .components import BoxCollider, CircleCollider, PolygonCollider, Rigidbody2D
+
+
+def _get_collider(obj):
+    """Returns the first collider component on an object (box/circle/polygon)."""
+    for comp in obj.components:
+        if isinstance(comp, (BoxCollider, CircleCollider, PolygonCollider)):
+            return comp
+    return None
+
+
+def _polygon_surface_y(poly, x):
+    """Topmost surface y of a world-space polygon at world-x, or None.
+
+    Walks every edge and keeps the highest (smallest y) crossing of the vertical
+    line at `x`. Slopes use this as their ground level so a character can walk up
+    a ramp smoothly instead of stopping at an invisible box edge.
+    """
+    pts = poly.get_world_points()
+    if not pts:
+        return None
+    best = None
+    for i in range(len(pts)):
+        ax, ay = pts[i]
+        bx, by = pts[(i + 1) % len(pts)]
+        if abs(bx - ax) < 0.001:
+            continue  # vertical edge is a wall, not a slope surface
+        if min(ax, bx) - 0.001 <= x <= max(ax, bx) + 0.001:
+            t = (x - ax) / (bx - ax)
+            y = ay + t * (by - ay)
+            if best is None or y < best:
+                best = y
+    return best
 
 # --- Vignette (camera gradient) ---
 # Precomputed radial mask that softly darkens the screen edges. It is reused
@@ -41,6 +73,7 @@ class Scene:
         self.game_objects = []
         self._objects_to_destroy = []
         self._objects_to_add = []
+        self.active = True   # False = paused/hidden (used by overlay stack)
         self.camera_position = Vector2(0, 0)
         self.camera_target = None  # the object the camera will follow (e.g. the Player)
         self.camera_smoothness = 5.0
@@ -59,6 +92,8 @@ class Scene:
         self.camera_zoom_target = 1.0
         self.zoom_smoothness = 3.0       # how fast it eases toward the target
         self.camera_manual = False       # when True automatic follow is off (menu camera)
+        self._zoom_punch_timer = 0.0     # seconds left on a zoom punch
+        self._zoom_punch_base = 1.0      # the target zoom to restore after the punch
 
         # --- Camera vignette (menu/gameplay gradient + hit flash) ---
         self.vignette_intensity = 0.22   # 0..1 constant edge darkening (subtle in-game)
@@ -109,6 +144,18 @@ class Scene:
         """Smoothly eases the camera zoom toward the target value (1.0 = normal/close)."""
         self.camera_zoom_target = target
 
+    def zoom_punch(self, amount: float, duration: float = 0.25):
+        """Quick zoom 'punch' for impact moments (spell hits, power-ups, boss jumps).
+
+        After the punch the camera eases back to its regular target. Amount is a
+        multiplier (e.g. 1.15 = 15 percent closer for an instant).
+        """
+        if amount <= 0:
+            return
+        self._zoom_punch_base = self.camera_zoom_target
+        self.camera_zoom_target = min(2.0, self.camera_zoom_target * amount)
+        self._zoom_punch_timer = duration
+
     def _is_ui_object(self, obj) -> bool:
         """Tells whether the object is drawn in screen space (UI) so it stays outside zoom."""
         for comp in obj.components:
@@ -148,7 +195,7 @@ class Scene:
         for obj in self.game_objects:
             if not obj.active:
                 continue
-            col = obj.get_component(BoxCollider)
+            col = _get_collider(obj)
             if col:
                 colliders.append(col)
                 if not col.is_trigger and not obj.get_component(Rigidbody2D):
@@ -162,7 +209,7 @@ class Scene:
         CELL = 128
         grid = {}
         for idx, col in enumerate(colliders):
-            r = col.get_rect()
+            r = col.get_aabb()
             for cx in range(r.left // CELL, r.right // CELL + 1):
                 for cy in range(r.top // CELL, r.bottom // CELL + 1):
                     grid.setdefault((cx, cy), []).append((idx, col))
@@ -179,7 +226,7 @@ class Scene:
                         continue
                     seen.add(key)
 
-                    if not c1.check_collision(c2):
+                    if not c1.overlap_check(c2):
                         continue
                     # Trigger event notifications
                     for comp in c1.game_object.components:
@@ -200,10 +247,20 @@ class Scene:
             if rb and not rb.is_grounded and rb.velocity.y >= 0:
                 foot_rect = pygame.Rect(int(obj.position.x + 4), int(obj.position.y + obj.size.y), int(obj.size.x - 8), 2)
                 for sc in static_solid_colliders:
-                    if foot_rect.colliderect(sc.get_rect()):
-                        rb.is_grounded = True
-                        rb.velocity.y = 0
-                        obj.position.y = sc.get_rect().top - obj.size.y
+                    if foot_rect.colliderect(sc.get_aabb()):
+                        if isinstance(sc, PolygonCollider):
+                            # Slope: ground level is the polygon surface at the
+                            # player's feet, not the AABB top (the triangle apex).
+                            surf = _polygon_surface_y(sc, foot_rect.centerx)
+                            if surf is not None and foot_rect.bottom <= surf + 3.0:
+                                rb.is_grounded = True
+                                rb.velocity.y = 0
+                                obj.position.y = surf - obj.size.y
+                                break
+                        else:
+                            rb.is_grounded = True
+                            rb.velocity.y = 0
+                            obj.position.y = sc.get_aabb().top - obj.size.y
                         break
 
     def _resolve_solid_collision(self, c1: BoxCollider, c2: BoxCollider):
@@ -228,8 +285,27 @@ class Scene:
         stat_obj = static_col.game_object
         rb = dyn_obj.get_component(Rigidbody2D)
 
-        rect1 = dynamic_col.get_rect()
-        rect2 = static_col.get_rect()
+        # SLOPE / POLYGON ground: instead of box overlap push, resolve against the
+        # polygon's top surface at the character's center. This lets a character
+        # walk up and down ramps smoothly (they stand on the slanted line).
+        if isinstance(static_col, PolygonCollider):
+            if rb.velocity.y >= 0:
+                sx = dyn_obj.position.x + dyn_obj.size.x / 2.0
+                surface = _polygon_surface_y(static_col, sx)
+                if surface is not None:
+                    bottom = dyn_obj.position.y + dyn_obj.size.y
+                    # Only snap if the feet are already at/near the surface so we
+                    # don't teleport up from a steep lower wall. The tolerance band
+                    # also keeps a character from flying upward while stuffed into
+                    # the polygon's thick middle.
+                    if bottom >= surface - 3.0 and bottom <= surface + max(16.0, static_col.get_aabb().height + 8.0):
+                        dyn_obj.position.y = surface - dyn_obj.size.y
+                        rb.velocity.y = 0
+                        rb.is_grounded = True
+            return
+
+        rect1 = dynamic_col.get_aabb()
+        rect2 = static_col.get_aabb()
 
         # One-way platform: only allows standing on it from above.
         # It supports the character while landing (moving downward); from below
@@ -290,6 +366,8 @@ class Scene:
             obj.start()
 
     def update(self, dt: float):
+        if not self.active:
+            return
         # Activate newly added objects
         if self._objects_to_add:
             for obj in self._objects_to_add:
@@ -333,6 +411,11 @@ class Scene:
                 self.camera_kick = Vector2(0, 0)
 
         # Smoothly ease the camera zoom toward the target (V2.0)
+        if self._zoom_punch_timer > 0.0:
+            self._zoom_punch_timer = max(0.0, self._zoom_punch_timer - dt)
+            if self._zoom_punch_timer <= 0.0:
+                # The punch is over: zoom back to the pre-punch target.
+                self.camera_zoom_target = self._zoom_punch_base
         if self.camera_zoom != self.camera_zoom_target:
             self.camera_zoom += (self.camera_zoom_target - self.camera_zoom) * min(dt * self.zoom_smoothness, 1.0)
             if abs(self.camera_zoom - self.camera_zoom_target) < 0.002:
@@ -366,11 +449,16 @@ class Scene:
         if abs(zoom - 1.0) < 0.001:
             if self.parallax_background:
                 self.parallax_background.draw(surface, render_cam)
-            for obj in self.game_objects:
+            # Optional manual z-sort: only sorts when an object has a non-zero
+            # z_index (avoids the cost on ordinary flat scenes).
+            objs = self.game_objects
+            if any(getattr(o, "z_index", 0) for o in objs):
+                objs = sorted(objs, key=lambda o: o.z_index)
+            for obj in objs:
                 if not self._is_ui_object(obj):
                     obj.draw(surface, render_cam)
             # Draw UI objects on top (independent of camera/zoom, z-order preserved)
-            for obj in self.game_objects:
+            for obj in objs:
                 if self._is_ui_object(obj):
                     obj.draw(surface, render_cam)
             self._draw_vignette(surface)
@@ -385,7 +473,10 @@ class Scene:
         world_surf.fill(self.background_color)
         if self.parallax_background:
             self.parallax_background.draw(world_surf, render_cam)
-        for obj in self.game_objects:
+        objs = self.game_objects
+        if any(getattr(o, "z_index", 0) for o in objs):
+            objs = sorted(objs, key=lambda o: o.z_index)
+        for obj in objs:
             if not self._is_ui_object(obj):
                 obj.draw(world_surf, render_cam)
         # Scale around the center (zoom<1 pushes away, >1 pulls closer)
@@ -394,7 +485,7 @@ class Scene:
         oy = (h - zoomed.get_height()) // 2
         surface.blit(zoomed, (ox, oy))
         # Draw UI objects separately, without zoom
-        for obj in self.game_objects:
+        for obj in objs:
             if self._is_ui_object(obj):
                 obj.draw(surface, render_cam)
         self._draw_vignette(surface)

@@ -204,12 +204,15 @@ class BossController(Component):
                 name_key = f"boss_{self.boss_key}" if hasattr(self, "boss_key") and self.boss_key in ("forest", "cave", "ice", "desert", "astro") else "boss_cave_fallback"
                 name_surf = self.font.render(f"{I18n.t(name_key)}: {int(self.health.current_hp)} HP", True, (255, 210, 180))
                 surface.blit(name_surf, (bar_x, bar_y - 18))
+        # Enrage visual phase (low HP) — drawn on top of the body
+        _draw_enrage_aura(surface, self.game_object, self.health, camera_offset)
 
 
 # -----------------------------------------------------------------------------
 # Helper: boss health bar + name drawing (shared by all boss types)
 # -----------------------------------------------------------------------------
 def _draw_boss_bar(surface, obj, health, font, boss_key, camera_offset, bar_w=80):
+    _draw_enrage_aura(surface, obj, health, camera_offset)
     sx = int(obj.position.x - camera_offset.x)
     sy = int(obj.position.y - camera_offset.y)
     w = int(obj.size.x)
@@ -227,6 +230,38 @@ def _draw_boss_bar(surface, obj, health, font, boss_key, camera_offset, bar_w=80
                     else "boss_cave_fallback")
         name_surf = font.render(f"{I18n.t(name_key)}: {int(health.current_hp)} HP", True, (255, 210, 180))
         surface.blit(name_surf, (bar_x, bar_y - 18))
+
+
+def _draw_enrage_aura(surface, obj, health, camera_offset):
+    """Draws a pulsing red/amber aura + crackling sparks around a low-HP boss.
+
+    This is the VISUAL half of the 'enrage' phase (the mechanical half already
+    fires faster at low HP via fire_interval*0.75). Purely cosmetic.
+    """
+    if not health or health.max_hp <= 0:
+        return
+    pct = health.current_hp / health.max_hp
+    if pct >= 0.5 or pct <= 0:
+        return
+    sx = int(obj.position.x - camera_offset.x)
+    sy = int(obj.position.y - camera_offset.y)
+    w, h = int(obj.size.x), int(obj.size.y)
+    cx, cy = sx + w / 2, sy + h / 2
+    pulse = 0.5 + 0.5 * math.sin(pygame.time.get_ticks() * 0.012)
+    # Glowing outline that breathes (bigger/redder the closer to death)
+    strength = 1.0 - min(1.0, pct * 2.0)   # 0 at 50% -> 1 at 0%
+    r = int(max(w, h) * (0.55 + 0.25 * pulse) * (1.0 + 0.35 * strength))
+    pygame.draw.circle(surface, (180, 40, 20, 90), (int(cx), int(cy)), r, width=3)
+    pygame.draw.circle(surface, (255, 110, 30, 70), (int(cx), int(cy)), r + 5, width=2)
+    # Crackling sparks emanating outward from the shell
+    tick = pygame.time.get_ticks()
+    for i in range(6):
+        ang = tick * 0.006 + i * (math.pi / 3)
+        dist = r + 8 + int(6 * math.sin(tick * 0.02 + i * 2.4))
+        px = int(cx + math.cos(ang) * dist)
+        py = int(cy + math.sin(ang) * dist)
+        pygame.draw.line(surface, (255, 140, 40), (int(cx + math.cos(ang) * (r - 6)), int(cy + math.sin(ang) * (r - 6))),
+                         (px, py), 2)
 
 
 class FlyingBoss(Component):

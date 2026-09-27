@@ -85,6 +85,78 @@ class LockIcon(Component):
 MENU_ZOOM = 1.8
 
 
+class BiomeProgress(Component):
+    """Draws the campaign's permanent biome progress in the main menu.
+
+    Each of the five campaign biomes is a small colored badge (drawn with plain
+    polygons, no emoji/fonts) plus its localized name. Completing a biome's boss
+    unlocks it forever (stored in the savegame's `completed_biomes` list):
+      - cleared  -> bright badge, the biome color, filled with a star
+      - locked   -> dim outline badge with a padlock in the middle
+    Since is_ui=True the badges are unaffected by the menu's close-up zoom.
+    """
+    is_ui = True
+
+    # Biome colors, mirroring deep_engine/procedural.BIOMES platform colors.
+    _COLORS = {
+        "forest": (60, 150, 110),
+        "cave": (120, 80, 160),
+        "ice": (110, 190, 240),
+        "desert": (210, 140, 60),
+        "astro": (90, 90, 200),
+    }
+    _ORDER = ["forest", "cave", "ice", "desert", "astro"]
+
+    def __init__(self, completed=None, x=450, y=0, badge=26, gap=86):
+        super().__init__()
+        self.completed = set(completed or [])
+        self.x = x
+        self.y = y
+        self.badge = badge
+        self.gap = gap
+
+    def draw(self, surface, camera_offset):
+        if not self.game_object.active:
+            return
+        font = pygame.font.Font(None, 18)
+        for i, biome in enumerate(self._ORDER):
+            bx = self.x + i * self.gap
+            by = self.y
+            s = self.badge
+            color = self._COLORS.get(biome, (150, 150, 150))
+            unlocked = biome in self.completed
+            if unlocked:
+                # Filled badge in the biome color with a white star on top
+                pygame.draw.rect(surface, color, (bx, by, s, s), border_radius=s // 5)
+                pygame.draw.rect(surface, (255, 255, 255), (bx, by, s, s), 2, border_radius=s // 5)
+                cx, cy = bx + s // 2, by + s // 2
+                pts = [
+                    (cx, cy - s // 3),
+                    (cx + s // 7, cy - s // 10),
+                    (cx + s // 3, cy - s // 10),
+                    (cx + s // 7, cy + s // 10),
+                    (cx + s // 5, cy + s // 3),
+                    (cx, cy + s // 5),
+                    (cx - s // 5, cy + s // 3),
+                    (cx - s // 7, cy + s // 10),
+                    (cx - s // 3, cy - s // 10),
+                    (cx - s // 7, cy - s // 10),
+                ]
+                pygame.draw.polygon(surface, (255, 240, 180), pts)
+            else:
+                # Dim outline-only badge with a small padlock
+                pygame.draw.rect(surface, (95, 100, 110), (bx, by, s, s), 2, border_radius=s // 5)
+                lx, ly = bx + s // 2 - s // 6, by + s // 2 - s // 6
+                lock = pygame.Rect(lx, ly, s // 3, int(s * 0.45))
+                pygame.draw.rect(surface, (95, 100, 110), lock, border_radius=s // 12)
+                arc = pygame.Rect(lx, ly - s // 6, s // 3, s // 3)
+                pygame.draw.arc(surface, (95, 100, 110), arc, 0.2, 3.0, width=max(2, s // 10))
+            # Localized biome name below the badge
+            label = I18n.t("biome_" + biome)
+            text_surf = font.render(label, True, (190, 200, 215))
+            surface.blit(text_surf, (bx + s // 2 - text_surf.get_width() // 2, by + s + 4))
+
+
 class FadeOverlay(Component):
     """Fades the full-screen darkness from 255 to 0 (opening) when added to a new scene.
 
@@ -371,6 +443,21 @@ def build_main_menu_scene() -> Scene:
     hs_obj.add_component(LocalizedLabel("menu_highscore", {"score": _profile.get("high_score", 0)}))
     scene.add_object(hs_obj)
     _menu_ui.append(hs_obj)
+
+    # Campaign progress: one badge per campaign biome, unlocked forever once its
+    # boss is defeated (stored in the savegame's `completed_biomes` list).
+    prog_title = GameObject(name="ProgTitle", x=450, y=604)
+    prog_title.add_component(TextRenderer(text=I18n.t("campaign_progress"), font_size=15, color=(180, 195, 215),
+                                          is_ui=True, shadow=(0, 0, 0), center_x=True))
+    prog_title.add_component(LocalizedLabel("campaign_progress"))
+    scene.add_object(prog_title)
+    _menu_ui.append(prog_title)
+
+    prog = GameObject(name="Progress", x=450, y=632)
+    prog.add_component(BiomeProgress(completed=_profile.get("completed_biomes", []),
+                                     x=450, y=632, badge=26, gap=86))
+    scene.add_object(prog)
+    _menu_ui.append(prog)
 
     ver = GameObject(name="Version", x=15, y=575)
     ver.add_component(TextRenderer(text=f"DerinEngine v{DERINENGINE_VERSION}", font_size=13, color=(110, 140, 180), is_ui=True, shadow=(0, 0, 0)))

@@ -236,9 +236,9 @@ PAGE = r"""<!DOCTYPE html>
 
   /* ---- editor layout ---- */
   .ed-wrap { display: flex; gap: 12px; align-items: flex-start; }
-  .ed-left { width: 140px; flex-shrink: 0; }
+  .ed-left { width: 225px; flex-shrink: 0; }
   .ed-center { flex: 1; min-width: 0; }
-  .ed-right { width: 220px; flex-shrink: 0; }
+  .ed-right { width: 235px; flex-shrink: 0; }
   .ed-panel { background: #181c24; border: 1px solid #2c313c; border-radius: 10px; padding: 10px; }
   .ed-panel h3 { margin: 0 0 8px; font-size: 13px; color: #9aa4b5; text-transform: uppercase; letter-spacing: .5px; }
   .tool-btn { display: block; width: 100%; text-align: left; margin-bottom: 4px; padding: 6px 8px; background: #20242e; border: 1px solid #2c313c; border-radius: 6px; font-size: 13px; color: #dfe6f2; cursor: pointer; }
@@ -257,6 +257,20 @@ PAGE = r"""<!DOCTYPE html>
   .objitem:hover { background: #20242e; }
   .objitem.active { background: #3b6ef0; }
   .objitem span { color: #7d8699; font-size: 11px; }
+  .tl { color: #7d8699; font-size: 12px; letter-spacing: .5px; margin-right: 2px; }
+  .sep { width: 1px; height: 22px; background: #2c313c; margin: 0 4px; display: inline-block; }
+  .scroll { max-height: 260px; overflow: auto; }
+  #hier .hi { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 6px; cursor: pointer; font-size: 12px; color: #cfd6e6; }
+  #hier .hi:hover { background: #20242e; }
+  #hier .hi.active { background: #3b6ef0; color: #fff; }
+  #hier .hi .dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  #hier .hi .hname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #hier .hi .hpos { color: #7d8699; font-size: 11px; }
+  #hier .hi.active .hpos { color: #dfe6f2; }
+  #hier .hi.locked .hname { color: #ffd75e; }
+  #hier .hi.dragging { opacity: 0.4; }
+  #hier .hi button { padding: 1px 6px; font-size: 12px; background: transparent; border: none; color: #9aa4b5; cursor: pointer; }
+  #hier .hi button:hover { color: #fff; background: rgba(255,255,255,.08); border-radius: 4px; }
 </style>
 </head>
 <body>
@@ -272,10 +286,17 @@ PAGE = r"""<!DOCTYPE html>
 <!-- ============ EDITOR ============ -->
 <div class="panel active" id="editor">
   <div class="ed-bar">
-    <span class="status" style="margin-right:4px">Seviye:</span>
+    <span class="tl">Seviye</span>
     <select id="levelSelect" onchange="openLevel(this.value)" style="background:#0b0d11;border:1px solid #2c313c;color:#dfe6f2;border-radius:8px;padding:8px"></select>
-    <button class="run" onclick="saveLevelAs()">Farklı Kaydet…</button>
-    <button class="secondary" onclick="loadLevel()">Yeniden Yükle</button>
+    <button class="run" onclick="saveLevel()" title="Kaydet (Ctrl+S)">Kaydet</button>
+    <button class="secondary" onclick="saveLevelAs()" title="Yeni isimle kaydet">Farklı Kaydet…</button>
+    <button class="secondary" onclick="loadLevel()" title="Diskten tazele">Yeniden Yükle</button>
+    <span class="sep"></span>
+    <button class="secondary" onclick="undo()" title="Geri al (Ctrl+Z)">&larrhk; Geri al</button>
+    <button class="secondary" onclick="redo()" title="Yinele (Ctrl+Y)">&rarrhk;</button>
+    <button class="secondary" onclick="duplicateSelected()" title="Çoğalt (Ctrl+D)">&cong; Çoğalt</button>
+    <button class="danger" onclick="deleteSelected()" title="Sil (Delete)">Sil</button>
+    <span class="sep"></span>
     <button class="secondary" onclick="resetLevel()">Şablona Sıfırla</button>
     <button class="danger" onclick="deleteLevel()">Seviyeyi Sil</button>
     <span class="status" id="edStatus"></span>
@@ -284,35 +305,52 @@ PAGE = r"""<!DOCTYPE html>
     <b>Farklı Kaydet</b> senin isim vermeni ister (örn. <i>benim_bolum.json</i>). <b>default.json</b> hep sabit duran
     "sıfır şablon"dur, asla ezilmez.</div>
   <div class="ed-wrap">
-    <div class="ed-left ed-panel">
-      <h3>Nesneler</h3>
-      <div id="palette"></div>
+    <div class="ed-left">
+      <div class="ed-panel" style="margin-bottom:10px">
+        <h3>&#10133; Nesne Ekle</h3>
+        <div id="palette" class="scroll"></div>
+      </div>
+      <div class="ed-panel">
+        <h3>&#127795; Sahne</h3>
+        <div id="hier" class="scroll"></div>
+      </div>
     </div>
     <div class="ed-center">
+      <div class="ed-bar" style="flex-wrap:nowrap;margin-bottom:6px">
+        <button class="secondary" onclick="zoomBy(-1)" title="Uzaklaş">&minus;</button>
+        <span class="status" id="zoomLabel" style="min-width:44px;text-align:center">%100</span>
+        <button class="secondary" onclick="zoomBy(1)" title="Yakınlaş">+</button>
+        <button class="secondary" onclick="frameView();draw()" title="Sahneyi pencereye sığdır">&zigrarr;</button>
+        <span class="sep"></span>
+        <span class="status">Izgara</span>
+        <select id="sceneGrid" style="width:auto;background:#0b0d11;border:1px solid #2c313c;color:#dfe6f2;border-radius:8px;padding:6px">
+          <option value="4">4 px</option><option value="8" selected>8 px</option>
+          <option value="16">16 px</option><option value="32">32 px</option></select>
+      </div>
       <canvas id="cv" width="1280" height="560"></canvas>
-      <div class="hint">Tıkla = nesne yerleştir, sürükle = taşı, seçili nesnede köşelerden = boyut,
-      teker = yakınlaş (imleç üzerinde), ok tuşları = gez, boşluğa tıkla = seçimi bırak.
-      Izgara %GRID% px.</div>
+      <div class="ed-panel" style="margin-top:8px;padding:6px 10px">
+        <span class="status" id="statusBar">Kanvasa tıkla veya Sahne listesinden nesne seç. Tıklama ipuçları için farenin altına gel.
+          Izgara %GRID% px, teker = yakınlaş, ok tuşları = gez.</span>
+      </div>
     </div>
     <div class="ed-right">
       <div class="ed-panel" style="margin-bottom:10px">
-        <h3>Özellikler</h3>
+        <h3>&#128295; Inspector</h3>
         <div id="props">Bir nesne seç.</div>
+        <div class="ed-bar" style="margin-top:8px;margin-bottom:0">
+          <button class="secondary" onclick="duplicateSelected()">&cong; Çoğalt</button>
+          <button class="secondary" onclick="moveObj(-1)" title="Çizim sırasında yukarı (daha üstte)">&uarr;</button>
+          <button class="secondary" onclick="moveObj(1)" title="Çizim sırasında aşağı (daha altta)">&darr;</button>
+          <button class="danger" onclick="deleteSelected()">Sil</button>
+        </div>
       </div>
       <div class="ed-panel">
-        <h3>Seviye (meta)</h3>
+        <h3>&#9881; Seviye Ayarları</h3>
         <div class="prop"><label>Ad</label><input id="metaName" type="text"></div>
         <div class="prop"><label>Arka plan rengi</label><input id="metaBg" type="color" value="#101822"></div>
         <div class="prop"><label>Parallax teması</label><select id="metaTheme"></select></div>
-        <div class="prop"><label>Izgara duyarlılığı</label><select id="metaGrid">
-          <option value="4">4 px</option><option value="8" selected>8 px</option>
-          <option value="16">16 px</option><option value="32">32 px</option></select></div>
       </div>
     </div>
-  </div>
-  <div class="ed-panel objlist" style="margin-top:10px">
-    <h3>Nesne listesi</h3>
-    <div id="objlist"></div>
   </div>
 </div>
 
@@ -418,6 +456,35 @@ const TEMPLATES = %TEMPLATES%;
 const SCHEMAS = %SCHEMAS%;
 const THEMES = %THEMES%;
 
+/* ---------- undo / redo ---------- */
+let undoStack = [];
+let redoStack = [];
+const UNDO_MAX = 60;
+function record() {
+  undoStack.push(JSON.stringify(level));
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  redoStack.length = 0;
+}
+function afterRestore() {
+  if (!level) return;
+  if (sel < 0 || sel >= level.objects.length) sel = -1;
+  metaToControls(); updateProps(); updateTree(); draw(); zoomLabel();
+}
+function undo() {
+  if (!undoStack.length) return;
+  redoStack.push(JSON.stringify(level));
+  level = JSON.parse(undoStack.pop());
+  document.getElementById('edStatus').textContent = 'Geri alındı.';
+  afterRestore();
+}
+function redo() {
+  if (!redoStack.length) return;
+  undoStack.push(JSON.stringify(level));
+  level = JSON.parse(redoStack.pop());
+  document.getElementById('edStatus').textContent = 'Yinelendi.';
+  afterRestore();
+}
+
 const tabs = document.querySelectorAll('.tab');
 tabs.forEach(t => t.onclick = () => {
   tabs.forEach(x => x.classList.remove('active'));
@@ -440,7 +507,7 @@ function buildPalette() {
       document.querySelectorAll('.tool-btn').forEach(x => x.classList.remove('active'));
       b.classList.add('active');
       currentTool = JSON.parse(JSON.stringify(tpl));
-      sel = -1; updateProps(); updateList();
+      sel = -1; updateProps(); updateTree();
       draw();
     };
     pal.appendChild(b);
@@ -476,6 +543,7 @@ function draw() {
   level.objects.forEach((o, i) => {
     const x = sx(o), y = sy(o), w = o.w * zoom, h = o.h * zoom;
     if (x + w < 0 || y + h < 0 || x > cv.width || y > cv.height) return;
+    ctx.globalAlpha = (o.hidden) ? 0.22 : 1;
     ctx.fillStyle = rgbStr(colorOf(o));
     ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = i === sel ? '#ffffff' : 'rgba(0,0,0,0.5)';
@@ -491,6 +559,19 @@ function draw() {
       const hs = 5, pts = [[x,y],[x+w/2,y],[x+w,y],[x,y+h/2],[x+w,y+h/2],[x,y+h],[x+w/2,y+h],[x+w,y+h]];
       pts.forEach(p => { ctx.fillRect(p[0]-hs/2, p[1]-hs/2, hs, hs); });
     }
+    if (o.hidden) {
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.font = '10px system-ui';
+      ctx.fillText('gizli', x + 3, y - 4);
+    }
+    if (o.locked && i === sel) {
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'rgba(255,230,80,1)';
+      ctx.font = '12px system-ui';
+      ctx.fillText('\u{1F512}', x + w - 14, y - 4);
+    }
+    ctx.globalAlpha = 1;
   });
 }
 
@@ -505,6 +586,7 @@ function evtPos(e) {
 function hitIndex(wx, wy) {
   for (let i = level.objects.length - 1; i >= 0; i--) {
     const o = level.objects[i];
+    if (o.hidden) continue;
     if (wx >= o.x && wx <= o.x + o.w && wy >= o.y && wy <= o.y + o.h) return i;
   }
   return -1;
@@ -527,7 +609,8 @@ cv.addEventListener('mousedown', e => {
   if (sel >= 0 && sel < level.objects.length) {
     const o = level.objects[sel];
     const corner = cornerAt(p.wx, p.wy, o);
-    if (corner) {
+    if (corner && !o.locked) {
+      record();
       drag = { mode: 'resize', index: sel, corner, ox: o.x, oy: o.y, ow: o.w, oh: o.h };
       draw(); return;
     }
@@ -536,24 +619,35 @@ cv.addEventListener('mousedown', e => {
   if (i >= 0) {
     const o = level.objects[i];
     sel = i;
-    drag = { mode: 'move', index: i, dx: p.wx - o.x, dy: p.wy - o.y };
-    updateProps(); updateList();
+    if (!o.locked) {
+      record();
+      drag = { mode: 'move', index: i, dx: p.wx - o.x, dy: p.wy - o.y };
+    }
+    updateProps(); updateTree();
   } else if (currentTool) {
     // place a new object snapped to grid
+    record();
     const t = JSON.parse(JSON.stringify(currentTool));
     t.x = snap(p.wx);
     t.y = snap(p.wy);
     level.objects.push(t);
     sel = level.objects.length - 1;
     drag = { mode: 'place', index: sel };
-    updateProps(); updateList();
+    updateProps(); updateTree();
   } else {
-    sel = -1; updateProps(); updateList();
+    sel = -1; updateProps(); updateTree();
   }
   draw();
 });
 cv.addEventListener('mousemove', e => {
   const p = evtPos(e);
+  const sb = document.getElementById('statusBar');
+  let msg = 'İmleç: ' + Math.round(p.wx) + ', ' + Math.round(p.wy);
+  if (sel >= 0 && level.objects[sel]) {
+    const o = level.objects[sel];
+    msg += '  ·  Seçili: ' + (o.name || o.tag) + ' (' + Math.round(o.w) + '×' + Math.round(o.h) + ')';
+  }
+  sb.textContent = msg;
   if (drag) {
     if (drag.mode === 'move' || drag.mode === 'place') {
       const o = level.objects[drag.index];
@@ -581,17 +675,23 @@ cv.addEventListener('wheel', e => {
   camX = p.wx - (p.sx / nz);
   camY = p.wy - (p.sy / nz);
   zoom = nz;
-  draw();
+  draw(); zoomLabel();
 }, { passive: false });
-// canvas pan via arrow keys
+// canvas pan via arrow keys + engine-style shortcuts
 document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.target.closest('input,select,textarea')) return;
+  const ctrl = e.ctrlKey || e.metaKey;
+  if (ctrl && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
+  if (ctrl && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); redo(); return; }
+  if (ctrl && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); duplicateSelected(); return; }
+  if (ctrl && (e.key === 's' || e.key === 'S')) { e.preventDefault(); saveLevel(); return; }
   const mv = 40 / zoom;
   if (e.key === 'ArrowRight') camX += mv;
   else if (e.key === 'ArrowLeft') camX -= mv;
   else if (e.key === 'ArrowDown') camY += mv;
   else if (e.key === 'ArrowUp') camY -= mv;
   else if (e.key === 'Delete') { deleteSelected(); }
+  else if (e.key === 'Escape') { sel = -1; updateProps(); updateTree(); }
   else return;
   draw();
 });
@@ -604,6 +704,9 @@ function updateProps() {
   const key = keyOf(o);
   const schema = SCHEMAS[key] || SCHEMAS[o.tag] || [];
   let html = '<div class="prop"><label>Tip</label><input value="' + (o.name || o.tag) + '" disabled></div>';
+  if (o.locked) {
+    html += '<p class="hint">\u{1F512} Kilitli: düzenlemek için listeden kilidi aç.</p>';
+  }
   html += '<div class="prop"><label>X</label><input type="number" value="' + o.x + '" onchange="setNum(' + sel + ',\'x\',this.value)"></div>';
   html += '<div class="prop"><label>Y</label><input type="number" value="' + o.y + '" onchange="setNum(' + sel + ',\'y\',this.value)"></div>';
   html += '<div class="prop"><label>Genişlik W</label><input type="number" value="' + o.w + '" onchange="setNum(' + sel + ',\'w\',this.value)"></div>';
@@ -633,32 +736,127 @@ function updateProps() {
   });
   box.innerHTML = html;
 }
-window.setNum = (i, k, v) => { const n = parseFloat(v); if (!isNaN(n)) { level.objects[i][k] = n; draw(); } };
-window.setVal = (i, k, v) => { level.objects[i][k] = v; draw(); };
+window.setNum = (i, k, v) => { if (L(i).locked) return; const n = parseFloat(v); if (!isNaN(n)) { record(); level.objects[i][k] = n; draw(); } };
+window.setVal = (i, k, v) => { if (L(i).locked) return; record(); level.objects[i][k] = v; draw(); };
 window.setColor = (i, hex) => {
+  if (L(i).locked) return;
   const m = hex.match(/[a-f0-9]{2}/ig);
+  record();
   level.objects[i].color = m.map(x => parseInt(x, 16));
   draw();
 };
+function L(i) { return (i >= 0 && i < level.objects.length) ? level.objects[i] : {}; }
 function deleteSelected() {
-  if (sel >= 0 && sel < level.objects.length) {
+  if (sel >= 0 && sel < level.objects.length && !level.objects[sel].locked) {
+    record();
     level.objects.splice(sel, 1);
     sel = -1;
-    updateProps(); updateList(); draw();
+    updateProps(); updateTree(); draw();
     document.getElementById('edStatus').innerHTML = '<span class="ok">Nesne silindi.</span>';
   }
 }
+function duplicateSelected() {
+  if (sel < 0 || sel >= level.objects.length) return;
+  record();
+  const o = level.objects[sel];
+  const c = JSON.parse(JSON.stringify(o));
+  c.name = (o.name || o.tag) + ' (kopya)';
+  c.x = snap(o.x + 8); c.y = snap(o.y + 8);
+  level.objects.splice(sel + 1, 0, c);
+  sel = sel + 1;
+  updateProps(); updateTree(); draw();
+  document.getElementById('edStatus').innerHTML = '<span class="ok">Nesne çoğaltıldı.</span>';
+}
+function moveObj(d, idx) {
+  const i = (idx === undefined) ? sel : idx;
+  const j = i + d;
+  if (i < 0 || i >= level.objects.length || j < 0 || j >= level.objects.length) return;
+  record();
+  const o = level.objects.splice(i, 1)[0];
+  level.objects.splice(j, 0, o);
+  sel = j;
+  updateProps(); updateTree(); draw();
+}
+function zoomBy(dir) {
+  const f = dir > 0 ? 1.2 : 1 / 1.2;
+  zoom = Math.min(3, Math.max(0.25, zoom * f));
+  draw(); zoomLabel();
+}
+function zoomLabel() {
+  const el = document.getElementById('zoomLabel');
+  if (el) el.textContent = Math.round(zoom * 100) + '%';
+}
 
-/* ---------- object list ---------- */
-function updateList() {
-  const box = document.getElementById('objlist');
+/* ---------- object list (scene tree) ---------- */
+function updateTree() {
+  const box = document.getElementById('hier');
   box.innerHTML = '';
   level.objects.forEach((o, i) => {
-    const d = document.createElement('div');
-    d.className = 'objitem' + (i === sel ? ' active' : '');
-    d.innerHTML = (o.name || o.tag) + '<span> @ ' + Math.round(o.x) + ',' + Math.round(o.y) + '</span>';
-    d.onclick = () => { sel = i; updateProps(); updateList(); draw(); };
-    box.appendChild(d);
+    const row = document.createElement('div');
+    row.className = 'hi' + (i === sel ? ' active' : '') + (o.locked ? ' locked' : '');
+    row.draggable = true;
+    row.ondragstart = (ev) => { ev.dataTransfer.setData('text/plain', i); row.classList.add('dragging'); };
+    row.ondragend = () => row.classList.remove('dragging');
+    row.ondragover = (ev) => { ev.preventDefault(); };
+    row.ondrop = (ev) => {
+      ev.preventDefault();
+      const from = parseInt(ev.dataTransfer.getData('text/plain'), 10);
+      if (isNaN(from) || from === i) return;
+      record();
+      const o2 = level.objects.splice(from, 1)[0];
+      level.objects.splice(i, 0, o2);
+      sel = i;
+      updateProps(); updateTree(); draw();
+    };
+    row.onclick = () => { sel = i; updateProps(); updateTree(); draw(); };
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.style.background = rgbStr(colorOf(o));
+    dot.title = o.tag || '';
+    const name = document.createElement('span');
+    name.className = 'hname';
+    name.textContent = (o.name || o.tag || '?') + (o.hidden ? ' (gizli)' : '');
+    name.title = o.tag || '';
+    const pos = document.createElement('span');
+    pos.className = 'hpos';
+    pos.textContent = '@' + Math.round(o.x) + ',' + Math.round(o.y);
+    row.appendChild(dot); row.appendChild(name); row.appendChild(pos);
+    const gh = document.createElement('button');
+    gh.textContent = o.hidden ? '\u25C8' : '\u25C9';
+    gh.title = o.hidden ? 'Göster (tıkla)' : 'Gizle (tıkla)';
+    gh.onclick = (ev) => {
+      ev.stopPropagation();
+      record();
+      o.hidden = !o.hidden;
+      if (o.hidden && sel === i) { sel = -1; updateProps(); }
+      updateTree(); draw();
+    };
+    row.appendChild(gh);
+    const lk = document.createElement('button');
+    lk.textContent = o.locked ? '\u{1F512}' : '\u{1F513}';
+    lk.title = o.locked ? 'Kilidi aç' : 'Kilitle (düzenleme yok)';
+    lk.onclick = (ev) => {
+      ev.stopPropagation();
+      record();
+      o.locked = !o.locked;
+      updateTree(); draw();
+    };
+    row.appendChild(lk);
+    if (i > 0) {
+      const up = document.createElement('button');
+      up.textContent = '\u2191';
+      up.title = 'Yukarı taşı (çizim üstte)';
+      up.onclick = (ev) => { ev.stopPropagation(); moveObj(-1, i); };
+      row.appendChild(up);
+    }
+    if (i < level.objects.length - 1) {
+      const dn = document.createElement('button');
+      dn.textContent = '\u2193';
+      dn.title = 'Aşağı taşı (çizim altta)';
+      dn.onclick = (ev) => { ev.stopPropagation(); moveObj(1, i); };
+      row.appendChild(dn);
+    }
+    box.appendChild(row);
   });
 }
 
@@ -683,10 +881,10 @@ function controlsToMeta() {
   level.meta.background_color = [parseInt(hex.slice(0,2),16), parseInt(hex.slice(2,4),16), parseInt(hex.slice(4,6),16)];
   level.meta.parallax_theme = document.getElementById('metaTheme').value;
 }
-document.getElementById('metaName').addEventListener('change', () => { controlsToMeta(); });
-document.getElementById('metaBg').addEventListener('change', () => { controlsToMeta(); draw(); });
-document.getElementById('metaTheme').addEventListener('change', () => { controlsToMeta(); draw(); });
-document.getElementById('metaGrid').addEventListener('change', e => { gridSize = parseInt(e.target.value, 10); camX = Math.round(camX / gridSize) * gridSize; camY = Math.round(camY / gridSize) * gridSize; draw(); });
+document.getElementById('metaName').addEventListener('change', () => { record(); controlsToMeta(); });
+document.getElementById('metaBg').addEventListener('change', () => { record(); controlsToMeta(); draw(); });
+document.getElementById('metaTheme').addEventListener('change', () => { record(); controlsToMeta(); draw(); });
+document.getElementById('sceneGrid').addEventListener('change', e => { gridSize = parseInt(e.target.value, 10); camX = Math.round(camX / gridSize) * gridSize; camY = Math.round(camY / gridSize) * gridSize; draw(); });
 
 /* ---------- load / save ---------- */
 function refreshLevelSelect(levels, keep) {
@@ -708,6 +906,7 @@ function frameView() {
   zoom = Math.min(cv.width / (maxX + 80), cv.height / (maxY + 80), 1.5);
   zoom = Math.max(0.25, zoom);
   camX = 0; camY = 0;
+  zoomLabel();
 }
 async function loadLevel() {
   const r = await fetch('/api/level');
@@ -717,9 +916,10 @@ async function loadLevel() {
   camX = 0; camY = 0; zoom = 1;
   frameView();
   sel = -1;
+  undoStack = []; redoStack = [];
   refreshLevelSelect(d.levels, (d.level && d.level._name) || 'default.json');
   metaToControls();
-  updateProps(); updateList();
+  updateProps(); updateTree(); zoomLabel();
   draw();
   document.getElementById('edStatus').textContent = '';
 }
@@ -732,7 +932,8 @@ async function openLevel(name) {
   refreshLevelSelect(d.levels, name);
   frameView();
   sel = -1;
-  metaToControls(); updateProps(); updateList(); draw();
+  undoStack = []; redoStack = [];
+  metaToControls(); updateProps(); updateTree(); zoomLabel(); draw();
   document.getElementById('edStatus').innerHTML = '<span class="ok">Açıldı: ' + name + '</span>';
 }
 function saveLevelAs() {
@@ -770,15 +971,30 @@ async function doSaveAs() {
   refreshLevelSelect(lv.levels, d.name);
   document.getElementById('edStatus').innerHTML = '<span class="ok">Kaydedildi: custom_levels/' + d.name + '</span>';
 }
+async function saveLevel() {
+  const cur = document.getElementById('levelSelect').value;
+  if (!cur || cur === 'default.json') { saveLevelAs(); return; }
+  controlsToMeta();
+  const body = JSON.parse(JSON.stringify(level));
+  delete body._name;
+  const r = await fetch('/api/level/save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: cur, meta: body.meta, objects: body.objects })
+  });
+  const d = await r.json();
+  if (!d.ok) { document.getElementById('edStatus').innerHTML = '<span class="err">HATA: ' + (d.error || '') + '</span>'; return; }
+  document.getElementById('edStatus').innerHTML = '<span class="ok">Kaydedildi: custom_levels/' + d.name + '</span>';
+}
 async function resetLevel() {
   const d = await postJson('/api/level/reset', {});
   if (!d.ok) { document.getElementById('edStatus').innerHTML = '<span class="err">' + (d.error || 'hata') + '</span>'; return; }
   level = d.level;
   refreshLevelSelect(d.levels || [], 'default.json');
   sel = -1;
+  undoStack = []; redoStack = [];
   gridSize = 8; camX = 0; camY = 0; zoom = 1;
   frameView();
-  metaToControls(); updateProps(); updateList(); draw();
+  metaToControls(); updateProps(); updateTree(); zoomLabel(); draw();
   document.getElementById('edStatus').innerHTML = '<span class="ok">Şablon (default.json) editöre yüklendi — kaydetmedikçe diskte bir şey değişmez.</span>';
 }
 async function deleteLevel() {

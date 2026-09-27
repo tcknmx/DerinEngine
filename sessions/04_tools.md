@@ -108,8 +108,39 @@
     eklendi (deep-tool.bat kalıbı: chcp 65001 + köke in + çalıştır) — çifte tık
     = panel + otomatik tarayıcı. Doğrulama: py_compile + 17 uçtan uca test PASS
     (modules tr/en 13, scan11/all 0/0/0, find 16, run probe, log, `.pyx` 400,
-    new üret+koruma), `--lang en all` 0/0/0. Eski 8765 süreçleri kapatılıp sunucu
-    yeni kodla yeniden başlatıldı. ✅ Commit+Pus: `5fb747f` (26.09.2026).
+new üret+koruma), `--lang en all` 0/0/0. Eski 8765 süreçleri kapatılıp sunucu
+     yeni kodla yeniden başlatıldı. ✅ Commit+Pus: `5fb747f` (26.09.2026).
+14. **Editör → gerçek oyun motoru UI (Godot/Unity hissi)** (26.09.2026, kullanıcı
+    isteği "level editörünü hâlâ beğenmedim; düz liste istemiyorum"):
+    (a) **Sahne hiyerarşisi** — sol panel ağaç görünümü: tip rengi nokta + ad + @x,y
+    + seçim vurgusu + ↑/↓ çizim sırası butonları (`updateTree` → `#hier`; eski
+    `objlist` paneli kaldırıldı). (b) **Toolbar** — Seviye seçici, Kaydet (Ctrl+S,
+    açık dosyaya yazar; default.json seçiliyse "Farklı Kaydet"e yönlendirir),
+    Farklı Kaydet…, Yeniden Yükle | Geri al, Yinele, Çoğalt, Sil | Sıfırla, Sil +
+    durum mesajı. (c) **Inspector** — özellikler + hızlı butonlar (Çoğalt/↑/↓/Sil);
+    "Seviye Ayarları" (ad, arka plan, tema) Sağ panelde ayrı kart. (d) **Görünüm
+    çubuğu** — ‒/+/Sığdır + ızgara seçici (`sceneGrid`, eski metaGrid taşındı) +
+    zoom % etiketi. (e) **Undo/redo** — JSON snapshot yığını (60 adım; taşma
+    shift); her mutasyon öncesi `record()` (yerleştir/taşı/boyutlandır/sil/çoğalt/
+    özellik/meta/sırala); Ctrl+Z geri al, Ctrl+Shift+Z / Ctrl+Y yinele, Ctrl+D
+    çoğalt, Delete sil, Escape seçimi bırak; açılış/seviye değişimi yığını temizler.
+    (f) **Durum çubuğu** — imleç dünya koordinatları + seçili nesne adı ve boyutu
+    (canlı). Doğrulama: py_compile + 8765 (node v24 ile) sayfadan JS ayıklanıp
+    `node --check` **JS_SYNTAX_OK** + 10 yeni UI kimliği sayfada + `/api/level` 200.
+    Sunucu yeni kodla yeniden başlatıldı (tarayıcı açıldı). ✅ **Gizle/kilit +
+    sürükle-bırak sıralama TAMAMLANDI (27.09.2026, madde 15)** — aşağıya bak.
+    ⏳ **COMMIT BEKLİYOR** (kullanıcı onayı).
+
+- **Madde 15 — Webpanel gizle/kilit + sürükle-bırak sıralama (27.09.2026, OZ).**
+  (a) **Gizle**: ağaç/kanvastaki göz butonu → nesne `hidden` (çizimde %22 soluk +
+  "gizli" etiketi, tıklama/taşıma atlanır, düzenlemeler korunur). (b) **Kilit**:
+  kilit butonu → `locked` (seçiliyken 🔒 gösterilir; taşıma/resize/düzenleme/silme
+  engellenir; props panelinde uyarı satırı). (c) **Sürükle-bırak**: ağaç satırları
+  `ondragstart/ondragover/ondrop` ile yeniden sıralanır (çizim sırası değişir).
+  Görsel: `.locked`/`.dragging` CSS sınıfları. Doğrulama: JS dokuz placeholder
+  (`%GRID%` vb.) temizlenince `node --check` **JS_SYNTAX_OK**; `wp_logic_test.js`
+  node testi — hidden tıklanamaz, locked algılanır, drag sıralaması çalışır.
+  **Etkilenen:** araç dışı kod yok. ⏳ **COMMIT BEKLİYOR.**
 
 ---
 
@@ -236,9 +267,19 @@ korundu (komutlar game katmanında kayıtlı). Doğrulama: py_compile OK, `impor
 
 - **Modül 7 kullanılmayan import WARN temizliği** (`game/*.py`) — manuel, kullanıcı.
 - **tarayıcı interaktif playtest** (kullanıcıya bırakıldı).
-- **web paneli: katıştırılmış oyun sekmesi** (pygbag iframe) — aday.
-- **editör: Z geri al (undo)** — aday.
-- **`webpanel.py` git'e eklensin mi?** kullanıcı kararı (henüz commit yok).
+- **web paneli: katıştırılmış oyun sekmesi** (pygbag iframe) — aday, ertelendi.
+- **editör: gizle/kilit + sürükle-bırak sıralama** — madde 14 sonrası KALAN.
+
+## GÖREV HEDEFİ — editörü gerçek motor UI'ye çevir (26.09.2026)
+
+Kullanıcı: "level editörü Godot/Unity editörleri gibi modern oyun motoru UI olsun;
+düz JSON listesi isteğini beğenmiyorum". Dönüşüm:
+hierarchy (Sahne ağacı) + toolbar (Kaydet/Farklı/geri al/yinele/çoğalt/sil/zoom) +
+Inspector (hızlı butonlar) + durum çubuğu + klavye kısayolları (Ctrl+Z/Y/D/S,
+Delete, Esc) + **undo/redo (60 snapshot)** + kaydet (açık dosyaya, default korunur) +
+çoğalt/↑↓ çizim sırası. ✔ **KOD YAZILDI + DOĞRULANDI** (madde 14; sig-HEDEF-14;
+sunucu canlı, sayfa F5 ile görülür). ⏳ commit için kullanıcı onayı bekleniyor.
+KALAN: gizle/kilit, sürükle-bırak sıralama.
 
 ---
 

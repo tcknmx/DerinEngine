@@ -78,6 +78,8 @@ def build_procedural_level(biome=None, seed=None, chunks=8, difficulty=0):
         ctrl = player.get_component(PlayerController)
         if ctrl is not None:
             ctrl.restart_scene_factory = _restart
+            # Biome-feel physics: each biome tunes gravity/jump/grip/wind.
+            ctrl.apply_biome(data.get("biome"))
         # Death scenario
         health = player.get_component(Health)
         if health is not None:
@@ -89,9 +91,22 @@ def build_procedural_level(biome=None, seed=None, chunks=8, difficulty=0):
     _NEXT_SCENE_FACTORIES["procedural"] = build_procedural_level
 
     # Play the theme matching the scene's actual biome (correct music even with random pick)
-    SoundFX.play_music(data.get("biome", "forest"))
+    _play_theme(data.get("biome", "forest"))
 
     return scene
+
+
+def _play_theme(biome, is_boss=False, fallback="level"):
+    """Central level-music picker used by every scene builder.
+
+    Guarantees the same 'theme' logic everywhere a level is entered:
+      - boss arenas request 'boss_<biome>',
+      - anything else plays '<biome>' when known, otherwise the shared 'level' track.
+    Audio generation falls back to a safe generic track when a theme is missing
+    (Audio handles that internally), so no build path can crash or stall on music.
+    """
+    name = f"boss_{biome}" if is_boss else (biome or fallback)
+    SoundFX.play_music(name)
 
 
 # =============================================================================
@@ -130,10 +145,25 @@ def _campaign_sector_wipe():
     state.campaign_state["sector_score"] = 0
 
 
-def _campaign_sector_commit():
-    """Add the sector score to the persistent base when the sector is completed (boss defeated)."""
+def _campaign_sector_commit(biome=None):
+    """Add the sector score to the persistent base when the sector is completed (boss defeated).
+
+    When the completing sector's biome is given, it is also recorded in the
+    savegame's `completed_biomes` list: this is the permanent campaign progress
+    that the main menu shows as unlocked biome badges.
+    """
     state.campaign_state["score"] += state.campaign_state["sector_score"]
     state.campaign_state["sector_score"] = 0
+    if biome:
+        try:
+            profile = SaveGame(os.path.join(user_data_dir(), "savegame.json"))
+            done = list(profile.get("completed_biomes", []))
+            if biome not in done:
+                done.append(biome)
+                profile.set("completed_biomes", done)
+                profile.save()
+        except Exception:
+            pass  # noqa: bilinçli (progress persistence is best-effort)
 
 
 def build_campaign_entrance(biome, difficulty, index):
@@ -260,7 +290,7 @@ def build_campaign_boss(biome, difficulty, index):
     # - final (astro): victory; otherwise the next biome's entrance (difficulty +1)
     if is_final:
         def _exit():
-            _campaign_sector_commit()  # add the final sector score to the base
+            _campaign_sector_commit(biome)  # add the final sector score to the base
             state.campaign_state["index"] = 0
             return build_victory_scene()
     else:
@@ -269,7 +299,7 @@ def build_campaign_boss(biome, difficulty, index):
         nxt_diff = difficulty + 1
 
         def _exit():
-            _campaign_sector_commit()  # add the completed sector score to the persistent base
+            _campaign_sector_commit(biome)  # add the completed sector score to the persistent base
             state.campaign_state["index"] = ni
             return build_campaign_entrance(nxt_biome, nxt_diff, ni)
 
@@ -278,7 +308,8 @@ def build_campaign_boss(biome, difficulty, index):
         if gp is not None:
             gp.next_scene_factory = _exit
 
-    SoundFX.play_music("boss_" + biome)
+    _play_theme(biome, is_boss=True)
+
     return scene
 
 
@@ -309,4 +340,5 @@ def build_endless_level(difficulty, index=0):
             gp.next_scene_factory = (lambda d=difficulty: build_endless_level(d + 1))
 
     SoundFX.play_music("level")
+    _play_theme(None, fallback="level")
     return scene

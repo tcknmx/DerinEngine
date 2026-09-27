@@ -197,6 +197,7 @@ def generate(biome=None, seed=None, chunks=8, difficulty=0, viewport_width=900):
         cx0 = c * CHUNK_W
         cx1 = (c + 1) * CHUNK_W
         _maybe_island(objects, rng, cx0, cx1, seg_heights[c], b, difficulty, safe_max_x=safe_max_x)
+        _maybe_ramp(objects, rng, cx0, cx1, seg_heights[c], b, safe_max_x=safe_max_x)
         _maybe_breakable(objects, rng, cx0, cx1, seg_heights[c], safe_max_x=safe_max_x,
                          is_last_chunk=(c == chunks - 1))
 
@@ -367,6 +368,35 @@ def _maybe_island(objects, rng, cx0, cx1, ground_y, b, difficulty=0, safe_max_x=
         # Sniper: on elevated platforms, only at high difficulty levels
         if difficulty >= 3:
             _push(objects, "SniperEnemy", ix + 24, iy - 40, 24, 26, (120, 200, 90))
+
+
+def _maybe_ramp(objects, rng, cx0, cx1, ground_y, b, safe_max_x=0):
+    """A sloped ramp reaching down from the ground into reachable terrain.
+
+    Uses the engine's PolygonCollider slope support: the player walks up/down
+    the triangle surface instead of stopping at an invisible box. The ramp sits
+    INLINE with the ground (its low edge touches the segment top = ground_y),
+    so it reads as natural terrain, not a floating prop.
+
+    It is never placed inside the spawn safe zone. Only occasionally (chance),
+    so ramps stay a set-piece, not the default ground type.
+    """
+    if safe_max_x and cx0 < safe_max_x:
+        return
+    if rng.random() >= 0.30:
+        return
+    # The ramp spans up to ~2/3 of the chunk; low edge = the ground line.
+    rw = rng.choice([120, 160, 200])
+    rh = rng.randint(56, 96)
+    rx = rng.randint(cx0 + 40, cx1 - rw - 20)
+    slope = 1 if rng.random() < 0.5 else -1
+    _push(objects, "Ramp", rx, ground_y - rh, rw, rh, b["platform"], slope=slope)
+    # Reward atop the high edge: coins, following the ramp line.
+    if slope > 0:
+        coin_x = rx + rw - 40
+    else:
+        coin_x = rx + 40
+    _push(objects, "Coin", coin_x, ground_y - rh - 30, 18, 18, b["coin"])
 
 
 def _maybe_breakable(objects, rng, cx0, cx1, ground_y, safe_max_x=0, is_last_chunk=False):

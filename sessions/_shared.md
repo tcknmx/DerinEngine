@@ -8,12 +8,65 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[OYUN] Rampa + keyframe + biyom fiziği + kampanya ilerleme haritası tamamlandı
+  (27.09.2026, `03_game.md`).** Kullanıcı: son KALAN kolonu "continue" → sırayla:
+  **(a)** Prosedürel seviyeye eğimli rampa bölümü: `builders._build_ramp` (`RampVisual`
+  üçgen bileşeni + `PolygonCollider`), `procedural._maybe_ramp` (%30, safe-zone dışı,
+  slope ±1, tepe coin) → RAMP_GEN_OK (40 seed/53 ramp) + RAMP_BUILD_OK. **(b)** Flyer
+  bob'u `KeyframeAnimator`'a taşındı (`_build_flyer`) → FLYER_KF_OK. **(c)** Müzik tema
+  bağlama merkezileşti: `scenes._play_theme(biome, is_boss, fallback)` (procedural/boss/
+  endless tek yerden). **(d)** Biyoma özel fizik: `PlayerController.apply_biome()` —
+  `biome_gravity/jump/grip/wind` çarpanları (ice kaygan, cave ağır, desert rüzgârlı,
+  astro düşük-yerçekimli), oyun akışında `data["biome"]` ile bağlandı → BIOME_PHYS_OK.
+  **(e)** Kampanya ilerleme haritası (deneyim 8): menüde 5 biyom rozeti
+  (`ui.BiomeProgress`), boss yenilince savegame `completed_biomes` listesi kalıcı →
+  COMMIT_SAVE_OK + MENU_BOOT_OK. Doğrulama: py_compile 31 dosya OK, `deep-tool
+  --lang en all` → **0 WARN, 0 BUG, 0 ERR** (DEVİR temizliği de bitti). **Etkilenen:**
+  oyun + i18n (`campaign_progress`, `biome_*` — TR/EN). COMMIT+PUŞ bekliyor
+  (önceki motor 2–5 batch'i ile birlikte, webpanel dahil).
+
+- **[MOTOR] Özellik 2–5 + slopes tamamlandı (27.09.2026, `02_engine.md`).** Kullanıcı: "hepsine
+  başla, 1-1,5 saat dışarıdayken çal" → 5 yeni motor yeteneği eklendi + doğrulandı:
+  **2) Çokgen/daire/segment çarpışma** (`PolygonCollider`/`CircleCollider`, SAT,
+  `scene.py` generic çarpışma hattı), **3) Sahne ağacı + SceneManager** (parent/child
+  hiyerarşisi, lokal konum + `world_position`, push/pop overlay sahne yığını, `Scene.active`),
+  **4) Keyframe animasyon** (`KeyframeAnimator` — tween eğrileriyle sayı/renk/Vector2
+  interpolasyonu, path alias `sprite.color`), **5) Tilemap + katman + kamera fx** (YENİ
+  `deep_engine/tilemap.py`, ızgara katmanları + ekran kesme (culling), `zoom_punch`),
+  **slopes/eğik zemin** (`_polygon_surface_y` rampa yüzeyi; karakter rampa boyunca smooth
+  yürür). Yeni exportlar: `CircleCollider`, `PolygonCollider`, `SceneManager`,
+  `KeyframeAnimator`, `Tilemap`. Doğrulama: py_compile OK, `deep-tool --lang en all`
+  0 BUG/0 ERR, endless 64 obje 180-frame sim OK, headless Engine 30 frame OK, testler
+  `COLLIDER_MATH_OK`/`SCENE_TREE_OK`/`KEYFRAME_OK`/`TILEMAP_OK`/`SLOPE_OK` geçti.
+  **Etkilenen:** motor katmanı (deep_engine/) — oyun kodu DEĞİŞMEDİ (geriye uyumlu);
+  yeni yetenekleri oyunda kullanmak ayrı görev → `03_game.md` KALAN'a eklenecek.
+
+- **[SİSTEM] Gemini + Antigravity tamamen temizlendi (27.09.2026).** Kullanıcı: "gemini+agy ile
+  başlamıştık ama artık opencode'dayız; onlardan kalan projeyle ilgili bi şey varsa incele,
+  gereksizse sil — sadece opencode kalsın." Tarama sonucu: eski **MiniEngine** (DerinEngine'in
+  önceki hayatı) kuruluş tarihçesi `.gemini` içindeydi; `implementation_plan.md` (Editör Crash +
+  Motor Kapasitesi) değerli tek belgeydi ama tüm fikirleri DerinEngine'de **zaten mevcut**
+  (saflık kuralı, `scene.py` shake, `components.py` Animator/Event/Tween, builders JSON) —
+  kayıp bilgi yok. `01_strategy.md` "NOT (veri)" güncellendi. Silinen: `C:\Users\token\.gemini`
+  (38,3 MB) + `AppData\Roaming\antigravity` (19,3 MB) + `AppData\Local\antigravity` (4,3 MB).
+  Masaüstü `galeri\Gemini_Generated_Image_*` kullanıcının kişisel görselleri — DOKUNULMADI.
+  **Etkilenen:** proje kodu/oyun yok; sadece dış ajan kalıntıları temizlendi.
+
+- **[ARAÇ] webpanel editörü gerçek oyun motoru UI oldu (26.09.2026, `04_tools.md` madde 14).**
+  Godot/Unity hissi: sol **Sahne hiyerarşisi** (tip noktası + ad + ↑/↓ çizim sırası,
+  eski düz liste kaldırıldı), üst **toolbar** (Kaydet Ctrl+S / Farklı Kaydet / Geri al /
+  Yinele / Çoğalt / Sil + zoom sığdır + ızgara seçici), sağ **Inspector** (hızlı butonlar),
+  alt durum çubuğu (imleç coords + seçili). **Undo/redo** eklendi (60 snapshot; Ctrl+Z,
+  Ctrl+Shift+Z/Ctrl+Y, Ctrl+D çoğalt, Delete sil, Esc seçim bırak). **Etkilenen:** sadece
+  webpanel (araç) — oyun/motor yok. Doğrulama: py_compile + `node --check` JS_OK + 10 UI
+  kimliği sayfada + API 200. 8765 yeni kodla çalışıyor (F5). COMMIT+PUŞ bekliyor.
+
 - **[ARAÇ] webpanel UX paketi (26.09.2026, `04_tools.md` madde 13).** deep-tool'a
   **`--api modules`** eklendi (gerçek TR/EN modül adları) → webpanel çipleri artık
   canlı; tarama çıktısı renkli (W/B/E/i); tarayıcı otomatik açılıyor (çifte tık
   için `webpanel.bat` eklendi); 8765 doluysa yumuşak davran; log sekmesi "canlı
   izle". 17 test + `--lang en all` 0/0/0. **Etkilenen:** araç dışı kod yok; sunucu
-  yeni kodla yeniden başlatıldı (sayfa F5 yeterli). COMMIT+PUŞ bekliyor.
+  yeni kodla yeniden başlatıldı (sayfa F5 yeterli). ✅ Commit+push: `5fb747f` (+`3e7869c`).
 
 - **[ARAÇ] deep-tool arayüzü web paneline geçti (26.09.2026, `04_tools.md` madde 12).**
   deep-tool'a **`--api` JSON modu** eklendi (`scan`/`find`/`new` → yapılandırılmış çıktı;
