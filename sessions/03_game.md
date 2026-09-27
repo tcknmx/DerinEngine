@@ -141,6 +141,12 @@
   animasyonları, tween tabanlı), `Camera.zoom_punch` (boss vuruş anı). > RAMPA + düşman
   keyframe animasyonu + biyom fiziği TAMAMLANDI (aşağıya kayıt düşüldü). Kalan: tilemap
   zeminleri, overlay pause sahnesi, zoom_punch burst bağlaması (oyun oturumunda sırada).
+- **Yeni motor 6+7 yeteneklerini oyuna bağlamak (28.09.2026 eklendi, `02_engine.md`'de
+  hazır):** `Tilemap.to_segments()`/`to_data()` (veri katmanı — prosedürel zeminleri
+  segment geometrisine dökmek / kaydedip yüklemek) ve motor-UI kiti (`Panel`/`Button`/
+  `ScrollContainer`) — menü/pause/options ekranlarını kurarken kullanılabilir.
+  (İlk somut aday: menüdeki Sonsuz Mod kilit satırını veya pause katmanını kit ile
+  yeniden kurmak; oyun oturumunda sıraya alınır.)
 - **deneyim_iyilestirmeleri 5–8** (aşağıda, bu dosyaya taşındı — orijinal dosya silindi):
   1. (1–4 zaten uygulandı; 5 TAMAMLANDI, 6–7 uygulandı; 8 TAMAMLANDI — aşağıya bak.)
 
