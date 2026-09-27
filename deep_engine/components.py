@@ -1,5 +1,6 @@
 import pygame
 from .math2d import Vector2
+from .log import log
 
 def _slow_dt(dt):
     """Slows down the dt of non-player entities while the time-slow powerup is active.
@@ -677,8 +678,8 @@ class Health(Component):
                 sc = getattr(Engine.instance, "active_scene", None)
                 if sc is not None and hasattr(sc, "flash"):
                     sc.flash(0.55)
-            except Exception:
-                pass  # noqa: bilinçli
+            except Exception as e:
+                log.debug("hasar flasi cizilemedi: %r" % (e,))
         else:
             # On an enemy/boss hit: punchy shake + a strong hit sound
             SoundFX.play("boss_hit" if getattr(self.game_object, "tag", "") == "Boss" else "hit")
@@ -725,8 +726,8 @@ class Health(Component):
                 scene.add_object(em)
                 emitter.burst(count=14, color=color, speed_range=(60, 240), size_range=(3, 7),
                               lifespan_range=(0.4, 0.8), gravity=120.0, origin_offset=center)
-        except Exception:
-            pass  # noqa: bilinçli
+        except Exception as e:
+            log.debug("olum patlamasi partikulleri hatasi: %r" % (e,))
 
     def _shake(self, amount: float):
         """Adds screen shake (trauma) to the active scene."""
@@ -735,8 +736,8 @@ class Health(Component):
             eng = Engine.instance
             if eng and eng.active_scene:
                 eng.active_scene.add_shake(amount)
-        except Exception:
-            pass  # noqa: bilinçli
+        except Exception as e:
+            log.debug("ekran sarsintisi eklenemedi: %r" % (e,))
 
     def update(self, dt: float):
         if self.invulnerable_timer > 0:
@@ -899,8 +900,8 @@ class _AutoRemove(Component):
                 eng = Engine.instance
                 if eng and eng.active_scene and self.game_object in eng.active_scene.game_objects:
                     eng.active_scene.game_objects.remove(self.game_object)
-        except Exception:
-            pass  # noqa: bilinçli
+        except Exception as e:
+            log.debug("AutoRemove temizligi basarisiz: %r" % (e,))
 
 
 class SpawnIn(Component):

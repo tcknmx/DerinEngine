@@ -18,6 +18,7 @@ Usage:
 import json
 import os
 import sys
+from .log import log
 
 # Persistence in the browser (pygbag/emscripten): the MEMFS filesystem resets
 # on page refresh. So save data is also mirrored to the browser's persistent
@@ -39,8 +40,8 @@ def _local_storage():
         from platform import window
         if hasattr(window, "localStorage"):
             return window.localStorage
-    except Exception:
-        pass  # noqa: bilinçli
+    except Exception as e:
+        log.debug("localStorage erisilemedi, dosya kaydi kullanilacak: %r" % (e,))
     return None
 
 
@@ -54,8 +55,8 @@ def _storage_to_file(local, data):
         return
     try:
         local.setItem(_WS_KEY, json.dumps(data, ensure_ascii=False))
-    except Exception:
-        pass  # noqa: bilinçli
+    except Exception as e:
+        log.warn("localStorage kaydi basarisiz, yalnizca dosyada saklanacak: %r" % (e,))
 
 
 def _storage_from_file(local):

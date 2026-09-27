@@ -2,6 +2,7 @@ import math
 import struct
 import io
 import pygame
+from .log import log
 
 class SoundFX:
     """Audio engine that synthesizes retro 8-bit sounds in memory, with no external audio files."""
@@ -31,8 +32,9 @@ class SoundFX:
         """
         try:
             return pygame.mixer.Sound(io.BytesIO(raw))
-        except Exception:
-            pass  # noqa: bilinçli
+        except Exception as e:
+            # BytesIO'den dogrudan cozulemedi -> temp-file fallback denenir (asagi)
+            log.debug("Sound bytes decode denemesi basarisiz: %r; onbekleme dosyasi deneniyor" % (e,))
         try:
             import os
             import hashlib
@@ -41,8 +43,8 @@ class SoundFX:
             candidates = []
             try:
                 candidates.append(os.path.join(base, f"_snd_{digest}_{channels}ch.wav"))
-            except Exception:
-                pass  # noqa: bilinçli
+            except Exception as e:
+                log.debug("ses onbellek yolu olusturulamadi: %r" % (e,))
             candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), f"_snd_{digest}_{channels}ch.wav"))
             last = None
             for fp in candidates:
@@ -279,8 +281,8 @@ class SoundFX:
         if snd:
             try:
                 snd.play()
-            except Exception:
-                pass  # noqa: bilinçli
+            except Exception as e:
+                log.warn("SoundFX.play basarisiz (%s): %r" % (sound_name, e))
 
     @classmethod
     def play_jump(cls):
@@ -293,8 +295,8 @@ class SoundFX:
         if snd:
             try:
                 snd.play()
-            except Exception:
-                pass  # noqa: bilinçli
+            except Exception as e:
+                log.warn("SoundFX.play_jump basarisiz (%s): %r" % (pick, e))
 
     @classmethod
     def play_powerup(cls, power_type=None):
@@ -311,8 +313,8 @@ class SoundFX:
         if snd:
             try:
                 snd.play()
-            except Exception:
-                pass  # noqa: bilinçli
+            except Exception as e:
+                log.warn("SoundFX.play_powerup basarisiz (%s): %r" % (key, e))
 
     # ---  8-bit chiptune music (mathematical background melody) ---
     _NOTE = {

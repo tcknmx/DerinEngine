@@ -6,6 +6,7 @@ from .input import Input
 from .scene import Scene
 from . import __version__ as ENGINE_VERSION
 from . import user_data_dir
+from .log import log
 
 class Engine:
     """Main core of the DerinEngine game engine."""
@@ -99,8 +100,8 @@ class Engine:
                 prof = SaveGame(os.path.join(user_data_dir(), "savegame.json"))
                 prof.set("lang", I18n.current_lang)
                 prof.save()
-            except Exception:
-                pass  # noqa: bilinçli
+            except Exception as e:
+                log.debug("dil tercihi savegame'e yazilamadi: %r" % (e,))
             from .audio import SoundFX
             SoundFX.play("coin")
 
@@ -156,7 +157,7 @@ class Engine:
                 from platform import window as _w
                 _w.console.log("[ENGINE] " + str(msg))
             except Exception:
-                pass  # noqa: bilinçli
+                log.debug("web konsol mesaji gonderilemedi")  # print yedeği asagida
             print("[ENGINE] " + str(msg), flush=True)
 
         self.is_running = True
@@ -199,7 +200,7 @@ class Engine:
                 if rb and pc:
                     p_dbg = f"P: grounded={rb.is_grounded} coy={pc.coyote_timer:.2f} buf={pc.jump_buffer_timer:.2f} dbl={pc.can_double_jump} wall={pc.wall_sliding} vy={rb.velocity.y:.0f} slow={self._time_slow_remaining:.2f}"
         except Exception:
-            pass  # noqa: bilinçli
+            log.debug("debug katmani oyuncu bilgisini toplayamadi")
         debug_texts = [
             f"[DerinEngine v{ENGINE_VERSION} Debug - F3 to Toggle]",
             f"FPS: {fps} (dt: {dt*1000:.1f}ms)",

@@ -8,6 +8,21 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[MOTOR] Meh/Motor deep-tool DEVİR GÖREVİ tamamlandı (27.09.2026, `02_engine.md`).**
+  Kullanıcı: Önceki motor işi commit sonrası MOTOR KALAN'ı bitir. **(1) Sessiz
+  except'ler bilinçlendi (20 nokta):** `audio.py` (5), `components.py` (4), `core.py`
+  (3), `savegame.py` (2) → `log` importu eklendi; hatalar `log.debug`/`log.warn` ile
+  motor.log'a düşüyor (oyun davranışı değişmedi). `log.py` (6) — logger kendi içinde
+  log çağıramaz (sonsuz döngü) → `pass` yerine akış ifadeleri (handle None/continue/
+  return). Sonuç: `deep_engine/` tarafında Modül 7 "boş except" listesi **tamamen
+  sıfırlandı**. **(2) Ölü import `_m`:** zaten yoktu. **(3) Modül 6 O(n²):** tüm satırlar
+  incelendi → sabit-küçük/sabit-list/cull = yanlış pozitif, collision zaten uzaysal grid
+  (CELL=128) → kod değişmedi; ARAÇ tarayıcı önerisi `04_tools.md` KALAN'a eklendi.
+  Doğrulama: py_compile 32 dosya OK, deep-tool --lang tr all **0 WARN/0 BUG/0 ERR**,
+  menü 180 frame + ses/log yolları headless OK. **Etkilenen:** oyun/araç oturumları —
+  `game/main/webpanel` tarafı boş-except listesi onlara ait (kendi oturumlarında).
+  ⏳ **COMMIT+PUŞ bekliyor.**
+
 - **[MOTOR] İki bekleyen motor özelliği tamamlandı (27.09.2026, `02_engine.md`).**
   Kullanıcı: commit+push sonrası kalan KALAN'ları tamamla. **(6) Veri katmanı:**
   `Tilemap.to_data()/from_data()` (JSON-safe roundtrip) + `to_segments()` — dolu

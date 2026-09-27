@@ -291,8 +291,34 @@ bozuk dosyalar için `py_compile`, her değişiklikte "oyun X sn çökmeden boot
      `deep_engine/procedural.py`: L249
    - Yanlış pozitifse kod değiştirme; ARAÇ oturumuna "tarayıcı ayarı gerekli" notu ver.
 
-Doğrulama: `python tools\deep-tool.py --lang tr all` → Modül 1 sessiz-except ve Modül 7
-kullanılmayan-import WARN'ları sıfır; headless boot smoke (menü + seviye) hatasız.
+> **TAMAMLANDI (27.09.2026, MOTOR oturumu):**
+> **Madde 1 — sessiz except'ler bilinçlendi.** 20 noktada `pass` yerine anlamlı ifade
+> (MotorLogger `log.debug`/`log.warn` ya da akış/atama) koyuldu → deep_engine/ tarafında
+> Modül 7 "boş except" listesi ve WARN'lar **sıfırlandı**. Özet:
+>   - `audio.py` (5): `log` importu eklendi; BytesIO decode fallback'i `log.debug`,
+>     `play/play_jump/play_powerup` hataları `log.warn` (kanal sınırı nadirdir).
+>   - `components.py` (4): `log` importu eklendi; hasar flaşı, ölüm patlaması,
+>     sarsıntı, AutoRemove hataları `log.debug`.
+>   - `core.py` (3): `log` importu eklendi; savegame dil yazma, web konsol yansıması
+>     (print yedeği aynen durur), debug overlay oyuncu bilgisi `log.debug`.
+>   - `savegame.py` (2): `log` importu eklendi; localStorage erişilemezse `log.debug`,
+>     yazma başarısızsa `log.warn`.
+>   - `log.py` (6): logger kendi içinde log çağıramaz (sonsuz döngü) → `pass` yerine
+>     akış ifadeleri: `self._file_handle = None` (kapatma/yazma hatasında referansı
+>     temizle), `continue` (bozuk handler'ı atla), `return` (konsol/tarayıcı yoksa).
+>   - NOT: `deep_engine/editor.py` artık yok (webpanel'e taşındı) — o satırlar güncel.
+> **Madde 2 — `_m` ölü import:** zaten yoktu, deep-tool Modül 11 artık raporlamıyor.
+> **Madde 3 — Modül 6 O(n²):** tüm satırlar incelendi → **yanlış pozitif** (sabit
+> boyutlu küçük döngüler: sessentez tamponları, vignette cache, `candidates`=2 eleman,
+> parallax 4 bulut/18 yıldız, tilemap görünür-hücre cull, procedural `count≤4`) veya
+> **düşük önem** (scene.py L245 stable-ground O(n×m) `break` ile erken çıkar; collision
+> zaten uzaysal grid CELL=128 ile karededir). Kod değişikliği GEREKMEDİ. ARAÇ tarayıcı
+> ayarı önerisi: Modül 6 küçük-sabit listeleri (ör. `< 32` hücre/satır) yanlış-pozitif
+> notuyla yumuşatabilir → `04_tools.md` KALAN'a eklendi.
+> **Doğrulama:** py_compile 32 dosya OK; `deep-tool --lang tr all` → **0 WARN, 0 BUG,
+> 0 ERR**; headless menü 180 frame + ses/log best-effort yolları OK (MENU_BOOT_OK,
+> AUDIO_LOG_OK). Oyun davranışı değişmedi (yalnız görünürlük/niyet).
+> ⏳ KALAN commit+push (kullanıcı onayı).
 
 ---
 

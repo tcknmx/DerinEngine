@@ -269,6 +269,10 @@ korundu (komutlar game katmanında kayıtlı). Doğrulama: py_compile OK, `impor
 - **tarayıcı interaktif playtest** (kullanıcıya bırakıldı).
 - **web paneli: katıştırılmış oyun sekmesi** (pygbag iframe) — aday, ertelendi.
 - **editör: gizle/kilit + sürükle-bırak sıralama** — madde 14 sonrası KALAN.
+- **Modül 6 (Performans) yanlış-pozitif yumuşatması** (27.09, MOTOR devri — `02_engine.md`):
+  O(n²) satırlarının tamamı incelendi; hepsi ya sabit-küçük liste ya cull'lanmış çizim
+  ya da zaten uzaysal grid. Tarayıcı, küçük-sabit iç döngüleri (ör. `< 32` eleman/tampon)
+  yanlış-pozitif olarak işaretlemeyebilir → temiz tarama.
 
 ## GÖREV HEDEFİ — editörü gerçek motor UI'ye çevir (26.09.2026)
 
