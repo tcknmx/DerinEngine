@@ -16,6 +16,7 @@ from deep_engine import (
     __version__ as DERINENGINE_VERSION,
     user_data_dir,
 )
+from deep_engine.ui import UITheme, Panel, Button
 
 
 from . import state
@@ -577,4 +578,140 @@ def build_victory_scene() -> Scene:
     scene.add_object(t4)
 
     SoundFX.play_music("victory")
+    return scene
+
+
+class PauseController(Component):
+    """Handles the pause overlay: resume (ESC) and the give-up/to-menu flow.
+
+    The pause screen is a transparent overlay pushed on the SceneManager stack.
+    - ESC -> pops the overlay back to the frozen game scene.
+    - 'M' -> returns to the main menu (abandon the current run).
+    - The resume button (UI kit Button, focused by default) also pops.
+    """
+    is_ui = True
+
+    def __init__(self):
+        super().__init__()
+        self._focused_index = 0
+        self._buttons = []          # (Button, callback) pairs
+        self._button_keys = []      # (Button, i18n_key) pairs for T refresh
+
+    def start(self):
+        scene = Engine.instance.active_scene
+        # The pause scene exposes its interactive buttons for focus handling.
+        self._buttons = list(getattr(scene, "_pause_buttons", []))
+        for i, (btn, _) in enumerate(self._buttons):
+            btn.focused = (i == self._focused_index)
+
+    def _resume(self):
+        SoundFX.play("click")
+        sm = Engine.instance.scene_manager
+        if sm is not None:
+            sm.pop()
+        return True
+
+    def _to_menu(self):
+        SoundFX.play("click")
+        from .scenes import build_main_menu_scene
+        if self._resume():
+            Engine.switch_scene(build_main_menu_scene())
+        return True
+
+    def update(self, dt: float):
+        # Language hotkey (T) also refreshes the pause buttons in the new language
+        if Input.get_key_down("T"):
+            for btn, key in self._button_keys:
+                btn.set_text(I18n.t(key))
+        # Keyboard navigation between the buttons (up/down, WASD not needed)
+        total = len(self._buttons)
+        if total == 0:
+            return
+        if Input.get_key_down("DOWN") or Input.get_key_down("S"):
+            self._focused_index = (self._focused_index + 1) % total
+            SoundFX.play("click")
+        elif Input.get_key_down("UP") or Input.get_key_down("W"):
+            self._focused_index = (self._focused_index - 1) % total
+            SoundFX.play("click")
+        # ESC = "back/close overlay" (the default on the pause screen)
+        if Input.get_key_down("ESCAPE"):
+            self._resume()
+            return
+        # ENTER/Space activates the focused button
+        if Input.get_key_down("ENTER") or Input.get_key_down("SPACE"):
+            btn, callback = self._buttons[self._focused_index]
+            if callback is not None:
+                callback()
+            return
+        # 'M' jumps straight to the main menu
+        if Input.get_key_down("M"):
+            self._to_menu()
+            return
+        for i, (btn, _) in enumerate(self._buttons):
+            btn.focused = (i == self._focused_index)
+
+
+def build_pause_scene() -> Scene:
+    """Pause overlay: a transparent scene (frozen world visible below) with a
+    dark panel, a title and the Resumé / Main Menu buttons (engine UI kit).
+    """
+    scene = Scene(name="Pause", background_color=(8, 10, 16))
+    scene.transparent = True
+
+    theme = UITheme(
+        panel_bg=(22, 26, 38),
+        panel_border=(90, 100, 130),
+        button_bg=(50, 70, 110),
+        button_hover=(70, 95, 150),
+        button_focus=(220, 220, 235),
+        button_text=(235, 240, 250),
+    )
+
+    dim = GameObject(name="PauseDim", x=0, y=0, width=800, height=600)
+    dim.add_component(Panel(theme=theme, color=(10, 12, 20), border=None,
+                            radius=0, alpha=150))
+    scene.add_object(dim)
+
+    title = GameObject(name="PauseTitle", x=400, y=120)
+    title.add_component(TextRenderer(text=I18n.t("pause_title"), font_size=44,
+                                     color=(255, 220, 90), is_ui=True,
+                                     center_x=True, shadow=(0, 0, 0)))
+    title.add_component(LocalizedLabel("pause_title"))
+    scene.add_object(title)
+
+    hint = GameObject(name="PauseHint", x=400, y=182)
+    hint.add_component(TextRenderer(text=I18n.t("pause_hint"), font_size=16,
+                                    color=(170, 185, 210), is_ui=True,
+                                    center_x=True, shadow=(0, 0, 0)))
+    hint.add_component(LocalizedLabel("pause_hint"))
+    scene.add_object(hint)
+
+    # Interactive buttons: (font_center_x) resume + main menu
+    pause_controller = PauseController()
+
+    resume = GameObject(name="ResumeBtn", x=300, y=240, width=200, height=46)
+    resume_button = Button(text=I18n.t("pause_resume_btn"), on_click=pause_controller._resume,
+                           theme=theme, font_size=22)
+    resume.add_component(resume_button)
+    scene.add_object(resume)
+
+    menu = GameObject(name="MenuBtn", x=300, y=306, width=200, height=46)
+    menu_button = Button(text=I18n.t("pause_menu_btn"), on_click=pause_controller._to_menu,
+                         theme=theme, font_size=22)
+    menu.add_component(menu_button)
+    scene.add_object(menu)
+
+    # The controller needs the button list AFTER they're added (order = focus order)
+    pause_controller._buttons = [(resume_button, resume_button.on_click),
+                                 (menu_button, menu_button.on_click)]
+    pause_controller._button_keys = [(resume_button, "pause_resume_btn"),
+                                     (menu_button, "pause_menu_btn")]
+    scene._pause_buttons = pause_controller._buttons
+    ctrl_obj = GameObject(name="PauseCtrl", x=0, y=0)
+    ctrl_obj.add_component(pause_controller)
+    scene.add_object(ctrl_obj)
+
+    # ESC on the pause overlay = close it and return to the frozen game
+    scene.on_escape = pause_controller._resume
+
     return scene

@@ -66,6 +66,13 @@ class I18n:
             "boss_objective": "HEDEF: Yıldızları topla ve bölüm sonu canavarını yok et!",
             "boss_defeated": "CANAVAR YIKILDI! ZAFER PORTALINA GİR!",
             
+            "pause_title": "DURAKLATMA",
+            "pause_resume": "[ESC] Devam Et",
+            "pause_menu": "[M] Ana Menü",
+            "pause_hint": "Dinlenme molası — oyun donduruldu",
+            "pause_resume_btn": "Devam Et",
+            "pause_menu_btn": "Ana Menü",
+
             "game_over_title": "OYUN BİTTİ!",
             "game_over_subtitle": "Tüm Canların Tükendi...",
             "game_over_restart": "Yeniden Denemek İçin [R] veya [SPACE]'e Bas",
@@ -147,6 +154,12 @@ class I18n:
             
             "game_over_title": "GAME OVER!",
             "game_over_subtitle": "You Ran Out of Lives...",
+            "pause_title": "PAUSED",
+            "pause_resume": "[ESC] Resume",
+            "pause_menu": "[M] Main Menu",
+            "pause_hint": "Break time — the game is frozen",
+            "pause_resume_btn": "Resume",
+            "pause_menu_btn": "Main Menu",
             "game_over_restart": "Press [R] or [SPACE] to Retry",
             "game_over_menu": "Press [M] to Return to Main Menu",
             

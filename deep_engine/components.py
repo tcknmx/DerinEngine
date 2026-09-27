@@ -81,8 +81,11 @@ class SpriteRenderer(Component):
         self.color = color
         self.shape = shape  # 'rect', 'circle'
         self.border_radius = border_radius
+        self.visible = True  # False hides the shape (colliders stay active)
 
     def draw(self, surface: pygame.Surface, camera_offset: Vector2):
+        if not self.visible:
+            return
         obj = self.game_object
         screen_x = int(obj.position.x - camera_offset.x)
         screen_y = int(obj.position.y - camera_offset.y)

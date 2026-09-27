@@ -25,6 +25,7 @@ from .ui import (
     build_main_menu_scene,
     build_game_over_scene,
     build_victory_scene,
+    build_pause_scene,
 )
 from . import builders as _builders
 
@@ -32,6 +33,85 @@ _NEXT_SCENE_FACTORIES = {
     "victory": build_victory_scene,
     "menu": build_main_menu_scene,
 }
+
+def _attach_ground_tilemap(scene, data):
+    """Rasterizes the generated ground into a real Tilemap (grid + 2 color layers).
+
+    The procedural generator emits ground as flat rect sprites. This helper
+    converts the ground footprint into 32px grid cells on a Tilemap attached to
+    the scene, and hides the old flat ground sprites (colliders stay for physics).
+    The scene keeps a `_tilemap_ground` reference (and its `to_segments()` line
+    segments under `_tilemap_segments`) as the runtime <-> editor bridge.
+    """
+    from deep_engine import Tilemap, SpriteRenderer, GameObject
+    bname = data.get("biome")
+    if not bname:
+        return
+    from deep_engine import procedural as proc
+    b = proc.BIOMES.get(bname)
+    if not b:
+        return
+
+    ts = 32
+    grounds = [e for e in data["objects"] if e.get("tag") == "Ground"]
+    if not grounds:
+        return
+
+    # World bounding box of all ground rects
+    min_x = int(min(e["x"] for e in grounds))
+    min_y = int(min(e["y"] for e in grounds))
+    max_x = int(max(e["x"] + e["w"] for e in grounds))
+    max_y = int(max(e["y"] + e["h"] for e in grounds))
+
+    cols = (max_x - min_x) // ts + 1
+    rows = (max_y - min_y) // ts + 1
+    grid = [[None] * cols for _ in range(rows)]
+
+    def _fill(e, tid):
+        c0 = int((e["x"] - min_x) // ts)
+        c1 = int((e["x"] + e["w"] - min_x - 0.01) // ts)
+        r0 = int((e["y"] - min_y) // ts)
+        r1 = int((e["y"] + e["h"] - min_y - 0.01) // ts)
+        # Upper layers (top surface, id 1) win over subsoil (id 2): a cell that
+        # overlaps both keeps the top-surface color.
+        for r in range(max(0, r0), min(rows, r1 + 1)):
+            for c in range(max(0, c0), min(cols, c1 + 1)):
+                if grid[r][c] is None or tid == 1:
+                    grid[r][c] = tid
+
+    top = tuple(b["platform"])          # surface color -> tile id 1
+    soil = tuple(b["platform_alt"])     # subsoil color -> tile id 2
+    for e in grounds:
+        color = tuple(e.get("color", []))
+        if color[:3] == soil:
+            _fill(e, 2)
+    for e in grounds:
+        color = tuple(e.get("color", []))
+        if color[:3] == top:
+            _fill(e, 1)
+
+    tm_obj = GameObject(name="TilemapGround", x=min_x, y=min_y,
+                        width=cols * ts, height=rows * ts, tag="Tilemap")
+    tm = tm_obj.add_component(Tilemap(tile_size=ts, offset=(min_x, min_y)))
+    tm.set_tile_set({1: top, 2: soil})
+    tm.add_layer(grid)
+    scene.add_object(tm_obj)
+
+    # Hide the old flat ground sprites (their colliders stay for physics);
+    # islands (one-way platforms) keep their sprite, only solid ground hides.
+    from deep_engine import BoxCollider
+    for obj in scene.find_all_by_tag("Ground"):
+        col = obj.get_component(BoxCollider)
+        if col is not None and col.one_way:
+            continue
+        spr = obj.get_component(SpriteRenderer)
+        if spr is not None:
+            spr.visible = False
+
+    # Geometry bridge: keep the tilemap + its outline segments on the scene.
+    scene._tilemap_ground = tm
+    scene._tilemap_segments = tm.to_segments()
+
 
 def build_procedural_level(biome=None, seed=None, chunks=8, difficulty=0):
     """Builds a random biome/level scene from the procedural generator.
@@ -62,6 +142,13 @@ def build_procedural_level(biome=None, seed=None, chunks=8, difficulty=0):
         place_object(scene, dict(entry))
 
     scene.start()
+
+    # Real tilemap ground: rasterize the flat Ground rects into a 32px grid
+    # (2 color layers: platform surface + subsoil) and hide the old sprites.
+    _attach_ground_tilemap(scene, data)
+
+    # ESC opens the pause overlay while playing (menu_idle keeps quit behavior)
+    _register_pause(scene)
 
     # Write the target star count to the UI
     _builders._finalize_goal_ui(scene)
@@ -107,6 +194,28 @@ def _play_theme(biome, is_boss=False, fallback="level"):
     """
     name = f"boss_{biome}" if is_boss else (biome or fallback)
     SoundFX.play_music(name)
+
+
+def _register_pause(scene):
+    """Wires ESC -> pause overlay to a game scene.
+
+    On the main menu (player `menu_idle`) ESC keeps its default quit behavior;
+    everywhere else ESC freezes the scene and opens the pause overlay.
+    """
+    sm = Engine.instance.scene_manager
+    if sm is None:
+        return
+    sm.register("pause", build_pause_scene())
+
+    def _on_escape():
+        player = scene.find_by_tag("Player")
+        ctrl = player.get_component(PlayerController) if player is not None else None
+        if ctrl is not None and getattr(ctrl, "menu_idle", False):
+            return False  # main menu -> ESC quits the game as usual
+        sm.push("pause")
+        return True
+
+    scene.on_escape = _on_escape
 
 
 # =============================================================================
@@ -252,6 +361,9 @@ def build_campaign_boss(biome, difficulty, index):
     for entry in data["objects"]:
         place_object(scene, dict(entry))
     scene.start()
+
+    # ESC opens the pause overlay while playing (menu_idle keeps quit behavior)
+    _register_pause(scene)
 
     # In the boss arena the goal is defeating the boss, not collecting stars -> adjust the UI
     chain = state.campaign_state["chain"]

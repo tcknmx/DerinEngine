@@ -109,15 +109,29 @@ class Engine:
         if Input.get_key_down("F3"):
             self.show_debug_info = not self.show_debug_info
 
-        # Quit with ESC
+        # Quit with ESC (unless the active scene takes over ESC, e.g. a pause overlay)
         if Input.get_key_down("ESCAPE"):
-            self.is_running = False
+            handled = False
+            if self.active_scene is not None:
+                _hook = getattr(self.active_scene, "on_escape", None)
+                if callable(_hook):
+                    try:
+                        handled = bool(_hook())
+                    except Exception as e:
+                        log.debug("sahne ESC hooku hata verdi: %r" % (e,))
+            if not handled:
+                self.is_running = False
 
         # 3. Update & Draw
+        # An overlay scene (transparent, e.g. Pause) still shows the frozen scene below it.
+        if self.active_scene.transparent and self.scene_manager is not None:
+            below = self.scene_manager.below_scene
+            if below is not None and below is not self.active_scene:
+                below.draw(self.screen)
         self.active_scene.update(dt)
         self.active_scene.draw(self.screen)
         # Apply 2D dynamic lighting
-        if self.lighting and self.active_scene.name not in ["Main Menu", "Zafer Ekrani", "Game Over"]:
+        if self.lighting and self.active_scene.name not in ["Main Menu", "Pause", "Zafer Ekrani", "Game Over"]:
             self.lighting.render_lights(self.screen, self.active_scene, self.active_scene.render_camera)
 
         # 4. Debug info overlay (FPS, object count, etc.)

@@ -74,6 +74,8 @@ class Scene:
         self._objects_to_destroy = []
         self._objects_to_add = []
         self.active = True   # False = paused/hidden (used by overlay stack)
+        self.transparent = False  # True = draws its world/UI without filling the screen (overlay scenes like Pause)
+        self.on_escape = None  # optional callable() -> True if ESC handled by this scene (pause), False/None = quit
         self.camera_position = Vector2(0, 0)
         self.camera_target = None  # the object the camera will follow (e.g. the Player)
         self.camera_smoothness = 5.0
@@ -442,7 +444,8 @@ class Scene:
             surface.blit(rs, (0, 0))
 
     def draw(self, surface: pygame.Surface):
-        surface.fill(self.background_color)
+        if not self.transparent:
+            surface.fill(self.background_color)
         render_cam = self.render_camera
         zoom = self.camera_zoom
         # Normal (no zoom) drawing — the most common path, optimized for performance.

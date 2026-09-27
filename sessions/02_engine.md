@@ -262,6 +262,15 @@ bozuk dosyalar için `py_compile`, her değişiklikte "oyun X sn çökmeden boot
   SCROLL_RANGE_OK, SCROLL_DRAG_OK, UI_DRAW_OK, UI_KIT_OK. (Oyun tarafında kullanımı
   ayrı görev → `03_game.md`.)
 - (Bekliyor) motor özelliği 1 (Event+Tween) sonrası temizlik: docs/tests.
+  > **HEDEF (28.09.2026):** Event (`Component.on/emit`) ve Tween sistemine
+  > tamamlayıcı test + kısa doküman notu ekle (başlangıç kaydı).
+  > **TAMAMLANDI (27.09.2026):** yeni `tests/test_engine_core.py` → `python tests\test_engine_core.py`
+  > = `ALL OK`. Kapsar: Event `on/once/off/emit` (once tek tetik, off tek callback + tümünü
+  > temizleme, kwargs iletimi) + Tween float/Vector2/color (yerinde Vector2 yazımı, renk
+  > clamp 0-255), zincir `after()`, `delay`, easing string (bounce/back), `clear()`.
+  > Not: `to()` source'unu `getattr/setattr` ile okuduğundan attribute nesneleri kullanılır
+  > (dict DEĞİL — test `SimpleNamespace`).
+- (Bekliyor) motor özelliği 6 — **veri katmanı**: tilemap verilerini dosyaya
 
 ---
 

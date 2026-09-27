@@ -8,6 +8,21 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[MOTOR+OYUN] 4'lü grup işi tamamlandı (27.09.2026, `02_engine.md` + `03_game.md`).**
+  Kullanıcı: "yap hepsini" (tilemap zeminleri + overlay pause + motor-UI kiti + Event/Tween
+  test). **(A) Gerçek tilemap zeminler:** `build_procedural_level` artık Ground rect'lerini
+  32px grid'e rasterliyor (`_attach_ground_tilemap`): üst yüzey = biome platform rengi,
+  alt toprak = platform_alt; solid Ground sprite'ları gizleniyor (`SpriteRenderer.visible`
+  — motor özellik, collider kalır), one-way adalar görünmüyor. **(B) Overlay pause:**
+  `Scene.transparent` + motor ESC `on_escape` kancası + `SceneManager.push/pop` (tek-overlay).
+  ESC oyunda pause açar (`Pause` sahnesi = Panel + UI Kit `Button`), menüde çıkış korunur;
+  pause açıkken oyun sahnesi donuk alt katta çizilir, lighting pause'ta çizilmez. **İki ESC
+  durumunu** her oyun sahnesi `scene.on_escape` ile yönetir (`menu_idle` ayrımı).
+  **(C) Boss ölümü** `zoom_punch(1.18, 0.35)` (kamera çekmesi, slow-mo ile birlikte).
+  **(D) Event+Tween test:** yeni `tests/test_engine_core.py` → `python tests\test_engine_core.py`
+  = `ALL OK`. doğrulama: deep-tool **0 WARN / 0 BUG / 0 ERR** (tüm modüller). commit `TBD`.
+  Dokümantasyon: oyun KALAN maddesi (boss zoom_punch) tamamlandı; `02_engine.md` HEDEF kayıtları.
+
 - **[MOTOR] Meh/Motor deep-tool DEVİR GÖREVİ tamamlandı (27.09.2026, `02_engine.md`).**
   Kullanıcı: Önceki motor işi commit sonrası MOTOR KALAN'ı bitir. **(1) Sessiz
   except'ler bilinçlendi (20 nokta):** `audio.py` (5), `components.py` (4), `core.py`

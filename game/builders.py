@@ -399,6 +399,8 @@ def _build_boss(scene, data):
         eng._time_slow_factor = 0.28
         if eng and eng.active_scene:
             eng.active_scene.add_shake(0.9)
+            # Zoom punch: a quick dramatic camera pull-in on the boss' death blow.
+            eng.active_scene.zoom_punch(1.18, 0.35)
             # Big multi-burst explosion at the boss's position whenever it dies.
             if boss.game_object:
                 emitter = boss.game_object.get_component(ParticleEmitter)

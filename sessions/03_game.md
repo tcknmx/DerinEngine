@@ -134,6 +134,13 @@
 
 ## OYUN KALAN (bekleyen oyun işleri, sıra kullanıcıyla)
 
+> **HEDEF (28.09.2026, grup görevi — "yap hepsini"):** (1) prosedürel seviyede gerçek
+> tilemap zeminleri (ızgara + katman), (2) overlay pause katmanı (`SceneManager` ile
+> menü üstünde duraklatma), (3) zoom_punch burst bağlaması, (4) motor-UI kitini oyuna
+> taşıma (menü/pause en az bir ekranda `deep_engine/ui.Button`). Doğrulama: py_compile
+> + deep-tool 0 WARN/0 BUG/0 ERR + headless boot (pause + menü).
+> **TAMAMLANDI (27.09.2026) — aşağıya kalıcı kayıt düşüldü.**
+
 - **Yeni motor yeteneklerini oyuna bağlamak (27.09.2026 eklendi, motor özellikleri 2–5
   `02_engine.md`'de hazır):** seviye/builder tarafında `Tilemap` (gerçek ızgara zeminleri
   + katman) ve `PolygonCollider` ile **eğimli rampalar / çokgen platformlar** kullanılabilir;
@@ -141,6 +148,8 @@
   animasyonları, tween tabanlı), `Camera.zoom_punch` (boss vuruş anı). > RAMPA + düşman
   keyframe animasyonu + biyom fiziği TAMAMLANDI (aşağıya kayıt düşüldü). Kalan: tilemap
   zeminleri, overlay pause sahnesi, zoom_punch burst bağlaması (oyun oturumunda sırada).
+  **> BU BLOK TAMAMLANDI (27.09.2026) — `_attach_ground_tilemap` + Pause overlay +
+  zoom_punch aşağıya kaydedildi (grup görevi).**
 - **Yeni motor 6+7 yeteneklerini oyuna bağlamak (28.09.2026 eklendi, `02_engine.md`'de
   hazır):** `Tilemap.to_segments()`/`to_data()` (veri katmanı — prosedürel zeminleri
   segment geometrisine dökmek / kaydedip yüklemek) ve motor-UI kiti (`Panel`/`Button`/
@@ -169,6 +178,27 @@
 
 ### OYUN TAMAMLANANLAR (27.09.2026 — motor özellikleri 2–5 + kemik oturumu)
 
+- **Gerçek tilemap zeminler (grup görevi, TAMAMLANDI)**: `scenes.py`'de
+  `_attach_ground_tilemap(scene, data)` — `build_procedural_level` sonrası Ground
+  rect'lerini 32px grid'e rasterler (2 katman: üst = biyom `platform` rengi, alt =
+  `platform_alt` toprak rengi); `TilemapGround` GameObject (tag="Tilemap") +
+  `Tilemap(tile_size=32, offset=(min_x,min_y))`; solid Ground sprite'ları
+  `SpriteRenderer.visible=False` ile gizlenir (collider fonksiyonu aynen durur, one-way
+  adalar görünür kalır); `scene._tilemap_ground` + `_tilemap_segments = tm.to_segments()`
+  köprüsü. build_endless_level + boss hariç tüm prosedürel seviyeler otomatik kapsanır.
+- **Overlay pause katmanı (grup görevi, TAMAMLANDI)**: `deep_engine/scenemanager.py`
+  `push/pop` (tek-overlay, alt sahne donuk kalır — `start()` yeniden çağrılmaz) +
+  `Scene.transparent` + motor `on_escape` kancası; `ui.py` `build_pause_scene()` +
+  `PauseController` (Panel + UI Kit `Button`, ESC devam / M menü / "Devam Et" pop /
+  "Ana Menü" switch); `scenes._register_pause(scene)` tüm oyun sahnelerine bağlandı
+  (menüde `menu_idle` → ESC çıkış korunur, oyunda ESC → pause). doğrulama headless:
+  PUSH/POP_OK, MENU_ESC_OK, BOSS_ESC_PAUSE_OK.
+- **Boss ölümü zoom_punch (grup görevi, TAMAMLANDI)**: `builders.on_boss_death` →
+  `eng.active_scene.zoom_punch(1.18, 0.35)` (vuruş anı kamera çekmesi, slow-mo ile
+  birleşir). Motor `Camera.zoom_punch` önceden hazırdı; artık bağlı.
+- **Motor-UI kiti oyuna taşındı (grup görevi, TAMAMLANDI)**: pause ekranı
+  `deep_engine/ui.Button` + `Panel` + `UITheme` ile kuruldu (ilk somut kullanım);
+  i18n `pause_title/pause_hint/pause_resume_btn/pause_menu_btn` tr+en.
 - **Müzik tema bağlama derinliği**: `scenes.py`'de merkezi `_play_theme(biome, is_boss=False,
   fallback="level")`; procedural, boss (`is_boss=True`) ve endless (`fallback="level"`)
   artık tek yerden tema seçiyor; ui.py victory yerinde. py_compile OK.
