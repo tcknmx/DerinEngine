@@ -72,6 +72,7 @@ from .tween import (
 )
 from .scenemanager import SceneManager
 from .tilemap import Tilemap
+from .ui import UITheme, Panel, Button, ScrollContainer
 from .log import log, MotorLogger, WARN, BUG, ERR, INFO, DEBUG
 
 __all__ = [
@@ -125,4 +126,8 @@ __all__ = [
     "ERR",
     "INFO",
     "DEBUG",
+    "UITheme",
+    "Panel",
+    "Button",
+    "ScrollContainer",
 ]

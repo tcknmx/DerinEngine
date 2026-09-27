@@ -20,6 +20,10 @@ class Tilemap(Component):
 
     The tile map itself is not a collider: attach a BoxCollider (or a custom
     per-tile collider builder in the game layer) on the same object when needed.
+
+    The tile map is fully serializable through to_data()/from_data() and can
+    export its solid cells as boundary line segments via to_segments() -- the
+    bridge toward runtime/edit-time geometry (.map) tooling.
     """
     def __init__(self, tile_size=32, offset=(0, 0)):
         super().__init__()
@@ -74,6 +78,91 @@ class Tilemap(Component):
             if self.get_tile(l, col, row) is not None:
                 return True
         return False
+
+    # --- Data layer (JSON-compatible serialization / geometry export) --------
+    def to_data(self) -> dict:
+        """Serializes the tile map into a plain dict (JSON-safe).
+
+        Keys: `tile_size`, `offset`, `tile_set` (ids as strings; a tile entry is
+        `None` for air or a [r,g,b] color) and `layers` (each layer a list of
+        rows, each row a list of ids). No engine/game classes leak into the data.
+        """
+        tile_set = {}
+        for tid, color in self.tile_set.items():
+            if color is None:
+                tile_set[str(tid)] = None
+            elif isinstance(color, (tuple, list)) and len(color) >= 3:
+                tile_set[str(tid)] = list(color[:3])
+        return {
+            "tile_size": self.tile_size,
+            "offset": [self.offset[0], self.offset[1]],
+            "tile_set": tile_set,
+            "layers": [
+                {"z": layer["z"], "grid": [list(row) for row in layer["grid"]]}
+                for layer in self.layers
+            ],
+        }
+
+    @classmethod
+    def from_data(cls, data: dict) -> "Tilemap":
+        """Rebuilds a Tilemap from a `to_data()` dict (colors re-tupled)."""
+        tm = cls(tile_size=data.get("tile_size", 32))
+        tm.offset = list(data.get("offset", (0, 0)))
+        tile_set = {}
+        for key, color in data.get("tile_set", {}).items():
+            tile_set[int(key)] = tuple(color) if isinstance(color, (tuple, list)) else None
+        tm.set_tile_set(tile_set)
+        for layer in data.get("layers", []):
+            tm.add_layer([list(row) for row in layer["grid"]], z_index=layer.get("z", 0))
+        return tm
+
+    def to_segments(self, layer=-1) -> list:
+        """Exports solid cells as boundary line segments (world-space polygons).
+
+        For every solid cell, its four edges are emitted as `((x1,y1),(x2,y2))`
+        tuples UNLESS the neighbouring cell in that direction is also solid (shared
+        inner edges are culled). The result is the map's outline as connected
+        line segments -- a first-class `geometry` representation usable by the
+        runtime, physics re-checks or .map-style editors. Uses the bottom layer
+        (layer=-1) or a specific layer.
+        """
+        ts = self.tile_size
+        ox, oy = self.offset[0], self.offset[1]
+        spans = range(len(self.layers)) if layer < 0 else [layer]
+        rows = len(self.layers[spans[0]]["grid"]) if self.layers else 0
+        cols = len(self.layers[spans[0]]["grid"][0]) if rows else 0
+
+        def _filled(l, c, r):
+            """A cell is filled only if it has an actual drawable color (mirrors draw())."""
+            tid = self.get_tile(l, c, r)
+            return tid is not None and self.tile_set.get(tid) is not None
+
+        solid = [[[any(_filled(l, c, r) for l in spans)] for c in range(cols)]
+                 for r in range(rows)]
+        segments = []
+        for r in range(rows):
+            for c in range(cols):
+                if not any(solid[r][c]):
+                    continue
+                x0 = ox + c * ts
+                y0 = oy + r * ts
+                edges = [
+                    ((x0, y0), (x0 + ts, y0)),           # top
+                    ((x0 + ts, y0), (x0 + ts, y0 + ts)), # right
+                    ((x0, y0 + ts), (x0 + ts, y0 + ts)), # bottom
+                    ((x0, y0), (x0, y0 + ts)),           # left
+                ]
+                neighbours = [
+                    (r - 1, c),  # top
+                    (r, c + 1),  # right
+                    (r + 1, c),  # bottom
+                    (r, c - 1),  # left
+                ]
+                for edge, (nr, nc) in zip(edges, neighbours):
+                    if 0 <= nr < rows and 0 <= nc < cols and any(solid[nr][nc]):
+                        continue  # inner edge shared with a solid neighbour
+                    segments.append(edge)
+        return segments
 
     # --- Rendering ----------------------------------------------------------
     def draw(self, surface: pygame.Surface, camera_offset):

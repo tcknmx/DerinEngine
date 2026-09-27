@@ -201,6 +201,13 @@ class Input:
         return cls._mouse_pos
 
     @classmethod
+    def get_mouse_button(cls, button=0):
+        """Is the Left (0), Middle (1) or Right (2) mouse button HELD down?"""
+        if 0 <= button < 3:
+            return cls._mouse_buttons[button]
+        return False
+
+    @classmethod
     def get_mouse_button_down(cls, button=0):
         """Was the Left (0), Middle (1) or Right (2) button pressed?"""
         if 0 <= button < 3:

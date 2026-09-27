@@ -8,6 +8,22 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[MOTOR] İki bekleyen motor özelliği tamamlandı (27.09.2026, `02_engine.md`).**
+  Kullanıcı: commit+push sonrası kalan KALAN'ları tamamla. **(6) Veri katmanı:**
+  `Tilemap.to_data()/from_data()` (JSON-safe roundtrip) + `to_segments()` — dolu
+  hücrelerin dış sınır segmentlerini üretir (iç kenarlar cull; boş = tile_set'te
+  rengi olmayan ID, `draw()` ile tutarlı). `.map` köprüsünün veri/geometri adımı.
+  **(7) Motor-UI kiti:** YENİ `deep_engine/ui.py` — `UITheme` (override edilebilir
+  palet), `Panel` (yuvarlak panel), `Button` (hover/press/focus, mouse tık +
+  ENTER/gamepad-A, `enabled`/`on_click`), `ScrollContainer` (madde listesi, clip
+  + scrollbar: wheel + handle drag, `on_pick`). `Input.get_mouse_button()` (basılı
+  tutma) eklendi. Yeni exportlar: `UITheme`, `Panel`, `Button`, `ScrollContainer`.
+  Doğrulama: py_compile 32 dosya OK, `deep-tool --lang en all` → **0 WARN, 0 BUG,
+  0 ERR**, testler TEST1/TEST2_OK + BUTTON_CLICK/SCROLL_PICK/SCROLL_DRAG/UI_DRAW/
+  UI_KIT_OK, oyun menüsü 120 frame headless OK. **Etkilenen:** motor (dotcom) —
+  oyun kodu gönüllü değişmedi; kiti oyunda kullanmak ayrı görev (`03_game.md`).
+  ⏳ **COMMIT+PUŞ bekliyor** (kullanıcı onayı).
+
 - **[OYUN] Rampa + keyframe + biyom fiziği + kampanya ilerleme haritası tamamlandı
   (27.09.2026, `03_game.md`).** Kullanıcı: son KALAN kolonu "continue" → sırayla:
   **(a)** Prosedürel seviyeye eğimli rampa bölümü: `builders._build_ramp` (`RampVisual`

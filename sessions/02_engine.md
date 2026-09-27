@@ -245,11 +245,22 @@ bozuk dosyalar için `py_compile`, her değişiklikte "oyun X sn çökmeden boot
   (oyun `scenes._play_theme` merkezi; yukarıya 27.09 kaydı bak).
 - (Bekliyor) motor özelliği 6 — **veri katmanı**: tilemap verilerini dosyaya
   serileştirip geri yükleme (`.map` köprüsü: tilegrid → sınır segmentleri/custom
-  geometry). İlk adım: `Tilemap.to_data/from_data` + dolu hücrelerden çevre
-  segmentleri üreten `to_segments()`.
+  geometry). > **TAMAMLANDI (27.09.2026):** `Tilemap.to_data()`/`from_data()`
+  (JSON-safe roundtrip) + `to_segments()` (dolu hücrelerin dış sınır segmentleri;
+  iç kenarlar cull; boş = tile_set'te rengi olmayan ID — draw() ile tutarlı).
+  Testler: TEST1_OK (2x2 blok → 8 segman, iç kenar yok) + TEST2_OK (2 katman
+  roundtrip → 14 segman, üst katman hücresi sınır yapıyor).
 - (Bekliyor) motor özelliği 7 — **motor-UI kiti**: `deep_engine/ui.py` içinde
   Panel/Button/ScrollContainer + temalar (mouse/klavye/gamepad etkileşimi); mevcut
-  oyun menüsü/HUD bileşenleri zamanla bu kit'e taşınır. Oyun kullanımı `03_game.md`.
+  oyun menüsü/HUD bileşenleri zamanla bu kit'e taşınır. > **TAMAMLANDI (27.09.2026):**
+  YENİ `deep_engine/ui.py` — `UITheme` (renk paleti, override edilebilir),
+  `Panel` (yuvarlak dikdörtgen panel), `Button` (hover/press/focus durumları,
+  mouse tık + ENTER/gamepad-A aktivasyonu, `enabled`/`on_click`), `ScrollContainer`
+  (madde listesi, clip + scrollbar, wheel + handle drag, `on_pick`). `Input`'a
+  `get_mouse_button()` (basılı tutma) eklendi. Exportlar: `UITheme`, `Panel`,
+  `Button`, `ScrollContainer`. Testler: BUTTON_CLICK_OK, SCROLL_PICK_OK,
+  SCROLL_RANGE_OK, SCROLL_DRAG_OK, UI_DRAW_OK, UI_KIT_OK. (Oyun tarafında kullanımı
+  ayrı görev → `03_game.md`.)
 - (Bekliyor) motor özelliği 1 (Event+Tween) sonrası temizlik: docs/tests.
 
 ---
