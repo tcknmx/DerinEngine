@@ -8,6 +8,27 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[OYUN-HTML] Boss M2 tamamlandı — gerçek boss arenası (28.09.2026,
+  `01_strategy.md` [2] port planı M2).** `deep_engine_html/game/bosses.js` YENİ
+  (Python `game/bosses.py` birebir portu): `BossController`/`FlyingBoss`/
+  `SniperBoss`/`CosmicBoss`/`ShieldBoss` + paylaşılan boss bar/`_draw_enrage_aura`;
+  canvas çizimleri (fillRect/arc/line). `builders.js`: `register_builder/extractor
+  ("Boss", ...)` + `_build_boss` (Python `_build_boss` eşi: flying/sniper/cosmic
+  trigger+rigidbody YOK, shield/archer Rigidbody+katı; `next`→`scene_key`;
+  `on_boss_death` → slow-mo 0.28 + shake + `zoom_punch(1.18,0.35)` + patlama +
+  portal unlock + `campaign_defeated` etiketi). `scenes.js`: `build_campaign_boss`
+  M1 kabuğu → **gerçek arena** (`procedural_generate_boss_arena`; boss UI; ölümde
+  aynı girişe dönüş; `_exit`: final→zafer, değilse sonraki biyom). **Motor
+  `Scene`'e zoom katmanı eklendi** (Python `scene.py` eşi): `zoom_to`/
+  `zoom_punch`/`set_vignette`/`flash` + `camera_zoom_target`/`_zoom_punch_timer`/
+  `_vignette`/`hit_flash` + draw'da zoom ölçekleme + vinyet (gradyan feature-guard).
+  `index.html`'e `game/bosses.js` (entities'ten sonra, ui'dan önce).
+  **`test_game.js` 63/63 ALL OK** (TEST8b: arena kurulumu, boss tipi/hp, kilitli
+  portal, ölüm→portal açılır+slow-mo+zoom punch, çıkış sonraki giriş, astro
+  cosmic→zafer+endless_unlocked). Tüm süitler yeşil: motor 353/353 + browser 23/23
+  + tools 24/24. Etkilenen: HTML oyun (3 dosya + index.html) + `core.js`;
+  **Py motor ve Py oyun DEĞİŞMEDİ**. M3 sıra: menü zoom vinyetini kullanmak +
+  FadeOverlay + tilemap + boss giriş duyurusu.
 - **[OYUN-HTML] Star Collector Hero portu M1 oynanabilir çekirdek (28.09.2026,
   `01_strategy.md` [2] port planı).** `deep_engine_html/game/*.js` portu ilerledi:
   yeni `state` (paylaşımlı `DE_GAME.savegame()` tekil profili — Python tek

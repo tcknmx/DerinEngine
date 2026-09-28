@@ -2,7 +2,7 @@
  * game/*.js katmanının headless doğrulaması:
  *  - prosedürel seviye kurulumu (Player/Portal/Coin), düşme/zıplama/dash/ateş,
  *  - coin toplama -> skor + streak + portal kilidi açma,
- *  - kampanya zinciri (astro son, boss kabuğu ilerlemesi, zafer),
+ *  - kampanya zinciri (astro son, boss arenası, ölüm -> portal açılır, zafer),
  *  - sonsuz mod portalı, ana menü (menu_idle -> P ile kampanya başlar).
  * Çalıştır: node deep_engine_html\test_game.js
  */
@@ -32,7 +32,7 @@ function loadGame(name) {
   const code = fs.readFileSync(path.join(__dirname, "game", name), "utf8");
   new Function("DE", "window", "document", "DE_GAME", code)(global.DE, windowStub, documentStub, global.DE_GAME);
 }
-for (const f of ["state.js", "entities.js", "ui.js", "scenes.js", "builders.js"]) loadGame(f);
+for (const f of ["state.js", "entities.js", "bosses.js", "ui.js", "scenes.js", "builders.js"]) loadGame(f);
 
 // --- Input stub: tarayıcı yok; get_key/get_key_down/get_horizontal_axis vb. statikleri. ---
 class FakeInput {
@@ -251,19 +251,47 @@ let campaign;
     && typeof portals[0].get_component(DE_GAME.GoalPortal).next_scene_factory === "function");
 }
 
-console.log("TEST8b boss kabuğu (M1) ilerletir:");
+console.log("TEST8b boss arenası (M2):");
 {
   const cs = DE_GAME.state.campaign_state;
   const chain = cs["chain"];
-  // İlk biyomun boss'u -> sonraki biyomun girişine atlar.
-  const next = DE_GAME.build_campaign_boss(chain[0], 1, 0);
-  const expectedNext = "Prosedürel " + DE.PR_BIOMES[chain[1]]["name_tr"];
-  check("boss kabuğu sonraki girişe gitti", next !== null
-    && next.name === expectedNext && cs["index"] === 1, next.name + " index=" + cs["index"]);
-  // Final (astro) -> Zafer ekranı + index sıfırlanır.
+  // İlk biyomun boss'u -> gerçek arena üretir (boss + kilitli portal + boss UI).
+  const arena = DE_GAME.build_campaign_boss(chain[0], 1, 0);
+  use(arena);
+  const boss = arena.find_by_tag("Boss");
+  check("boss nesnesi kuruldu", boss !== null);
+  check("boss tipi geçerli", boss !== null && (
+    boss.boss_type === "archer" || boss.boss_type === "flying" ||
+    boss.boss_type === "sniper" || boss.boss_type === "shield"), boss && boss.boss_type);
+  const bhp = boss ? boss.get_component(DE.Health) : null;
+  check("boss Health var", bhp !== null && bhp.max_hp > 0, bhp ? "hp=" + bhp.max_hp : null);
+  check("boss komponenti kuruldu", boss !== null && (
+    boss.get_component(DE_GAME.BossController) !== null ||
+    boss.get_component(DE_GAME.FlyingBoss) !== null ||
+    boss.get_component(DE_GAME.SniperBoss) !== null ||
+    boss.get_component(DE_GAME.ShieldBoss) !== null));
+  const gp = arena.find_all_by_tag("Portal")[0].get_component(DE_GAME.GoalPortal);
+  check("çıkış portalı boss'un next'ini paylaşır", boss !== null && boss.scene_key === "campaign_next_entrance");
+  check("portal kilitli", gp.is_unlocked === false);
+  // Boss'u yen -> ölüm davranışı: portal açılır, slow-mo + zoom punch tetiklenir.
+  bhp.take_damage(999999);
+  check("boss öldü (inactive)", boss.active === false);
+  check("portal AÇILDI", gp.is_unlocked === true);
+  check("boss ölümünde time-slow set", DE.Engine.instance._time_slow_remaining > 0);
+  check("boss ölümünde zoom_punch tetiklendi", arena.camera_zoom_target > 1.0 || arena._zoom_punch_timer > 0);
+  // Çıkış fabrikası: sonraki biyomun girişine gider + index ilerler.
+  const exited = gp.next_scene_factory();
+  check("çıkış sonraki girişe gitti", exited !== null && cs["index"] === 1);
+  // Final (astro) -> gerçek arena + boss ölünce Zafer ekranı.
   cs["index"] = 4;
-  const victory = DE_GAME.build_campaign_boss("astro", 5, 4);
-  check("final boss kabuğu zafer ekranı üretir", victory !== null && victory.name === "Zafer Ekrani");
+  const finalArena = DE_GAME.build_campaign_boss("astro", 5, 4);
+  const fb = finalArena.find_by_tag("Boss");
+  check("astro boss tipi cosmic", fb !== null && fb.boss_type === "cosmic", fb && fb.boss_type);
+  const fgp = finalArena.find_all_by_tag("Portal")[0].get_component(DE_GAME.GoalPortal);
+  fb.get_component(DE.Health).take_damage(999999);
+  check("final boss ölünce portal açıldı", fgp.is_unlocked === true);
+  const victory = fgp.next_scene_factory();
+  check("final -> Zafer ekranı", victory !== null && victory.name === "Zafer Ekrani", victory && victory.name);
   check("index sıfırlandı", cs["index"] === 0);
   check("zaferde endless_unlocked işlendi", DE_GAME.savegame().get("endless_unlocked", false) === true);
 }

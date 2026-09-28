@@ -125,6 +125,18 @@ DE.Scene = class Scene {
         this.camera_position = new DE.Vector2(0, 0);
         this.camera_smoothness = 5.0;
         this.camera_kick = new DE.Vector2(0, 0);   // Python Scene.camera_kick (dash kamera zıplaması)
+
+        // Kamera yakınlaştırma katmanı (Python scene.py V2.0 aynı): geniş açı ->
+        // oyuna girişte yumuşak zoom-in + boss/patlama anlarında zoom punch'ı
+        // (boss ölümü on_boss_death -> zoom_punch(1.18, 0.35) kullanır).
+        this.camera_zoom_target = 1.0;   // 1.0 = normal; >1 = yakın; <1 = uzak/geniş
+        this.zoom_smoothness = 3.0;      // hedefe yaklaşma hızı
+        this._zoom_punch_timer = 0.0;    // punch'ın kalan saniyesi
+        this._zoom_punch_base = 1.0;     // punch sonrası geri dönülecek hedef zoom
+
+        // Vinyet (kenar karartması) + kırmızı isabet flaşı (Python Scene aynı).
+        this.vignette_intensity = 0.22;  // 0..1 sürekli kenar karartması (oyunda hafif)
+        this.hit_flash = 0.0;            // 0..1 anlık kırmızı isabet ramp'i
         this.screen_width = 900;
         this.screen_height = 600;
         this.parallax_background = null;
@@ -162,6 +174,26 @@ DE.Scene = class Scene {
         this.camera_kick.x += x;
         this.camera_kick.y += y;
         return this;
+    }
+    set_vignette(v) {
+        // Python Scene.set_vignette: kalıcı vinyet gücü (0..1).
+        this.vignette_intensity = Math.max(0.0, Math.min(1.0, v));
+    }
+    flash(v) {
+        // Python Scene.flash: kırmızı isabet flaşı (üst üste biner, zamanla söner).
+        this.hit_flash = Math.min(1.0, Math.max(this.hit_flash, v));
+    }
+    zoom_to(target) {
+        // Python Scene.zoom_to: kamerayı hedefe yumuşakça yaklaştırır / uzaklaştırır.
+        this.camera_zoom_target = target;
+    }
+    zoom_punch(amount, duration = 0.25) {
+        // Python Scene.zoom_punch: anlık etki yaklaştırması (boss vuruşu vb.).
+        // Süre sonunda kamera normal hedefine geri döner.
+        if (amount <= 0) return;
+        this._zoom_punch_base = this.camera_zoom_target;
+        this.camera_zoom_target = Math.min(2.0, this.camera_zoom_target * amount);
+        this._zoom_punch_timer = duration;
     }
     update(dt) {
         const sim_dt = dt * this.time_scale;
@@ -246,6 +278,23 @@ DE.Scene = class Scene {
             const sh = this._shake_trauma * this._shake_trauma * 18.0;
             this._shake_trauma = Math.max(0, this._shake_trauma - dt * 1.4);
         }
+        // Kamera zoom yumuşatması + punch geri sarması (Python scene.py aynı).
+        if (this._zoom_punch_timer > 0.0) {
+            this._zoom_punch_timer = Math.max(0.0, this._zoom_punch_timer - dt);
+            if (this._zoom_punch_timer <= 0.0) {
+                this.camera_zoom_target = this._zoom_punch_base;
+            }
+        }
+        if (this.camera_zoom !== this.camera_zoom_target) {
+            this.camera_zoom += (this.camera_zoom_target - this.camera_zoom) * Math.min(dt * this.zoom_smoothness, 1.0);
+            if (Math.abs(this.camera_zoom - this.camera_zoom_target) < 0.002) {
+                this.camera_zoom = this.camera_zoom_target;
+            }
+        }
+        // Kırmızı isabet flaşı zamanla söner.
+        if (this.hit_flash > 0.0) {
+            this.hit_flash = Math.max(0.0, this.hit_flash - dt * 2.2);
+        }
     }
     _is_ui_object(obj) {
         for (const c of obj.components) {
@@ -253,22 +302,81 @@ DE.Scene = class Scene {
         }
         return false;
     }
+    _draw_vignette(ctx) {
+        // Kenar karartması + kırmızı isabet flaşı (Python _draw_vignette karşılığı).
+        // Canvas gradyanı yoksa ya da boş dönerse (test stub'ları) sessizce atlanır.
+        if (this.vignette_intensity <= 0.01 && this.hit_flash <= 0.01) return;
+        if (typeof ctx.createRadialGradient !== "function") return;
+        const w = ctx.canvas.width, h = ctx.canvas.height;
+        const cx = w / 2, cy = h / 2;
+        const maxR = Math.sqrt(cx * cx + cy * cy);
+        if (this.vignette_intensity > 0.01) {
+            const a = Math.min(1.0, this.vignette_intensity);
+            const g = ctx.createRadialGradient(cx, cy, maxR * 0.5, cx, cy, maxR);
+            if (g && typeof g.addColorStop === "function") {
+                g.addColorStop(0, "rgba(0,0,0,0)");
+                g.addColorStop(1, "rgba(0,0,0," + a.toFixed(3) + ")");
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, w, h);
+            }
+        }
+        if (this.hit_flash > 0.01) {
+            const a = Math.min(1.0, this.hit_flash);
+            const g = ctx.createRadialGradient(cx, cy, maxR * 0.3, cx, cy, maxR);
+            if (g && typeof g.addColorStop === "function") {
+                g.addColorStop(0, "rgba(255,40,30,0)");
+                g.addColorStop(1, "rgba(255,40,30," + (a * 0.55).toFixed(3) + ")");
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, w, h);
+            }
+        }
+    }
     draw(ctx) {
+        const zoom = this.camera_zoom;
+        if (Math.abs(zoom - 1.0) < 0.001) {
+            // Normal (zoomsuz) çizim — en yaygın yol, optimize (Python aynı).
+            if (this.background_color) {
+                ctx.fillStyle = `rgb(${this.background_color[0]},${this.background_color[1]},${this.background_color[2]})`;
+                ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            }
+            if (this.parallax_background) {
+                this.parallax_background.draw(ctx, ctx.canvas.width, ctx.canvas.height, this.camera_position);
+            }
+            const sorted = [...this.game_objects].sort((a, b) => a.z_index - b.z_index);
+            for (const o of sorted) {
+                if (!this._is_ui_object(o)) o.draw(ctx, this.camera_position);
+            }
+            // UI nesneleri en üstte, kameradan bağımsız (ekran uzayı)
+            for (const o of sorted) {
+                if (this._is_ui_object(o)) o.draw(ctx, new DE.Vector2(0, 0));
+            }
+            this._draw_vignette(ctx);
+            return;
+        }
+        // Zoomlu çizim: dünya (UI hariç) kameranın merkezi çevresinde ölçeklenir;
+        // UI nesneleri zoom'dan etkilenmez (Python scene.py aynı mantık).
+        const w = ctx.canvas.width, h = ctx.canvas.height;
+        ctx.save();
         if (this.background_color) {
             ctx.fillStyle = `rgb(${this.background_color[0]},${this.background_color[1]},${this.background_color[2]})`;
-            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            ctx.fillRect(0, 0, w, h);
         }
+        ctx.translate(w / 2, h / 2);
+        ctx.scale(zoom, zoom);
+        ctx.translate(-w / 2, -h / 2);
         if (this.parallax_background) {
-            this.parallax_background.draw(ctx, ctx.canvas.width, ctx.canvas.height, this.camera_position);
+            this.parallax_background.draw(ctx, w, h, this.camera_position);
         }
         const sorted = [...this.game_objects].sort((a, b) => a.z_index - b.z_index);
         for (const o of sorted) {
             if (!this._is_ui_object(o)) o.draw(ctx, this.camera_position);
         }
-        // UI nesneleri en üstte, kameradan bağımsız (ekran uzayı)
+        ctx.restore();
+        // UI nesneleri zoom'dan bağımsız ekran uzayında.
         for (const o of sorted) {
             if (this._is_ui_object(o)) o.draw(ctx, new DE.Vector2(0, 0));
         }
+        this._draw_vignette(ctx);
     }
 }
 

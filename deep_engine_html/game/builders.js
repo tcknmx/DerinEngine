@@ -304,7 +304,116 @@ function _build_player(scene, data) {
     return player;
 }
 
-/* _build_boss M2'de (bosses.js portuyla birlikte) gelecek. */
+/* --- _build_boss: boss arenası verisini (procedural.js PR_BOSSES) sahneye kurar.
+ * Python game/builders.py _build_boss birebir portu. -- */
+function _build_boss(scene, data) {
+    const x = _g(data, "x", 1800), y = _g(data, "y", 360);
+    const w = _g(data, "w", 64), h = _g(data, "h", 64);
+    const boss_key = _g(data, "boss_key", "cave");   // hangi biyomun boss'u
+    const color = (_g(data, "color", [220, 40, 30])).slice();
+    const light_color = (_g(data, "light", color)).slice();
+    // Accent: gövde renginden az daha parlak
+    const accent = color.map(c => Math.min(255, c + 45));
+    const boss = new DE.GameObject("Boss", x, y, w, h, "Boss");
+    const boss_type = _g(data, "boss_type", "archer");
+    boss.boss_type = boss_type;
+    boss.add_component(new DE.SpriteRenderer(color, "rect", 10));
+    // Flying, sniper ve cosmic (final) boss'ları yerçekimsiz/kinematiktir -> Rigidbody YOK.
+    // Shield ve archer boss'ları zeminde gezinir -> Rigidbody + katı BoxCollider.
+    if (boss_type === "flying" || boss_type === "sniper" || boss_type === "cosmic") {
+        boss.add_component(new DE.BoxCollider(true, false));
+    } else {
+        boss.add_component(new DE.Rigidbody2D(1100.0, true, 1800));
+        boss.add_component(new DE.BoxCollider(false, false));
+    }
+    boss.add_component(new DE.ParticleEmitter());
+    boss.add_component(new DE.LightSource(240, light_color, 1.0, true, 3.0, 30.0, [32, 32]));
+    boss.boss_key = boss_key;
+
+    // Bu boss'un çıkış portalı (kampanyada boss'un "next" hedefine götüren portal).
+    // NOT: portal, generate_boss_arena verisinde boss'tan SONRA kurulduğu için
+    // boss'a "next" anahtarını saklayıp portalı boss ÖLDÜĞÜNDE ararız (tüm sahne
+    // kurulduktan sonra). Erken arama -> portal bulunamaz -> açılmaz.
+    const next_key = _g(data, "next", "victory");
+    boss.scene_key = next_key;
+
+    const on_boss_death = () => {
+        boss.active = false;
+        if (DE.SoundFX && DE.SoundFX.play) DE.SoundFX.play("explosion");
+        const eng = DE.Engine.instance;
+        // Zafer slow-mo: düşman dünyasını (düşmanlar, düşman mermileri, sonraki
+        // boss'lar) kısa süre dramatik yavaşlatır. Oyuncu tam kontrolü korur.
+        eng._time_slow_remaining = 0.9;
+        eng._time_slow_factor = 0.28;
+        if (eng && eng.active_scene) {
+            eng.active_scene.add_shake(0.9);
+            // Zoom punch: boss son darbesinde hızlı dramatik yakınlaşma.
+            eng.active_scene.zoom_punch(1.18, 0.35);
+            // Boss pozisyonunda büyük çok-parçalı patlama
+            const emitter = boss.get_component(DE.ParticleEmitter);
+            if (emitter) {
+                const center = [boss.size.x / 2, boss.size.y / 2];
+                for (let i = 0; i < 3; i++) {
+                    emitter.burst(14, [255, 160, 60], [70, 220], [5, 10], [0.5, 1.0], 140.0, center);
+                    emitter.burst(10, [255, 240, 200], [40, 160], [3, 7], [0.35, 0.7], 0, center);
+                }
+            }
+        }
+        // Portalı dinamik bul: her şey boss ölünce kurulur. DİKKAT: boss aynı
+        // scene_key (next hedefi) paylaşabilir ve nesne listesinde portaldan önce
+        // gelir; o yüzden yalnızca tag="Portal" aranır.
+        const exit_portal = scene.game_objects.find(
+            (o) => o.tag === "Portal" && o.scene_key === boss.scene_key) || null;
+        if (exit_portal) {
+            const portal_comp = exit_portal.get_component(DE_GAME.GoalPortal);
+            if (portal_comp) portal_comp.unlock();
+        }
+        // "portal'a gir" bildirimi UI'da (varsa)
+        const ctrl = scene.find_by_tag("Player");
+        if (ctrl) {
+            const pc = ctrl.get_component(DE_GAME.PlayerController);
+            if (pc && pc.powerup_label_text_obj) {
+                const tr = pc.powerup_label_text_obj.get_component(DE.TextRenderer);
+                if (tr) {
+                    tr.text = DE.I18n.t("campaign_defeated");
+                    tr.color = [120, 255, 180];
+                }
+            }
+        }
+    };
+
+    boss.add_component(new DE.Health(_g(data, "hp", 100), false, on_boss_death));
+    if (boss_type === "flying") {
+        boss.add_component(new DE_GAME.FlyingBoss(
+            _g(data, "patrol_distance", 180.0), _g(data, "speed", 70.0),
+            _g(data, "fire_interval", 1.6), _g(data, "bullet_speed", 260.0),
+            _g(data, "shoot_count", 2), color, accent, boss_key));
+    } else if (boss_type === "sniper") {
+        boss.add_component(new DE_GAME.SniperBoss(
+            0.0, _g(data, "speed", 30.0),
+            _g(data, "fire_interval", 2.4), _g(data, "bullet_speed", 0.0),
+            _g(data, "shoot_count", 1), color, accent, boss_key));
+    } else if (boss_type === "shield") {
+        boss.add_component(new DE_GAME.ShieldBoss(
+            _g(data, "patrol_distance", 60.0), _g(data, "speed", 45.0),
+            _g(data, "fire_interval", 2.2), _g(data, "bullet_speed", 320.0),
+            _g(data, "shoot_count", 2), color, accent, boss_key));
+    } else if (boss_type === "cosmic") {
+        // ASTRO (FINAL) boss: uçar + (oyuncuya nişanlı) ateş topları + sniper lazeri.
+        boss.add_component(new DE_GAME.CosmicBoss(
+            _g(data, "patrol_distance", 180.0), _g(data, "speed", 70.0),
+            _g(data, "fire_interval", 1.6), _g(data, "bullet_speed", 260.0),
+            _g(data, "shoot_count", 2), color, accent, boss_key,
+            150.0, 130.0, Math.max(3.0, _g(data, "fire_interval", 4.2) * 2.0)));
+    } else {  // archer (varsayılan BossController)
+        boss.add_component(new DE_GAME.BossController(
+            _g(data, "patrol_distance", 160.0), _g(data, "speed", 65.0),
+            _g(data, "fire_interval", 2.0), _g(data, "bullet_speed", 320.0),
+            _g(data, "shoot_count", 1), color, accent, boss_key));
+    }
+    scene.add_object(boss);
+    return boss;
+}
 
 /* --- Extractors: nesneyi JSON'a döndürürken tip verisi toplar --- */
 function _extract_enemy(obj) {
@@ -395,6 +504,25 @@ function _extract_sniper(obj) {
              "color": spr ? [].concat(spr.color) : [120, 200, 90] };
 }
 
+function _extract_boss(obj) {
+    const comp = obj.get_component(DE_GAME.BossController);
+    const bcomp = obj.get_component(DE_GAME.FlyingBoss) || obj.get_component(DE_GAME.SniperBoss)
+        || obj.get_component(DE_GAME.ShieldBoss);
+    const hp = obj.get_component(DE.Health);
+    const data = { "hp": hp ? hp.max_hp : 100 };
+    const boss_type = obj.boss_type;
+    if (boss_type) data["boss_type"] = boss_type;
+    if (comp) {
+        data["patrol_distance"] = comp.distance;
+        data["speed"] = comp.speed;
+    }
+    if (bcomp) {
+        data["patrol_distance"] = (bcomp.distance !== undefined) ? bcomp.distance : 160.0;
+        data["speed"] = (bcomp.speed !== undefined) ? bcomp.speed : 60.0;
+    }
+    return data;
+}
+
 function _finalize_goal_ui(scene) {
     const coin_count = scene.find_all_by_tag("Coin").length;
     const player = scene.find_by_tag("Player");
@@ -422,13 +550,14 @@ function _register_level_builders() {
     DE.register_builder("Spikes", _build_spikes);
     DE.register_builder("PowerUp", _build_powerup);
     DE.register_builder("Player", _build_player);
-    // M2: register_builder("Boss", _build_boss) buraya gelecek.
+    DE.register_builder("Boss", _build_boss);
 
     DE.register_extractor("Enemy", _extract_enemy);
     DE.register_extractor("Flyer", _extract_flyer);
     DE.register_extractor("Hopper", _extract_hopper);
     DE.register_extractor("Turret", _extract_turret);
     DE.register_extractor("SniperEnemy", _extract_sniper);
+    DE.register_extractor("Boss", _extract_boss);
     DE.register_extractor("Platform", _extract_platform);
     DE.register_extractor("Ground", _extract_platform);
     DE.register_extractor("Ramp", _extract_ramp);
@@ -444,4 +573,6 @@ _register_level_builders();
 DE_GAME._builders = {
     _finalize_goal_ui,
     _register_level_builders,
+    _build_boss,
+    _extract_boss,
 };
