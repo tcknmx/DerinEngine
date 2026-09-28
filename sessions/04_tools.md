@@ -265,6 +265,12 @@ korundu (komutlar game katmanında kayıtlı). Doğrulama: py_compile OK, `impor
 
 ## ARAÇ KALAN (bekleyen araç işleri)
 
+- **HTML MOTOR SIRADAKİ (DerinEngine HTML) — bakınız `01_strategy.md` "BÜYÜK DÖNÜM
+  KARARI" (28.09.2026).** Yeni ana hat: saf tarayıcı JS. Yapıldı (A1–A4): çekirdek +
+  render + fizik + input + kutu demosu. **SIRADA:** A5+ — SpriteRenderer'a görsel
+  (resim), kamera takip + zoom, sağlam titreşim/pause, Audio (WebAudio), TextRenderer
+  font yükleme, UI kiti (Button taklidi), tilemap `.map` köprüsü, localStorage savegame.
+  Doğrulama komutu: `node deep_engine_html\test_core.js` → `ALL OK`.
 - **Modül 7 kullanılmayan import WARN temizliği** (`game/*.py`) — manuel, kullanıcı.
 - **tarayıcı interaktif playtest** (kullanıcıya bırakıldı).
 - **web paneli: katıştırılmış oyun sekmesi** (pygbag iframe) — aday, ertelendi.

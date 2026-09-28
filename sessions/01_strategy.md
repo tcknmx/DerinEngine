@@ -12,6 +12,16 @@ Kod yazmayı bilmeyen kullanıcıyla birlikte, sıfırdan **kendi oyun motorumuz
 (DerinEngine) Python + pygame ile inşa ediyoruz. Ticari motorların (Unity, Unreal,
 Godot) gerçekte ne yaptığını anlayıp **çalışan ürünler** çıkarmak.
 
+**BÜYÜK DÖNÜM KARARI (28.09.2026):** Motor ailesi iki hatta bölünüyor —
+1. **DerinEngine (Python)** = tamamlanmış/bakım hattı (1.0.0, git'te `33bfd85`).
+2. **DerinEngine HTML** = YENİ ANA HAT — saf tarayıcı JS motor, **%0 ek kütüphane**
+   (Canvas2D/WebGL/WebAudio/localStorage; Node yok, CDN yok, tek `index.html` demosu).
+   Aynı motor API'si taşınır (Engine/Scene/GameObject/Component + tüm bileşenler +
+   tilemap `.map` köprüsü + UI kiti). Gerekçe: 3D/voxel/`.map` WebGL'de kütüphanesiz
+   yapılır (Python'da ek kütüphanesiz neredeyse imkânsız), JS JIT + GPU çizimi Python
+   masaüstünden hızlı, WASM'den (pygbag) çok daha hızlı; kurulum/dağıtım tek klasör.
+   **Çok ileride DerinEngine 3'e kadar evrilecek** (HTML v2.1 → 3D yolculuğu).
+
 **KARAR (ana hedef sırası):** ÖNCE 2D motor, tam 2D v1 seviyesine olgunlaşır;
 SONRA kademe kademe 3D'ye evrilir. Yol:
 **(1)** STAR COLLECTOR HERO (mevcut 2D motor + demo) →
@@ -147,6 +157,11 @@ barındırılsın.
 8. Git: "siktir et" (atlandı, simdilik); kurulursa semver etiketleri.
 9. İlk 3 ürün ikonu + kademe sırası netleştirildi (ÜRÜN ÇİZELGESİ).
 10. deep-tool YAZMAZ/da DÜZELTMEZ — yalnızca tarar/bulur; düzeltme manuel (kullanıcı).
+11. **28.09.2026 — DerinEngine HTML dönümü:** (a) Mevcut Python motorunun güncel hali
+    git'e kaydedildi (`33bfd85`) ve resmi olarak **bakım hattı** ilan edildi. (b) Yeni
+    ana hat **DerinEngine HTML**: saf tarayıcı JS, %0 ek kütüphane, aynı API. (c) Bu
+    yol **DerinEngine 3'e** kadar evrilir (HTML 2D → 2.5D → voxel → `.map`). Oturum
+    sahipliği bu dosyaya göre güncellenecek (HTML motor işleri).
 
 ---
 

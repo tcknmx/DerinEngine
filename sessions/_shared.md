@@ -8,6 +8,31 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[HTML MOTOR] DerinEngine HTML çekirdeği kuruldu (28.09.2026, `04_tools.md`).**
+  İlk A1–A4 adımı: `deep_engine_html/` — saf tarayıcı JS, %0 kütüphane, Node(demo için
+  gerekmez, geliştirmede var). Aynı Python API'si taşındı: `Vector2/Component/GameObject/
+  Scene/Engine` (core.js), `SpriteRenderer/TextRenderer` (render.js), `BoxCollider/
+  Rigidbody2D/Physics` (physics.js — min-nüfuz çözümü, one-way, max_fall), `Input` (input.js).
+  Demo: `index.html` + `demo/main.js` — kutu (+çift zıplama) kutu zıplama sahnesi
+  (yerçekimi 1400, jump 620 — Python SCH değerleri). Doğrulama: `node --check` 5 dosya OK,
+  `node deep_engine_html\test_core.js` 12/12 `ALL OK` (düşme/zıplama/motor/çift zıplama/
+  one-way/max_fall). commit `TBD`.
+  **Fizik bug'ı yakalandı:** solve'de kendi collider'ı solids listesine dahil olunca oyuncu
+  kendini taşıyordu → `s === rb.collider` atlaması; ayrıca Y-ekseni velocity sıfırlamıyor,
+  X-ekseni dikey nüfuzu duvar sanıyordu → min-nüfuz (dxL/dxR/dyT/dyB) çözümü.
+  **Etkilenen:** tüm oturumlar — yeni motor işleri HTML hattında planlanacak.
+
+- **[STRATEJİ] Büyük dönüm kararı — DerinEngine HTML motoru başlıyor (28.09.2026,
+  `01_strategy.md`).** Kullanıcı: mevcut Python motorunu git'e kaydet (git=`33bfd85`,
+  temizdi), sonra **DerinEngine HTML**'i başlat; gelecekte DerinEngine 3'e kadar
+  evrilecek. **Python motor (1.0.0) artık bakım hattı** (yeni özellikler o tarafa
+  ağırlıklı yazılmayacak); **yeni ana hat = saf tarayıcı JS motor** (Canvas2D/WebGL/
+  WebAudio/localStorage; %0 ek kütüphane; Node gerekmez; demolar tek index.html).
+  Aynı motor API'si (Engine/Scene/GameObject/Component + fizik + tilemap `.map` +
+  UI kiti) taşınacak. Gerekçe özeti: 3D/voxel/`.map` WebGL'de kütüphanesiz mümkün,
+  JS JIT + GPU çizimi Python'dan hızlı, kurulum/dağıtım tek klasör.
+  **Etkilenen:** tüm oturumlar — yeni işler önce HTML motorunda planlanacak.
+
 - **[OYUN] Menü Sonsuz Mod satırı motor UI kitine taşındı (28.09.2026, `03_game.md`).**
   `build_main_menu_scene`'de M_RND satırı (`_menu_item` metin satırı) artık Kit `Button`
   ('deep_engine/ui.Button') ile kuruluyor: kilitliyken `enabled=False` gri buton +
@@ -17,7 +42,7 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
   (Button metnini i18n key ile senkron tutar — T ile dil değişince buton metni güncellenir).
   Doğrulama: py_compile OK, task test MENU_BUTTON_OK + MENU_UNLOCKED_OK + KIT_SYNC_OK +
   menü 90 frame headless OK, deep-tool `--lang en all` **0 WARN / 0 BUG / 0 ERR**.
-  commit `TBD`.
+  commit `33bfd85`.
 
 - **[MOTOR+OYUN] 4'lü grup işi tamamlandı (27.09.2026, `02_engine.md` + `03_game.md`).**
   Kullanıcı: "yap hepsini" (tilemap zeminleri + overlay pause + motor-UI kiti + Event/Tween
@@ -31,7 +56,7 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
   durumunu** her oyun sahnesi `scene.on_escape` ile yönetir (`menu_idle` ayrımı).
   **(C) Boss ölümü** `zoom_punch(1.18, 0.35)` (kamera çekmesi, slow-mo ile birlikte).
   **(D) Event+Tween test:** yeni `tests/test_engine_core.py` → `python tests\test_engine_core.py`
-  = `ALL OK`. doğrulama: deep-tool **0 WARN / 0 BUG / 0 ERR** (tüm modüller). commit `TBD`.
+  = `ALL OK`. doğrulama: deep-tool **0 WARN / 0 BUG / 0 ERR** (tüm modüller). commit `30feff6`.
   Dokümantasyon: oyun KALAN maddesi (boss zoom_punch) tamamlandı; `02_engine.md` HEDEF kayıtları.
 
 - **[MOTOR] Meh/Motor deep-tool DEVİR GÖREVİ tamamlandı (27.09.2026, `02_engine.md`).**

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DerinEngine HTML — Demo</title>
+<style>
+  body { margin: 0; background: #0e1220; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: monospace; }
+  canvas { image-rendering: pixelated; border: 2px solid #2a3350; border-radius: 6px; }
+  #info { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; color: #7c8db0; font-size: 13px; }
+</style>
+</head>
+<body>
+<canvas id="game" width="900" height="600"></canvas>
+<div id="info">DerinEngine HTML · A/D hareket · SPACE zıpla · F12 konsol</div>
+
+<!-- DerinEngine HTML çekirdeği (sıra önemli) -->
+<script src="engine/core.js"></script>
+<script src="engine/render.js"></script>
+<script src="engine/physics.js"></script>
+<script src="engine/input.js"></script>
+<!-- Demo oyunu -->
+<script src="demo/main.js"></script>
+</body>
+</html>
