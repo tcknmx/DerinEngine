@@ -222,6 +222,12 @@ DE.Scene = class Scene {
             this._shake_trauma = Math.max(0, this._shake_trauma - dt * 1.4);
         }
     }
+    _is_ui_object(obj) {
+        for (const c of obj.components) {
+            if (c.is_ui) return true;
+        }
+        return false;
+    }
     draw(ctx) {
         if (this.background_color) {
             ctx.fillStyle = `rgb(${this.background_color[0]},${this.background_color[1]},${this.background_color[2]})`;
@@ -231,7 +237,13 @@ DE.Scene = class Scene {
             this.parallax_background.draw(ctx, ctx.canvas.width, ctx.canvas.height, this.camera_position);
         }
         const sorted = [...this.game_objects].sort((a, b) => a.z_index - b.z_index);
-        for (const o of sorted) o.draw(ctx, this.camera_position);
+        for (const o of sorted) {
+            if (!this._is_ui_object(o)) o.draw(ctx, this.camera_position);
+        }
+        // UI nesneleri en üstte, kameradan bağımsız (ekran uzayı)
+        for (const o of sorted) {
+            if (this._is_ui_object(o)) o.draw(ctx, new DE.Vector2(0, 0));
+        }
     }
 }
 

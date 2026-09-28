@@ -11,6 +11,7 @@ DE.Input = class Input {
         this._down_consumed = {};
         this._mouse = { x: 0, y: 0, buttons: 0 };
         this._mouse_down = 0;
+        this._mouse_scroll = 0;
         this.init();
     }
     init() {
@@ -32,11 +33,14 @@ DE.Input = class Input {
             this._mouse.x = e.clientX; this._mouse.y = e.clientY;
         });
         window.addEventListener("mousedown", (e) => {
-            if (e.button === 0) this._mouse_down = 1;
-            if (e.button === 0) this._mouse.buttons = 1;
+            if (e.button === 0) { this._mouse_down = 1; this._mouse.buttons = 1; }
+            else this._mouse.buttons = 0;
         });
         window.addEventListener("mouseup", (e) => {
             if (e.button === 0) this._mouse.buttons = 0;
+        });
+        window.addEventListener("wheel", (e) => {
+            this._mouse_scroll += e.deltaY;
         });
     }
     _normalize(key) {
@@ -65,7 +69,18 @@ DE.Input = class Input {
     end_frame() {
         this._down = {};
         this._mouse_down = 0;
+        this._mouse_scroll = 0;
     }
     get_mouse_position() { return { x: this._mouse.x, y: this._mouse.y }; }
-    get_mouse_button_down() { return this._mouse_down > 0; }
+    get_mouse_button(button = 0) {
+        if (button !== 0) return false;
+        return this._mouse.buttons === 1;
+    }
+    get_mouse_button_down(button = 0) {
+        if (button !== 0) return false;
+        return this._mouse_down === 1;
+    }
+    get_mouse_scroll() { return this._mouse_scroll; }
+    is_controller_active() { return false; }
+    _gamepad_a_down() { return false; }
 }

@@ -204,7 +204,11 @@ zıplama demosu. Doğrulama: `node deep_engine_html\test_core.js` = 12/12 `ALL O
 - **G6 Tilemap + seviye:** tilemap.js (katman/get-set/place_at_world/solid_at/
   to_data/from_data/to_segments), levelfile.js (builder/extractor/place_object/
   load_level/save_level).
-- **G7 UI kiti:** ui.js (UITheme, Panel, Button, ScrollContainer) — Python kopyası olarak.
+- **G7 UI kiti:** ✅ (28.09) ui.js (UITheme, Panel, Button, ScrollContainer — Python
+  kopyası; Button hover/press/focus/disabled + ENTER, ScrollContainer tekerlek + drag +
+  on_pick, Scene.draw UI'ı kameradan bağımsız üstte çizer) + Input API eşitlendi
+  (get_mouse_button/get_mouse_button_down/get_mouse_scroll/is_controller_active +
+  wheel eventi). `test_ui.js` 31/31.
 - **G8 Sistemler:** SceneManager (push/pop/stack), console.js (DevConsole +
   register_command), log.js (MotorLogger → console sesviyesi), i18n.js (TR/EN + toggle),
   audio.js (SoundFX → WebAudio), savegame.js (SaveGame → localStorage), procedural.js

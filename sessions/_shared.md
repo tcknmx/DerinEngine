@@ -8,6 +8,16 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[HTML MOTOR] G7 UI kit tamam (28.09.2026, `01_strategy.md`).** ui.js: UITheme
+  (varsayılan palet + override), Panel, Button (hover/press/focus/disabled + tıklama
+  geçişi + ENTER aktivasyon), ScrollContainer (tekerlek + tutamaç sürükleme + on_pick +
+  hovered_index + kırpma). Scene.draw artık UI nesnelerini (`_is_ui_object`) kameradan
+  bağımsız, en üstte çizer (Python scene.py davranışı). Input.js Python ile eşitlendi:
+  `get_mouse_button(b)` (basılı), `get_mouse_button_down(b)` (basılma anı),
+  `get_mouse_scroll()`, `is_controller_active()`, `_gamepad_a_down()` + wheel eventi.
+  `test_ui.js` 31/31. Tüm 7 test süiti ALL OK; 14 dosya tam tarayıcı yüklemesi OK.
+  **Etkilenen:** strateji (G8/G9 kaldı).
+
 - **[HTML MOTOR] G4+G5+G6 tamam (28.09.2026, `01_strategy.md`).** **G4:** tween.js
   (ease_* 9 fn + Tween + TweenComponent + _Chain zinciri) `test_tween.js` 33/33.
   **G5:** parallax.js (6 tema + kayan yıldız) + lighting.js (LightSource pulse +
