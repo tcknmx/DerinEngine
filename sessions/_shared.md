@@ -8,6 +8,18 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[HTML MOTOR] G8 (sistemler) + G9 (sürüm) tamam — G1–G9 bitti (28.09.2026,
+  `01_strategy.md`).** scenemanager.js (SceneManager register/switch/push/pop +
+  overlay), log.js (MotorLogger eşik + handler), i18n.js (TR/EN birebir tablo),
+  savegame.js (localStorage), console.js (DevConsole + register_command +
+  typed-text), audio.js (SoundFX → WebAudio: 21 preset ses + preset riff +
+  algoritmik biyom stereo müziği), procedural.js (generate + generate_boss_arena:
+  güvenli açılış bölgesi, zorluk ölçeği, boss tipi). Input'a typed-text eklendi.
+  `test_systems.js` 47/47, `test_audio.js` 28/28, `test_procedural.js` 31/31.
+  G9: `DE.__version__`/`__engine_name__` core.js. **10 test süiti ALL OK; 21 dosya
+  tam tarayıcı yüklemesi OK.** Etkilenen: strateji (artık [1] bitti — [2] SCH portu
+  sırada).
+
 - **[HTML MOTOR] G7 UI kit tamam (28.09.2026, `01_strategy.md`).** ui.js: UITheme
   (varsayılan palet + override), Panel, Button (hover/press/focus/disabled + tıklama
   geçişi + ENTER aktivasyon), ScrollContainer (tekerlek + tutamaç sürükleme + on_pick +

@@ -209,11 +209,17 @@ zıplama demosu. Doğrulama: `node deep_engine_html\test_core.js` = 12/12 `ALL O
   on_pick, Scene.draw UI'ı kameradan bağımsız üstte çizer) + Input API eşitlendi
   (get_mouse_button/get_mouse_button_down/get_mouse_scroll/is_controller_active +
   wheel eventi). `test_ui.js` 31/31.
-- **G8 Sistemler:** SceneManager (push/pop/stack), console.js (DevConsole +
-  register_command), log.js (MotorLogger → console sesviyesi), i18n.js (TR/EN + toggle),
-  audio.js (SoundFX → WebAudio), savegame.js (SaveGame → localStorage), procedural.js
-  (biyom/chunk üretici → port aşamasında gerekli).
-- **G9 ARKA/ROOT:** __init__ eşdeğeri (DE namespace sürüm bilgisi) zaten var.
+- **G8 Sistemler:** ✅ (28.09) scenemanager.js (SceneManager: register/switch_to/push/
+  pop + overlay), log.js (MotorLogger: DEBUG/INFO/WARN/BUG/ERR eşiği + handler), i18n.js
+  (TR/EN tablo birebir + set/toggle/localize), savegame.js (SaveGame → localStorage),
+  console.js (DevConsole: typed text + geçmiş + register_command; help/clear/version
+  yerleşik), audio.js (SoundFX: WebAudio synth — 21 preset ses + preset riff + algoritmik
+  biyom müziği stereo), procedural.js (generate + generate_boss_arena — güvenli açılış
+  bölgesi, zorluk ölçeği, boss tipi seçimi). `test_systems.js` 47/47, `test_audio.js`
+  28/28, `test_procedural.js` 31/31. Input'a typed-text desteği eklendi.
+- **G9 ARKA/ROOT:** ✅ (28.09) `DE.__version__ = "1.0.0"`, `DE.__engine_name__`
+  core.js'e eklendi (Python `__init__.__version__` eşdeğeri — zaten namespace vardı).
+  **G grupları tamamlandı: G1–G9 HTML motor eşitliği bitti.**
 
 **Sonuç kriteri:** `node deep_engine_html\test_core.js` + her grup için eşlik eden
 birim test dosyaları; port sonunda **Python mantık testleriyle aynı sonuçlar**.

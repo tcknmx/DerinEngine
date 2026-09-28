@@ -4,6 +4,10 @@
  */
 var DE = DE || {};
 
+/* --- Sürüm bilgisi (Python deep_engine/__init__.__version__ eşdeğeri) ------- */
+DE.__version__ = "1.0.0";
+DE.__engine_name__ = "DerinEngine HTML";
+
 /* --- Rastgele (Python random ile uyumlu deterministik PRNG) -------------- */
 DE._rng = {
     _next: (function () {
@@ -106,6 +110,7 @@ DE.Scene = class Scene {
     constructor(name = "Scene", background_color = [20, 24, 40]) {
         this.name = name;
         this.background_color = background_color;
+        this.active = true;
         this.game_objects = [];
         this._objects_to_add = [];
         this.camera_offset = new DE.Vector2(0, 0);

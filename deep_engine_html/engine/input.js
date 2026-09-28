@@ -12,6 +12,7 @@ DE.Input = class Input {
         this._mouse = { x: 0, y: 0, buttons: 0 };
         this._mouse_down = 0;
         this._mouse_scroll = 0;
+        this._typed_chars = [];
         this.init();
     }
     init() {
@@ -19,6 +20,9 @@ DE.Input = class Input {
             const k = this._normalize(e.key);
             if (!this._keys[k]) this._down[k] = true;
             this._keys[k] = true;
+            if (e.key && e.key.length === 1) {
+                this._typed_chars.push(e.key);
+            }
             if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {
                 e.preventDefault();
             }
@@ -81,6 +85,12 @@ DE.Input = class Input {
         return this._mouse_down === 1;
     }
     get_mouse_scroll() { return this._mouse_scroll; }
+    get_typed_text() {
+        const s = this._typed_chars.join("");
+        this._typed_chars = [];
+        return s;
+    }
+    clear_typed() { this._typed_chars = []; }
     is_controller_active() { return false; }
     _gamepad_a_down() { return false; }
 }
