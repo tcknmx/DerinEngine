@@ -14,6 +14,10 @@ DE.Rect = class Rect {
     }
     get right()  { return this.x + this.w; }
     get bottom() { return this.y + this.h; }
+    get centery() { return this.y + this.h / 2; }
+    get centerx() { return this.x + this.w / 2; }
+    get top() { return this.y; }
+    get left() { return this.x; }
     static of(go) { return new DE.Rect(go.position.x, go.position.y, go.size.x, go.size.y); }
     overlaps(o) {
         return this.x < o.right && this.right > o.x
@@ -26,7 +30,7 @@ DE.BoxCollider = class BoxCollider extends DE.Component {
         super();
         this.is_trigger = is_trigger;
         this.one_way = one_way;
-        this.self = null;      // kendi Rect (her frame yenilenir)
+        this.self = null;
         this.offset_x = 0;
         this.offset_y = 0;
     }
@@ -35,6 +39,124 @@ DE.BoxCollider = class BoxCollider extends DE.Component {
         return new DE.Rect(o.position.x + this.offset_x, o.position.y + this.offset_y,
                            o.size.x, o.size.y);
     }
+    get_rect() {
+        const r = this.rect();
+        return { x: Math.trunc(r.x), y: Math.trunc(r.y), w: Math.trunc(r.w), h: Math.trunc(r.h),
+                 get right() { return this.x + this.w; }, get bottom() { return this.y + this.h; } };
+    }
+    get_aabb() { return this.rect(); }
+    check_collision(other) {
+        return this.rect().overlaps(other.rect());
+    }
+    _as_poly() {
+        const o = this.game_object;
+        const x = o.position.x, y = o.position.y, w = o.size.x, h = o.size.y;
+        return [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+    }
+    overlap_check(other) {
+        const oaabb = other.get_aabb();
+        const a = this.get_aabb();
+        if (!(a.x < oaabb.x + oaabb.w && oaabb.x < a.x + a.w && a.y < oaabb.y + oaabb.h && oaabb.y < a.y + a.h)) {
+            return false;
+        }
+        if (other instanceof DE.CircleCollider) {
+            const c = other.get_center();
+            const r = other.get_radius();
+            const o = this.game_object;
+            return DE.circle_aabb_overlap(c.x, c.y, r, o.position.x, o.position.y, o.size.x, o.size.y);
+        }
+        if (other instanceof DE.PolygonCollider) {
+            return DE.polygons_overlap(this._as_poly(), other.get_world_points());
+        }
+        return this.check_collision(other);
+    }
+}
+
+DE.CircleCollider = class CircleCollider extends DE.Component {
+    constructor(is_trigger = false, radius = null) {
+        super();
+        this.is_trigger = is_trigger;
+        this._radius = radius;   // null -> otomatik (nesne boyutundan)
+    }
+    get_radius() {
+        if (this._radius !== null) return Number(this._radius);
+        return Math.min(this.game_object.size.x, this.game_object.size.y) / 2.0;
+    }
+    get_center() {
+        const o = this.game_object;
+        return new DE.Vector2(o.position.x + o.size.x / 2.0, o.position.y + o.size.y / 2.0);
+    }
+    get_aabb() {
+        const c = this.get_center();
+        const r = this.get_radius();
+        return new DE.Rect(c.x - r, c.y - r, r * 2, r * 2);
+    }
+    check_collision(other) { return this.overlap_check(other); }
+    overlap_check(other) {
+        const oaabb = other.get_aabb();
+        const a = this.get_aabb();
+        if (!(a.x < oaabb.x + oaabb.w && oaabb.x < a.x + a.w && a.y < oaabb.y + oaabb.h && oaabb.y < a.y + a.h)) {
+            return false;
+        }
+        const c = this.get_center();
+        const r = this.get_radius();
+        if (other instanceof DE.CircleCollider) {
+            const oc = other.get_center();
+            return DE.circle_circle_overlap(c.x, c.y, r, oc.x, oc.y, other.get_radius());
+        }
+        if (other instanceof DE.BoxCollider) {
+            const o = other.game_object;
+            return DE.circle_aabb_overlap(c.x, c.y, r, o.position.x, o.position.y, o.size.x, o.size.y);
+        }
+        if (other instanceof DE.PolygonCollider) {
+            return DE.circle_polygon_overlap(c.x, c.y, r, other.get_world_points());
+        }
+        return false;
+    }
+}
+
+DE.PolygonCollider = class PolygonCollider extends DE.Component {
+    constructor(points = null, is_trigger = false, one_way = false) {
+        super();
+        this.is_trigger = is_trigger;
+        this.one_way = one_way;
+        this.points = (points || [[0, 0], [32, 0], [32, 32], [0, 32]]).map(p => [p[0], p[1]]);
+    }
+    get_world_points() {
+        const o = this.game_object;
+        const ox = o.position.x, oy = o.position.y;
+        return this.points.map(([px, py]) => [ox + px, oy + py]);
+    }
+    get_aabb() {
+        const pts = this.get_world_points();
+        const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+        const x = Math.min(...xs), y = Math.min(...ys);
+        return new DE.Rect(x, y, Math.max(...xs) - x, Math.max(...ys) - y);
+    }
+    check_collision(other) { return this.overlap_check(other); }
+    overlap_check(other) {
+        const oaabb = other.get_aabb();
+        const a = this.get_aabb();
+        if (!(a.x < oaabb.x + oaabb.w && oaabb.x < a.x + a.w && a.y < oaabb.y + oaabb.h && oaabb.y < a.y + a.h)) {
+            return false;
+        }
+        const wp = this.get_world_points();
+        if (other instanceof DE.PolygonCollider) {
+            return DE.polygons_overlap(wp, other.get_world_points());
+        }
+        if (other instanceof DE.CircleCollider) {
+            const c = other.get_center();
+            return DE.circle_polygon_overlap(c.x, c.y, other.get_radius(), wp);
+        }
+        if (other instanceof DE.BoxCollider) {
+            return DE.polygons_overlap(wp, other._as_poly());
+        }
+        return false;
+    }
+}
+
+DE._collider_overlap = function (a, b) {
+    return a.overlap_check(b);
 }
 
 DE.Rigidbody2D = class Rigidbody2D extends DE.Component {
@@ -67,58 +189,65 @@ DE.Rigidbody2D = class Rigidbody2D extends DE.Component {
  * ayrı ayrı x ekseninde sonra y ekseninde iterek çözer. Trigger/one_way ayrımı.
  */
 DE.Physics = class Physics {
+    static _solid_colliders(scene) {
+        const solids = [];
+        for (const o of scene.game_objects) {
+            if (!o.active) continue;
+            const rb = o.get_component(DE.Rigidbody2D);
+            const col = o.get_component(DE.BoxCollider) || o.get_component(DE.PolygonCollider) || o.get_component(DE.CircleCollider);
+            if (col && !col.is_trigger && !rb) solids.push(col);
+        }
+        return solids;
+    }
     static resolve(scene, dt) {
-        const solids = scene._solid_colliders || [];
+        const solids = DE.Physics._solid_colliders(scene);
+        // Çözüm yalnızca BoxCollider solid'ler için (Python _resolve_solid_collision mantığı).
+        // Polygon/Circle solid şimdilik sadece on_collision bildirir.
         for (const go of scene.game_objects) {
             if (!go.active) continue;
             const rb = go.get_component(DE.Rigidbody2D);
             if (!rb || !rb.collider) continue;
             rb.is_grounded = false;
-            let rect = rb.collider.rect();
             for (const s of solids) {
                 if (s === rb.collider) continue;
-                if (s.is_trigger) continue;
-                const srect = s.rect();
+                if (!(s instanceof DE.BoxCollider)) continue;
+                const rect = rb.collider.get_aabb();
+                const srect = s.get_aabb();
                 if (!rect.overlaps(srect)) continue;
-                // Nüfuz derinlikleri — hangi eksende daha az gömüldü?
-                const dxL = rect.right - srect.x;      // soldan nüfuz
-                const dxR = srect.right - rect.x;      // sağdan nüfuz
-                const dyT = rect.bottom - srect.y;     // üstten nüfuz
-                const dyB = srect.bottom - rect.y;     // alttan nüfuz
-                const minX = Math.min(dxL, dxR);
-                const minY = Math.min(dyT, dyB);
 
+                // One-way platform: üstten gelirken durulur (Python one_way davranışı)
                 if (s.one_way) {
-                    // Yalnız üstten gelirken durulur, alttan serbest geçilir
-                    if (rb.velocity.y > 0 && dyT <= dyB) {
+                    if (rb.velocity.y >= 0 && (rect.bottom - srect.y) <= Math.max(4.0, srect.h + 6.0)) {
+                        go.position.y = srect.y - go.size.y;
+                        rb.velocity.y = 0;
+                        rb.is_grounded = true;
+                    } else if (rb.velocity.y >= 0 && rb.collider.get_aabb().centery < srect.centery) {
                         go.position.y = srect.y - go.size.y;
                         rb.velocity.y = 0;
                         rb.is_grounded = true;
                     }
-                    rect = rb.collider.rect();
                     continue;
                 }
 
-                if (minX < minY) {
-                    // Yatay çarpışma (duvar) — az gömülen tarafa it
-                    if (dxL < dxR) {
-                        go.position.x = srect.x - go.size.x;
-                    } else {
-                        go.position.x = srect.right;
-                    }
+                const overlap_left = rect.right - srect.x;
+                const overlap_right = srect.right - rect.x;
+                const overlap_top = rect.bottom - srect.y;
+                const overlap_bottom = srect.bottom - rect.y;
+                const min_overlap = Math.min(overlap_left, overlap_right, overlap_top, overlap_bottom);
+
+                if (min_overlap === overlap_top && rb.velocity.y >= 0) {
+                    go.position.y = srect.y - go.size.y;
+                    rb.velocity.y = 0;
+                    rb.is_grounded = true;
+                } else if (min_overlap === overlap_bottom && rb.velocity.y < 0) {
+                    go.position.y = srect.bottom;
+                    rb.velocity.y = 0;
+                } else if (min_overlap === overlap_left) {
+                    go.position.x = srect.x - go.size.x;
                     rb.velocity.x = 0;
-                    rect = rb.collider.rect();
-                } else {
-                    // Dikey çarpışma (zemin/tavan)
-                    if (dyT < dyB) {
-                        go.position.y = srect.y - go.size.y;
-                        rb.velocity.y = 0;
-                        rb.is_grounded = true;
-                    } else {
-                        go.position.y = srect.bottom;
-                        rb.velocity.y = 0;
-                    }
-                    rect = rb.collider.rect();
+                } else if (min_overlap === overlap_right) {
+                    go.position.x = srect.right;
+                    rb.velocity.x = 0;
                 }
             }
         }

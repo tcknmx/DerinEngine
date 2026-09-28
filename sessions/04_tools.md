@@ -265,11 +265,13 @@ korundu (komutlar game katmanında kayıtlı). Doğrulama: py_compile OK, `impor
 
 ## ARAÇ KALAN (bekleyen araç işleri)
 
-- **HTML MOTOR SIRADAKİ (DerinEngine HTML) — bakınız `01_strategy.md` "BÜYÜK DÖNÜM
-  KARARI" (28.09.2026).** Yeni ana hat: saf tarayıcı JS. Yapıldı (A1–A4): çekirdek +
-  render + fizik + input + kutu demosu. **SIRADA:** A5+ — SpriteRenderer'a görsel
-  (resim), kamera takip + zoom, sağlam titreşim/pause, Audio (WebAudio), TextRenderer
-  font yükleme, UI kiti (Button taklidi), tilemap `.map` köprüsü, localStorage savegame.
+- **HTML MOTOR SIRADAKİ (DerinEngine HTML) — bakınız `01_strategy.md` MASTER SIRADAKİ
+  (28.09.2026).** Yeni ana hat: saf tarayıcı JS. A1–A4 bitti (çekirdek + render + fizik +
+  input + kutu demosu; commit `7606579`). **SIRADA G2–G9 motor eşitliği:** çarpışma hat
+  etleri + math2d (SAT), oynanış bileşenleri (Animator/KeyframeAnimator/BouncePad/Health/
+  Projectile/PowerUp/BreakablePlatform/SpawnIn), Tween, partikül+parallax+lighting,
+  tilemap+levelfile, UI kit, SceneManager+console+log+i18n+audio+savegame+procedural.
+  Sonra: SCH tam portu + tırmanma oyunu (Icy Tower mekaniği).
   Doğrulama komutu: `node deep_engine_html\test_core.js` → `ALL OK`.
 - **Modül 7 kullanılmayan import WARN temizliği** (`game/*.py`) — manuel, kullanıcı.
 - **tarayıcı interaktif playtest** (kullanıcıya bırakıldı).

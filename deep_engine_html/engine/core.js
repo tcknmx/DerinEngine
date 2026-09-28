@@ -4,6 +4,23 @@
  */
 var DE = DE || {};
 
+/* --- Rastgele (Python random ile uyumlu deterministik PRNG) -------------- */
+DE._rng = {
+    _next: (function () {
+        let s = 0x9E3779B9;
+        return function () {
+            s |= 0; s = (s + 0x6D2B79F5) | 0;
+            let t = Math.imul(s ^ (s >>> 15), 1 | s);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    })(),
+    seed(v) { this._s = v >>> 0; },
+    uniform(a, b) { return a + (b - a) * this._next(); },
+    rand() { return this._next(); },
+};
+DE._rng.seed(12345);
+
 /* --- Vector2 (Python math2d.Vector2 ile aynı) --------------------------- */
 DE.Vector2 = class Vector2 {
     constructor(x = 0, y = 0) {
@@ -32,6 +49,16 @@ DE.Component = class Component {
     start() {}
     update(dt) {}
     draw(ctx, camera_offset) {}
+    on_collision(other) {}
+}
+
+DE._slow_dt = function (dt) {
+    // Python _slow_dt: aktif sahne slow-mo ise zamanı yavaşlatır.
+    const eng = DE.Engine && DE.Engine.instance;
+    if (eng && eng.active_scene && eng.active_scene.time_scale !== undefined) {
+        return dt * eng.active_scene.time_scale;
+    }
+    return dt;
 }
 
 /* --- GameObject --------------------------------------------------------- */
@@ -83,6 +110,8 @@ DE.Scene = class Scene {
         this._objects_to_add = [];
         this.camera_offset = new DE.Vector2(0, 0);
         this.camera_zoom = 1.0;
+        this.time_scale = 1.0;
+        this._shake_trauma = 0.0;
     }
     add_object(obj) {
         this._objects_to_add.push(obj);
@@ -105,15 +134,63 @@ DE.Scene = class Scene {
             o.start();
         }
     }
+    add_shake(amount) {
+        this._shake_trauma = Math.min(1.0, this._shake_trauma + amount);
+    }
     update(dt) {
+        const sim_dt = dt * this.time_scale;
         this.start();
-        this._solid_colliders = [];
+        // Spatial grid (Python _handle_physics_and_collisions ile aynı yapı)
+        const colliders = [];
         for (const o of this.game_objects) {
             if (!o.active) continue;
-            const col = o.get_component(DE.BoxCollider);
-            if (col) this._solid_colliders.push(col);
+            const col = o.get_component(DE.BoxCollider) || o.get_component(DE.CircleCollider) || o.get_component(DE.PolygonCollider);
+            if (col) colliders.push(col);
+            const rb = o.get_component(DE.Rigidbody2D);
+            if (rb) rb.is_grounded = false;
         }
-        for (const o of this.game_objects) o.update(dt);
+        // update fazı (Rigidbody pozisyonu taşır)
+        for (const o of this.game_objects) o.update(sim_dt);
+
+        // Çarpışma çiftleri: uniform grid (CELL=128), aynı hücrede overlap → on_collision
+        const CELL = 128;
+        const grid = {};
+        for (let idx = 0; idx < colliders.length; idx++) {
+            const col = colliders[idx];
+            const r = col.get_aabb();
+            const x0 = Math.floor(r.x / CELL), x1 = Math.floor((r.x + r.w) / CELL);
+            const y0 = Math.floor(r.y / CELL), y1 = Math.floor((r.y + r.h) / CELL);
+            for (let cx = x0; cx <= x1; cx++) {
+                for (let cy = y0; cy <= y1; cy++) {
+                    const key = cx + "," + cy;
+                    if (!grid[key]) grid[key] = [];
+                    grid[key].push([idx, col]);
+                }
+            }
+        }
+        const seen = new Set();
+        for (const key in grid) {
+            const bucket = grid[key];
+            const n = bucket.length;
+            for (let a = 0; a < n; a++) {
+                const [ia, c1] = bucket[a];
+                for (let b = a + 1; b < n; b++) {
+                    const [ib, c2] = bucket[b];
+                    const pair_key = ia < ib ? ia + "_" + ib : ib + "_" + ia;
+                    if (seen.has(pair_key)) continue;
+                    seen.add(pair_key);
+                    if (!c1.overlap_check(c2)) continue;
+                    // Trigger / normal çarpışma bildirimi (her iki yön)
+                    for (const comp of c1.game_object.components) {
+                        if (comp.on_collision) comp.on_collision(c2.game_object);
+                    }
+                    for (const comp of c2.game_object.components) {
+                        if (comp.on_collision) comp.on_collision(c1.game_object);
+                    }
+                }
+            }
+        }
+
         if (DE.Physics) DE.Physics.resolve(this, dt);
     }
     draw(ctx) {

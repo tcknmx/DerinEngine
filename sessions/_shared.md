@@ -8,6 +8,25 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[HTML MOTOR] G2 + G3 tamam (28.09.2026, `01_strategy.md`).** **G2:** math2d.js
+  (SAT/polygon/circle/segment) + physics.js'te CircleCollider + PolygonCollider —
+  `test_math2d.js` 38/38 OK. **G3:** engine/components.js — Animator, KeyframeAnimator,
+  BouncePad, Health (i-frame), Projectile, PowerUp, BreakablePlatform, SpawnIn,
+  _AutoRemove; Scene.update artık **Python `_handle_physics_and_collisions` mantığı**:
+  spatial grid (CELL=128) + `on_collision` bildirimi + statik solid çözümü (min_overlap/
+  vy koşulları — BouncePad hayatta kaldı). `test_components.js` 27/27 ALL OK; gerileme:
+  test_core 12/12, test_math2d 38/38. index.html'e particles.js + components.js eklendi.
+  **Etkilenen:** strateji (HTML MOTOR planı G4–G9 kaldı) + araç (sıradaki motor işleri).
+
+- **[STRATEJİ+HTML] Yeni plan: py motor eşitliği → SCH portu → tırmanma oyunu
+  (28.09.2026, `01_strategy.md`).** Kullanıcı: "ikisini de plana yaz; önce py motorun
+  tüm bileşenlerinin tamamını HTML yapalım." MASTER SIRADAKİ'ye **HTML MOTOR (05)**
+  eklendi: G2–G9 grupları (çarpışma/SAT, oynanış bileşenleri, Tween, partikül+parallax+
+  lighting, tilemap+levelfile, UI kit, SceneManager+consol+log+i18n+audio+savegame+
+  procedural). Sonra: **SCH tam portu** (image dosyasız, kod-çizim şekiller birebir) ve
+  **sonsuz tırmanma oyunu (Icy Tower mekaniği — kırılan platformlar)**. KARAR LOGU madde 12.
+  **Etkilenen:** tüm oturumlar — yeni motor işleri HTML hattında.
+
 - **[HTML MOTOR] DerinEngine HTML çekirdeği kuruldu (28.09.2026, `04_tools.md`).**
   İlk A1–A4 adımı: `deep_engine_html/` — saf tarayıcı JS, %0 kütüphane, Node(demo için
   gerekmez, geliştirmede var). Aynı Python API'si taşındı: `Vector2/Component/GameObject/

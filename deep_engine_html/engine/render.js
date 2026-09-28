@@ -15,15 +15,26 @@ DE.SpriteRenderer = class SpriteRenderer extends DE.Component {
     constructor(color = [255, 255, 255], shape = "rect", border_radius = 0) {
         super();
         this.color = color;
-        this.shape = shape;          // "rect" | "circle" | "triangle"
+        this.shape = shape;          // "rect" | "circle" | "triangle" | "spikes"
         this.border_radius = border_radius;
         this.visible = true;
+        this._child = null;          // ek görsel: {img, w, h} ise color yerine resim
     }
     draw(ctx, camera_offset) {
         if (!this.visible || !this.game_object.active) return;
         const o = this.game_object;
         const x = o.position.x, y = o.position.y;
         const w = o.size.x, h = o.size.y;
+
+        // Görsel (Image) modu — sprite olarak çizer (Python'daki "image" desteği)
+        if (this._child) {
+            const img = this._child.img;
+            if (img && img.complete && img.naturalWidth > 0) {
+                ctx.drawImage(img, x, y, w, h);
+                return;
+            }
+        }
+
         const col = `rgb(${this.color[0]},${this.color[1]},${this.color[2]})`;
         ctx.fillStyle = col;
         if (this.shape === "circle") {
@@ -37,6 +48,28 @@ DE.SpriteRenderer = class SpriteRenderer extends DE.Component {
             ctx.lineTo(x + w, y + h);
             ctx.closePath();
             ctx.fill();
+        } else if (this.shape === "spikes") {
+            // Python'daki birebir davranış: 3 sivri üçgen + parlak uç çizgisi + taban blok
+            const n = 3, seg = w / n;
+            ctx.fillRect(x, y + h - 3, w, 3);
+            const tip_color = this.color.map(c => Math.min(255, c + 70));
+            ctx.fillStyle = col;
+            for (let i = 0; i < n; i++) {
+                const x0 = x + i * seg;
+                const tip_x = x0 + seg / 2;
+                ctx.beginPath();
+                ctx.moveTo(x0, y + h);
+                ctx.lineTo(tip_x, y - 2);
+                ctx.lineTo(x0 + seg, y + h);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = `rgb(${tip_color[0]},${tip_color[1]},${tip_color[2]})`;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(tip_x, y);
+                ctx.lineTo(tip_x, y + 3);
+                ctx.stroke();
+            }
         } else {
             const r = this.border_radius;
             if (r > 0) {

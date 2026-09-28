@@ -162,12 +162,60 @@ barındırılsın.
     ana hat **DerinEngine HTML**: saf tarayıcı JS, %0 ek kütüphane, aynı API. (c) Bu
     yol **DerinEngine 3'e** kadar evrilir (HTML 2D → 2.5D → voxel → `.map`). Oturum
     sahipliği bu dosyaya göre güncellenecek (HTML motor işleri).
+12. **28.09.2026 — HTML motor eşitliği + oyun hedefleri sırası (kullanıcı isteği):**
+    "İkisini de plana yaz; önce py motorun tüm bileşenlerinin tamamını HTML yapalım."
+    Sıra: **(1) Py→HTML motor eşitliği** (21 py dosyasındaki tüm sınıflar HTML'e
+    taşınır — aşağıda MASTER SIRADAKİ: HTML); **(2) Star Collector Hero'nun tam portu**
+    (kampanya, boss'lar, UI kit, i18n, savegame, ses — haftalarca sürer); **(3) Sonsuz
+    tırmanma oyunu** (demo'dan veya porttan bağımsız, **Icy Tower mekaniği**: kırılan
+    platformlar + sürekli yukarı tırmanma). Görsellik Python'daki gibi **kodla çizilen
+    şekiller** (resim dosyası yok) — birebir taşınır.
 
 ---
 
 ## MASTER SIRADAKİ Kuyruğu (hangi oturumda ne sırada)
 
 Adaylar, sahibi olan oturumla birlikte. Sırayı kullanıcı belirler.
+
+**HTML MOTOR (05 — yeni ana hat, `deep_engine_html/`): Envanter 21 py dosyası.**
+
+**A1–A4 ✅ (28.09, commit `7606579`):** çekirdek (Vector2/Component/GameObject/Scene/
+Engine), render (SpriteRenderer rect/circle/triangle/**spikes**/border_radius + TextRenderer
++ kamera), fizik (BoxCollider/Rigidbody2D min-nüfuz + one-way + max_fall), input, kutu
+zıplama demosu. Doğrulama: `node deep_engine_html\test_core.js` = 12/12 `ALL OK`.
+
+**[1] Motor eşitliği — kalan bileşen grupları (sırayla):**
+- **G2 Çarpışma hat etleri:** ✅ (28.09) CircleCollider + PolygonCollider + `math2d.js`
+  (SAT, point_in_polygon, circle_polygon, segment/çizgi, AABB) — `test_math2d.js` 38/38.
+- **G3 Oynanış bileşenleri:** ✅ (28.09) components.js — Animator, KeyframeAnimator,
+  BouncePad, Health, Projectile, PowerUp, BreakablePlatform, SpawnIn, _AutoRemove;
+  Scene.update artık spatial grid + on_collision bildirimi + statik solid çözümü (Python
+  `_handle_physics_and_collisions` mantığı). `test_components.js` 27/27.
+- **G4 Tween + olay:** tween.js (ease_* + Tween + TweenComponent + zincir).
+- **G5 Partikül + görsel katman:** particles.js ✅ (28.09, Particle + ParticleEmitter),
+  parallax.js (ParallaxLayer, ParallaxBackground), lighting.js (LightSource,
+  LightingEngine — Canvas compositing ile "carve").
+- **G6 Tilemap + seviye:** tilemap.js (katman/get-set/place_at_world/solid_at/
+  to_data/from_data/to_segments), levelfile.js (builder/extractor/place_object/
+  load_level/save_level).
+- **G7 UI kiti:** ui.js (UITheme, Panel, Button, ScrollContainer) — Python kopyası olarak.
+- **G8 Sistemler:** SceneManager (push/pop/stack), console.js (DevConsole +
+  register_command), log.js (MotorLogger → console sesviyesi), i18n.js (TR/EN + toggle),
+  audio.js (SoundFX → WebAudio), savegame.js (SaveGame → localStorage), procedural.js
+  (biyom/chunk üretici → port aşamasında gerekli).
+- **G9 ARKA/ROOT:** __init__ eşdeğeri (DE namespace sürüm bilgisi) zaten var.
+
+**Sonuç kriteri:** `node deep_engine_html\test_core.js` + her grup için eşlik eden
+birim test dosyaları; port sonunda **Python mantık testleriyle aynı sonuçlar**.
+Sütun da paralel: her grup commit'li ilerler (tek commit kalmayacak).
+
+**[2] Star Collector Hero tam portu** (HTML'e): kampanya + Sonsuz Mod + boss'lar +
+UI kit + i18n + savegame + ses + konsol. **Haftalarca sürer — büyük görev.**
+Kaynaklar: `game/*.py`, `main.py` (pygbag dalı hariç).
+
+**[3] Sonsuz tırmanma oyunu (Icy Tower mekaniği):** kırılan platformlar, sürekli
+yukarı, yükseklik skoru. Bağımsız başlayabilir (1. maddedeki BreakablePlatform +
+camera-follow ile). Demo kapak: "Star Climber".
 
 **ÖNCELİK — HATA AVI (kullanıcı raporu 23.09.2026):** "Hissiyat + Hata Avı"
 seferberliği start. İlk hedefler (03_game.md bug defterine işlendi):
