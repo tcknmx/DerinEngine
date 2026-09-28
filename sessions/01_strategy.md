@@ -259,9 +259,20 @@ Kaynaklar: `game/*.py`, `main.py` (pygbag dalı hariç).
   verisi) + motor `Scene` zoom katmanı (zoom_to/zoom_punch/vinyet/hit_flash;
   Python scene.py eşi). `index.html`'e `game/bosses.js` eklendi. **`test_game.js`
   63/63 ALL OK** (TEST8b boss ölümü -> portal açılır + çıkış + astro zafer).
-- **M3 UI derinliği:** `ui.js`'e kamera zoom menü yakınlaştırması + vinyet +
-  FadeOverlay çapraz geçişi (Scene API hazır — `zoom_to/set_vignette/flash` var),
-  `_attach_ground_tilemap` zemin rasterizasyonu (fizikle ilgisiz), boss giriş duyurusu.
+- **M3 UI derinliği (✅ 28.09):** `ui.js`'e menü CLOSE-UP zoomu
+  (`MENU_ZOOM=1.8`, `camera_manual`, `_place_menu_camera`) + güçlü menü vinyeti
+  (0.5; kampanya başlayınca `camera_manual=false` + `zoom_to(1.0)` +
+  `set_vignette(0.22)`) + `FadeOverlay` bileşeni ve MenuController çapraz geçiş
+  alanları (**dormant — Python'da `_pending_factory` hiç set edilmez; birebir
+  taşındı**). Motor `Scene.destroy`/`_objects_to_destroy` eklendi (Python
+  `scene.py:117/381` eşi; FadeOverlay kendini böyle siler). `scenes.js`
+  `_attach_ground_tilemap` (Python eşi): zemin rect'lerini 32px ızgaraya
+  rasterize (platform yüzeyi=1 + alt toprak=2, 2 renk katmanı), katı zemin
+  sprite'ları gizlenir (one-way adalar kalır, çarpışmalar durur),
+  `_tilemap_ground`/`_tilemap_segments` köprüsü sahneye yazılır. **Boss giriş
+  duyurusu İPTAL — Python'da karşılığı yok (grep: intro/duyuru/announce yok);
+  parite korunur.** **`test_game.js` 75/75 ALL OK** (tilemap rasterize + gizleme,
+  menü zoom/vinyet dönüşü, FadeOverlay kendini siler).
 - **M4+ Davranış:** `game/commands.py` (konsol komutları) + pygbag onaylı
   `main.py` giriş dalı + son 1:1 davranış farkları düzeltmesi.
 - **M5 İnce ayar:** menüde kampanya ilerleme rozetleri (yazıldı), deneyim

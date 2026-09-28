@@ -1,8 +1,7 @@
 /* DerinEngine HTML — game/scenes.js (Python game/scenes.py birebir portu)
  * Prosedürel seviye + kampanya sistemi (giriş -> boss -> sonraki biyom -> zafer).
- * KALAN (belgeli):
- *  - _attach_ground_tilemap (Tilemap rasterizasyonu) ATLANDI: görsel iyileştirme,
- *    fizik/kolaylaştırıcılar aynı kalır. M3'te eklenir.
+ * M3: _attach_ground_tilemap (zemin Tilemap rasterizasyonu) eklendi — düz zemin
+ * sprite'larını 32px karo ızgarasına çevirir (fizik aynı kalır, sadece görsel).
  */
 var DE_GAME = DE_GAME || {};
 
@@ -40,6 +39,80 @@ function _portal_campaign_boss() {
     return DE_GAME.build_victory_scene();
 }
 
+/* Zemin Tilemap rasterizasyonu (Python game/scenes.py:_attach_ground_tilemap portu).
+ * Prosedürel üretici zemini düz rect sprite'ları olarak üretir; bu yardımcı zemin
+ * ayak izini 32px karo ızgarasına çevirip sahneye Tilemap ekler ve eski düz zemin
+ * sprite'larını gizler (çarpışma alanları fizik için durur). Sahnede `_tilemap_ground`
+ * ve `_tilemap_segments` (runtime <-> editör köprüsü) tutulur. */
+function _attach_ground_tilemap(scene, data) {
+    const bname = data["biome"];
+    if (!bname) return;
+    const b = DE.PR_BIOMES[bname];
+    if (!b) return;
+
+    const ts = 32;
+    const grounds = (data["objects"] || []).filter(e => e["tag"] === "Ground");
+    if (!grounds.length) return;
+
+    // Tüm zemin rect'lerinin dünya sınır kutusu
+    let min_x = Infinity, min_y = Infinity, max_x = -Infinity, max_y = -Infinity;
+    for (const e of grounds) {
+        min_x = Math.min(min_x, Math.floor(e["x"]));
+        min_y = Math.min(min_y, Math.floor(e["y"]));
+        max_x = Math.max(max_x, Math.ceil(e["x"] + e["w"]));
+        max_y = Math.max(max_y, Math.ceil(e["y"] + e["h"]));
+    }
+    const cols = Math.trunc((max_x - min_x) / ts) + 1;
+    const rows = Math.trunc((max_y - min_y) / ts) + 1;
+    const grid = [];
+    for (let r = 0; r < rows; r++) {
+        grid.push([]);
+        for (let c = 0; c < cols; c++) grid[r].push(null);
+    }
+
+    const _fill = (e, tid) => {
+        const c0 = Math.trunc((e["x"] - min_x) / ts);
+        const c1 = Math.trunc((e["x"] + e["w"] - min_x - 0.01) / ts);
+        const r0 = Math.trunc((e["y"] - min_y) / ts);
+        const r1 = Math.trunc((e["y"] + e["h"] - min_y - 0.01) / ts);
+        for (let r = Math.max(0, r0); r <= Math.min(rows - 1, r1); r++) {
+            for (let c = Math.max(0, c0); c <= Math.min(cols - 1, c1); c++) {
+                // Üst katman (yüzey, id 1) alt katmana (id 2) karşı kazanır.
+                if (grid[r][c] === null || tid === 1) grid[r][c] = tid;
+            }
+        }
+    };
+    const _same3 = (a, b) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+    const top = b["platform"], soil = b["platform_alt"];
+    for (const e of grounds) {
+        const color = e["color"] || [];
+        if (_same3(color, soil)) _fill(e, 2);
+    }
+    for (const e of grounds) {
+        const color = e["color"] || [];
+        if (_same3(color, top)) _fill(e, 1);
+    }
+
+    const tm_obj = new DE.GameObject("TilemapGround", min_x, min_y, cols * ts, rows * ts, "Tilemap");
+    const tm = tm_obj.add_component(new DE.Tilemap(ts, [min_x, min_y]));
+    tm.set_tile_set({ 1: top, 2: soil });
+    tm.add_layer(grid);
+    scene.add_object(tm_obj);
+
+    // Eski düz zemin sprite'larını gizle (çarpışma alanları fizik için durur);
+    // adalar (one-way platformlar) sprite'ına kavuşur, yalnızca katı zemin gizlenir.
+    for (const obj of scene.find_all_by_tag("Ground")) {
+        const col = obj.get_component(DE.BoxCollider);
+        if (col && col.one_way) continue;
+        const spr = obj.get_component(DE.SpriteRenderer);
+        if (spr) spr.visible = false;
+    }
+
+    // Geometri köprüsü: tilemap + çizgi segmentleri sahneye saklanır.
+    scene._tilemap_ground = tm;
+    scene._tilemap_segments = tm.to_segments();
+}
+
 function build_procedural_level(biome = null, seed = null, chunks = 8, difficulty = 0) {
     const data = DE.procedural_generate(biome, seed, chunks, difficulty);
     const meta = {
@@ -60,8 +133,9 @@ function build_procedural_level(biome = null, seed = null, chunks = 8, difficult
     }
     scene.start();
 
-    // M1 KALAN: _attach_ground_tilemap (zemin Tilemap rasterizasyonu) burada ATLANDI.
-    // Görsel iyileştirme; fizik & kolaylaştırıcılar grid olmadan da aynı çalışır.
+    // Gerçek tilemap zemini: düz Zemin rect'lerini 32px ızgaraya rasterize et
+    // (platform yüzeyi + alt toprak, 2 renk katmanı) ve eski sprite'ları gizle.
+    _attach_ground_tilemap(scene, data);
 
     _register_pause(scene);
     DE_GAME._builders._finalize_goal_ui(scene);
@@ -310,3 +384,4 @@ DE_GAME._campaign_sector_commit = _campaign_sector_commit;
 DE_GAME._play_theme = _play_theme;
 DE_GAME._register_pause = _register_pause;
 DE_GAME._portal_campaign_boss = _portal_campaign_boss;
+DE_GAME._attach_ground_tilemap = _attach_ground_tilemap;

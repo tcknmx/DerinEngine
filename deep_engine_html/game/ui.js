@@ -1,9 +1,10 @@
 /* DerinEngine HTML — game/ui.js (Python game/ui.py birebir portu)
  * Menü / oyun sonu / zafer / duraklatma ekranları + yardımcı UI bileşenleri.
  * Motor UI kiti (DE.UITheme/Panel/Button) ve TextRenderer (is_ui) kullanılır.
- * KAMERA NOTU (M3 KALAN): Python menüsü player'a CLOSE-UP zoom + vinyet kullanır;
- * JS Scene.draw camera_zoom'u uygulamaz, bu yüzden yakınlaştırma/vinyet ATLANDI.
- * Çapraz geçiş (FadeOverlay) de M3'e bırakıldı (Python'da şu an kullanılmıyor).
+ * M3: menü kamerası CLOSE-UP zoom (MENU_ZOOM=1.8) + güçlü vinyet (0.5); kampanya
+ * başlarken zoom_to(1.0) + set_vignette(0.22). FadeOverlay + çapraz geçiş
+ * (dormant) Python'da birebir taşındı (Python'da _pending_factory hiç set
+ * edilmez — aynı davranış korunur).
  */
 var DE_GAME = DE_GAME || {};
 
@@ -146,8 +147,38 @@ DE_GAME.BiomeProgress = class BiomeProgress extends DE.Component {
     }
 };
 
+/* Menünün CLOSE-UP zoom değeri (1.0 = normal; >1 = yakın). Seviye seçilince 1.0'a döner. */
+DE_GAME.MENU_ZOOM = 1.8;
+
+/* FadeOverlay: yeni bir sahneye eklendiğinde ekran karartmasını 255->0 açar.
+ * Menüden başka moda yumuşak çapraz geçiş sağlardı; Python'da şu an dormant
+ * (MenuController._pending_factory hiç set edilmez) — birebir taşındı.
+ */
+DE_GAME.FadeOverlay = class FadeOverlay extends DE.Component {
+    constructor(fade_speed = 500.0) {
+        super();
+        this._alpha = 255.0;
+        this.fade_speed = fade_speed;
+        this.is_ui = true;  // çizimi zoom'dan etkilenmez
+    }
+    update(dt) {
+        this._alpha = Math.max(0.0, this._alpha - this.fade_speed * dt);
+        if (this._alpha <= 0.0) {
+            const scene = DE.Engine.instance ? DE.Engine.instance.active_scene : null;
+            if (scene && scene.destroy) scene.destroy(this.game_object);
+        }
+    }
+    draw(ctx, camera_offset) {
+        if (this._alpha <= 0) return;
+        const a = Math.max(0, Math.min(255, Math.trunc(this._alpha)));
+        ctx.fillStyle = "rgba(0,0,0," + (a / 255).toFixed(3) + ")";
+        ctx.fillRect(0, 0, ctx.canvas ? ctx.canvas.width : 900, ctx.canvas ? ctx.canvas.height : 600);
+    }
+};
+
 /* V2.0 ana menü kontrolcüsü: arka planda CANLI bir kampanya giriş seviyesi döner.
- * Oyuncu partiden önce hareketsiz durur; P/SPACE/ENTER -> Kampanya, 4 -> Sonsuz. */
+ * Oyuncu partiden önce hareketsiz durur; P/SPACE/ENTER -> Kampanya, 4 -> Sonsuz.
+ * Menü kamerası oyuncuya CLOSE-UP (zoom 1.8) + güçlü vinyet ile başlar. */
 DE_GAME.MenuController = class MenuController extends DE.Component {
     constructor() {
         super();
@@ -160,9 +191,18 @@ DE_GAME.MenuController = class MenuController extends DE.Component {
     }
     start() {
         this.done = false;
+        // Yumuşak çapraz geçiş: bir seçenek seçilince kısa kararma olur (dormant).
+        this._fade = 0.0;
+        this._fading_out = false;
+        this._fade_dir = 0;
+        this._pending_factory = null;
         this.scene = DE.Engine.instance.active_scene;
         this.player = this.scene.find_by_tag("Player");
-        // KAMERA NOTU (M3): Python burada yakınlaştırma/vinyet kurardı.
+        // Kamera: CLOSE-UP (oyuncu büyük, sol-orta) + menüde güçlü kenar vinyeti.
+        this.scene.camera_manual = true;
+        this.scene.camera_zoom = DE_GAME.MENU_ZOOM;
+        this.scene.camera_zoom_target = DE_GAME.MENU_ZOOM;
+        this.scene.set_vignette(0.5);
         if (this.player) {
             const pc = this.player.get_component(DE_GAME.PlayerController);
             if (pc) pc.menu_idle = true;
@@ -179,9 +219,24 @@ DE_GAME.MenuController = class MenuController extends DE.Component {
             }
         }
     }
+    _place_menu_camera() {
+        // Kamerayı konumlandır: oyuncu ekranın sol-ortasında yakın planda kalır.
+        const scene = this.scene;
+        const player = this.player;
+        if (!player) return;
+        const cx = player.position.x + player.size.x / 2;
+        const cy = player.position.y + player.size.y / 2;
+        const fx = 0.30, fy = 0.55;  // oyuncunun ekrandaki (yakın çekim) konum oranları
+        scene.camera_position.x = cx - (0.5 + (fx - 0.5) / scene.camera_zoom) * scene.screen_width;
+        scene.camera_position.y = cy - (0.5 + (fy - 0.5) / scene.camera_zoom) * scene.screen_height;
+    }
     _start_campaign() {
         DE.SoundFX.play("win");
         this.scene.name = this.scene._orig_name || this.scene.name;
+        // Oyun başlıyor: CLOSE-UP -> normal oyun büyüklüğü, vinyet hafifler.
+        this.scene.camera_manual = false;   // otomatik takip -> oyuncuya odaklan
+        this.scene.zoom_to(1.0);
+        this.scene.set_vignette(0.22);
         if (this.player) {
             const pc = this.player.get_component(DE_GAME.PlayerController);
             if (pc) pc.menu_idle = false;
@@ -217,6 +272,28 @@ DE_GAME.MenuController = class MenuController extends DE.Component {
     }
     update(dt) {
         if (this.done) return;
+        this._place_menu_camera();
+
+        if (this._fading_out) {
+            // Kararma: 255'e ulaşınca sahne geçer (varsa); 0'a dönünce biter.
+            const FADE_SPEED = 420.0;
+            this._fade = Math.max(0.0, Math.min(255.0, this._fade + this._fade_dir * FADE_SPEED * dt));
+            if (this._fade >= 255.0) {
+                if (this._pending_factory !== null && this._pending_factory !== undefined) {
+                    const new_scene = this._pending_factory();
+                    const fo = new DE.GameObject("FadeIn", 0, 0, 0, 0, "Default");
+                    fo.add_component(new DE_GAME.FadeOverlay());
+                    new_scene.add_object(fo);
+                    DE.Engine.switch_scene(new_scene);
+                    this._pending_factory = null;
+                }
+                this._fade_dir = -1;   // aydınlan (255 -> 0)
+            } else if (this._fade <= 0.0 && this._fade_dir < 0) {
+                this.done = true;
+            }
+            return;
+        }
+
         if (DE.Input.get_mouse_button_down(0)) {
             const m = DE.Input.get_mouse_position();
             for (let i = 0; i < this._click_zones.length; i++) {
@@ -239,6 +316,14 @@ DE_GAME.MenuController = class MenuController extends DE.Component {
         } else if (DE.Input.get_key_down("P") || DE.Input.get_key_down("SPACE") || DE.Input.get_key_down("ENTER")) {
             DE_GAME.state.game_mode = "campaign";
             this._start_campaign();
+        }
+    }
+    draw(ctx, camera_offset) {
+        // Tam ekran karartma katmanı (çapraz geçiş sırasında).
+        if (this._fade > 0) {
+            const a = Math.max(0, Math.min(255, Math.trunc(this._fade)));
+            ctx.fillStyle = "rgba(0,0,0," + (a / 255).toFixed(3) + ")";
+            ctx.fillRect(0, 0, ctx.canvas ? ctx.canvas.width : 900, ctx.canvas ? ctx.canvas.height : 600);
         }
     }
 };

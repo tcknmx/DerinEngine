@@ -8,6 +8,23 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[OYUN-HTML] M3 UI derinliği (28.09.2026, `01_strategy.md` [2] port planı
+  M3).** `ui.js`: menü kamerası CLOSE-UP zoom (`MENU_ZOOM=1.8`,
+  `camera_manual`, `_place_menu_camera`) + `set_vignette(0.5)`; kampanya
+  başlayınca `camera_manual=false` + `zoom_to(1.0)` + `set_vignette(0.22)`.
+  `FadeOverlay` bileşeni + MenuController çapraz geçiş alanları (`_fade`,
+  `_fading_out`, `_pending_factory`) eklendi — **dormant, Python'la birebir**
+  (Python'da `_pending_factory` hiç set edilmez). `engine/core.js`:
+  `Scene.destroy` + `_objects_to_destroy` (Python `scene.py:117/381` eşi,
+  FadeOverlay kendini siler). `scenes.js`: `_attach_ground_tilemap` (Python eşi)
+  `build_procedural_level`'e bağlandı — zemin rect'leri 32px Tilemap'e rasterize
+  (yüzey id1 + alt toprak id2), katı zemin sprite'ları gizlenir (one-way adalar
+  kalır, çarpışmalar aynen), `_tilemap_ground`/`_tilemap_segments` köprüsü.
+  **Boss giriş duyurusu İPTAL** (Python'da karşılığı yok — parite korunur).
+  **`test_game.js` 75/75 ALL OK.** Süitler yeşil: motor 353/353 + browser 23/23
+  + tools 24/24. Etkilenen: `core.js`, `ui.js`, `scenes.js`, `test_game.js`;
+  **Py motor ve Py oyun DEĞİŞMEDİ**. M4 sıra: `game/commands.py` (konsol
+  komutları) + pygbag onaylı `main.py` giriş dalı.
 - **[OYUN-HTML] Boss M2 tamamlandı — gerçek boss arenası (28.09.2026,
   `01_strategy.md` [2] port planı M2).** `deep_engine_html/game/bosses.js` YENİ
   (Python `game/bosses.py` birebir portu): `BossController`/`FlyingBoss`/

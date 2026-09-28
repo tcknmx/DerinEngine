@@ -134,6 +134,15 @@ let lvl;
   check("portal kilitli", gp.is_unlocked === false);
   check("_register_pause scene_manager yoksa güvenli", lvl.on_escape === undefined || typeof lvl.on_escape === "function");
   check("_NEXT_SCENE_FACTORIES: procedural (lazy kayıt)", typeof DE_GAME._NEXT_SCENE_FACTORIES["procedural"] === "function");
+  check("zemin tilemap rasterize", lvl._tilemap_ground !== null && lvl._tilemap_ground !== undefined
+    && lvl._tilemap_ground.layers_count === 1 && lvl._tilemap_segments.length > 0,
+    "segments=" + (lvl._tilemap_segments ? lvl._tilemap_segments.length : 0));
+  const groundHide = lvl.find_all_by_tag("Ground").filter(o => {
+    const s = o.get_component(DE.SpriteRenderer);
+    return s && o.get_component(DE.BoxCollider) && !o.get_component(DE.BoxCollider).one_way && s.visible === false;
+  });
+  check("katı zemin sprite'ları gizlendi", groundHide.length > 0, "gizli=" + groundHide.length);
+  check("tilemap gönderildi", lvl._tilemap_ground !== null && lvl.find_all_by_tag("Tilemap").length === 1);
 }
 
 // Taze seviye yardımcısı (düşme/zıplama/dash/ateş testleri bağımsız).
@@ -331,6 +340,13 @@ console.log("TEST10 ana menü:");
   })();
   check("MenuController var", menuCtrlComp !== null);
   check("menu_idle açık", ctrl.menu_idle === true);
+  check("menü CLOSE-UP zoom", menu.camera_manual === true
+    && menu.camera_zoom === DE_GAME.MENU_ZOOM && menu.camera_zoom_target === DE_GAME.MENU_ZOOM,
+    "zoom=" + menu.camera_zoom);
+  check("menü vinyet 0.5", Math.abs(menu.vignette_intensity - 0.5) < 0.001);
+  menuCtrlComp._place_menu_camera();
+  check("yakın plan kamera konumlandı", isFinite(menu.camera_position.x) && isFinite(menu.camera_position.y));
+  check("çapraz geçiş dormant", menuCtrlComp._fade === 0 && menuCtrlComp._fading_out === false);
   const hudHidden = menu._hud_ui.every(o => o.active === false);
   check("HUD menüde gizli", hudHidden);
   press("P");
@@ -338,6 +354,8 @@ console.log("TEST10 ana menü:");
   DE.Input.instance.end_frame();
   check("P ile kampanya başladı", DE_GAME.state.game_mode === "campaign");
   check("menu_idle kapandı", ctrl.menu_idle === false);
+  check("kamerası normal oyuna döndü", menu.camera_manual === false && menu.camera_zoom_target === 1.0);
+  check("vinyet 0.22'ye döndü", Math.abs(menu.vignette_intensity - 0.22) < 0.001);
   const hudShown = menu._hud_ui.every(o => o.active === true);
   check("HUD geri geldi", hudShown);
 }
@@ -353,6 +371,21 @@ console.log("TEST11 ESC -> pause overlay:");
   testScene.on_escape = function () { fired = true; return true; };
   if (engine.active_scene.on_escape) { engine.active_scene.on_escape(); }
   check("on_escape çağrılır", fired === true);
+}
+
+// ---- TEST 12: FadeOverlay (çapraz geçiş bileşeni) ----
+console.log("TEST12 FadeOverlay:");
+{
+  const sc = new DE.Scene("FadeTest", [0, 0, 0]);
+  const fo = new DE.GameObject("FadeIn", 0, 0, 0, 0, "Default");
+  const comp = fo.add_component(new DE_GAME.FadeOverlay(120));
+  sc.add_object(fo);
+  use(sc);
+  step(sc, 3, 1 / 60);
+  check("açılışta karanlık", comp._alpha > 0);
+  step(sc, 160, 1 / 60);
+  check("uyumu bitti", comp._alpha <= 0);
+  check("nesne sahneden silindi", sc.find_by_tag("FadeIn") === null);
 }
 
 // Toplam

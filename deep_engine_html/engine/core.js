@@ -116,6 +116,7 @@ DE.Scene = class Scene {
         this.active = true;
         this.game_objects = [];
         this._objects_to_add = [];
+        this._objects_to_destroy = [];   // Python Scene._objects_to_destroy (destroy/remove)
         this.camera_offset = new DE.Vector2(0, 0);
         this.camera_zoom = 1.0;
         this.time_scale = 1.0;
@@ -148,6 +149,10 @@ DE.Scene = class Scene {
     add_object(obj) {
         this._objects_to_add.push(obj);
         return obj;
+    }
+    destroy(obj) {
+        // Python Scene.destroy: nesneyi bir sonraki güncellemede sahneden siler.
+        this._objects_to_destroy.push(obj);
     }
     find_by_tag(tag) {
         for (const o of [...this.game_objects, ...this._objects_to_add]) {
@@ -198,6 +203,12 @@ DE.Scene = class Scene {
     update(dt) {
         const sim_dt = dt * this.time_scale;
         this.start();
+        // Silinmesi istenen nesneleri ayıkla (Python scene.py:381-383 aynı sıra)
+        if (this._objects_to_destroy.length) {
+            const doomed = this._objects_to_destroy;
+            this.game_objects = this.game_objects.filter(obj => doomed.indexOf(obj) === -1);
+            this._objects_to_destroy = [];
+        }
         // Spatial grid (Python _handle_physics_and_collisions ile aynı yapı)
         const colliders = [];
         for (const o of this.game_objects) {
