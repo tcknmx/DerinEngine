@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DerinEngine Panel</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, Segoe UI, sans-serif; background: #111318; color: #e8e8e8; margin: 0; padding: 16px; }
+  h1 { font-size: 18px; margin: 0 0 12px; }
+  h1 small { color: #888; font-weight: normal; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .tab { padding: 8px 14px; border-radius: 8px; background: #1d2129; cursor: pointer; border: 1px solid #2c313c; }
+  .tab.active { background: #3b6ef0; border-color: #3b6ef0; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  pre { background: #0b0d11; border: 1px solid #2c313c; border-radius: 8px; padding: 12px; min-height: 200px; max-height: 70vh; overflow: auto; font-size: 12px; line-height: 1.45; white-space: pre-wrap; color: #cfd6e6; }
+  button { background: #3b6ef0; color: #fff; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+  button.secondary { background: #2c313c; }
+  button.run { background: #2da44e; }
+  button.danger { background: #b3362c; }
+  textarea { width: 100%; background: #0b0d11; border: 1px solid #2c313c; color: #dfe6f2; border-radius: 8px; padding: 10px; font-family: Consolas, monospace; font-size: 13px; min-height: 120px; }
+  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .status { color: #9aa4b5; font-size: 12px; }
+  .ok { color: #2da44e; } .err { color: #f47067; }
+
+  /* ---- editor layout ---- */
+  .ed-wrap { display: flex; gap: 12px; align-items: flex-start; }
+  .ed-left { width: 225px; flex-shrink: 0; }
+  .ed-center { flex: 1; min-width: 0; }
+  .ed-right { width: 235px; flex-shrink: 0; }
+  .ed-panel { background: #181c24; border: 1px solid #2c313c; border-radius: 10px; padding: 10px; }
+  .ed-panel h3 { margin: 0 0 8px; font-size: 13px; color: #9aa4b5; text-transform: uppercase; letter-spacing: .5px; }
+  .tool-btn { display: block; width: 100%; text-align: left; margin-bottom: 4px; padding: 6px 8px; background: #20242e; border: 1px solid #2c313c; border-radius: 6px; font-size: 13px; color: #dfe6f2; cursor: pointer; }
+  .tool-btn:hover { border-color: #3b6ef0; }
+  .tool-btn.active { background: #3b6ef0; border-color: #3b6ef0; }
+  .tool-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+  canvas { background: #0b0d11; border: 1px solid #2c313c; border-radius: 10px; width: 100%; height: 560px; cursor: crosshair; display: block; touch-action: none; }
+  .prop { margin-bottom: 8px; }
+  .prop label { display: block; font-size: 12px; color: #9aa4b5; margin-bottom: 2px; }
+  .prop input, .prop select { width: 100%; background: #0b0d11; border: 1px solid #2c313c; color: #dfe6f2; border-radius: 6px; padding: 5px 8px; font-size: 13px; }
+  .prop input[type=color] { height: 30px; padding: 2px; }
+  .ed-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .hint { font-size: 12px; color: #7d8699; margin-top: 6px; line-height: 1.5; }
+  .objlist { max-height: 300px; overflow: auto; }
+  .objitem { padding: 5px 8px; border-radius: 6px; cursor: pointer; font-size: 12px; color: #cfd6e6; }
+  .objitem:hover { background: #20242e; }
+  .objitem.active { background: #3b6ef0; }
+  .objitem span { color: #7d8699; font-size: 11px; }
+  .tl { color: #7d8699; font-size: 12px; letter-spacing: .5px; margin-right: 2px; }
+  .sep { width: 1px; height: 22px; background: #2c313c; margin: 0 4px; display: inline-block; }
+  .scroll { max-height: 260px; overflow: auto; }
+  #hier .hi { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 6px; cursor: pointer; font-size: 12px; color: #cfd6e6; }
+  #hier .hi:hover { background: #20242e; }
+  #hier .hi.active { background: #3b6ef0; color: #fff; }
+  #hier .hi .dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  #hier .hi .hname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #hier .hi .hpos { color: #7d8699; font-size: 11px; }
+  #hier .hi.active .hpos { color: #dfe6f2; }
+  #hier .hi.locked .hname { color: #ffd75e; }
+  #hier .hi.dragging { opacity: 0.4; }
+  #hier .hi button { padding: 1px 6px; font-size: 12px; background: transparent; border: none; color: #9aa4b5; cursor: pointer; }
+  #hier .hi button:hover { color: #fff; background: rgba(255,255,255,.08); border-radius: 4px; }
+</style>
+</head>
+<body>
+<h1>DerinEngine Panel <small>127.0.0.1:%PORT%</small></h1>
+<div class="tabs">
+  <div class="tab active" data-tab="editor">Editör</div>
+  <div class="tab" data-tab="scan">deep-tool</div>
+  <div class="tab" data-tab="log">motor.log</div>
+  <div class="tab" data-tab="script">Kod</div>
+  <div class="tab" data-tab="game">Oyun</div>
+</div>
+
+<!-- ============ EDITOR ============ -->
+<div class="panel active" id="editor">
+  <div class="ed-bar">
+    <span class="tl">Seviye</span>
+    <select id="levelSelect" onchange="openLevel(this.value)" style="background:#0b0d11;border:1px solid #2c313c;color:#dfe6f2;border-radius:8px;padding:8px"></select>
+    <button class="run" onclick="saveLevel()" title="Kaydet (Ctrl+S)">Kaydet</button>
+    <button class="secondary" onclick="saveLevelAs()" title="Yeni isimle kaydet">Farklı Kaydet…</button>
+    <button class="secondary" onclick="loadLevel()" title="Diskten tazele">Yeniden Yükle</button>
+    <span class="sep"></span>
+    <button class="secondary" onclick="undo()" title="Geri al (Ctrl+Z)">&larrhk; Geri al</button>
+    <button class="secondary" onclick="redo()" title="Yinele (Ctrl+Y)">&rarrhk;</button>
+    <button class="secondary" onclick="duplicateSelected()" title="Çoğalt (Ctrl+D)">&cong; Çoğalt</button>
+    <button class="danger" onclick="deleteSelected()" title="Sil (Delete)">Sil</button>
+    <span class="sep"></span>
+    <button class="secondary" onclick="resetLevel()">Şablona Sıfırla</button>
+    <button class="danger" onclick="deleteLevel()">Seviyeyi Sil</button>
+    <span class="status" id="edStatus"></span>
+  </div>
+  <div class="hint" style="margin-bottom:8px">Editör <b>custom_levels/</b> klasöründe çalışır: her seviye ayrı isimli bir dosyadır.
+    <b>Farklı Kaydet</b> senin isim vermeni ister (örn. <i>benim_bolum.json</i>). <b>default.json</b> hep sabit duran
+    "sıfır şablon"dur, asla ezilmez.</div>
+  <div class="ed-wrap">
+    <div class="ed-left">
+      <div class="ed-panel" style="margin-bottom:10px">
+        <h3>&#10133; Nesne Ekle</h3>
+        <div id="palette" class="scroll"></div>
+      </div>
+      <div class="ed-panel">
+        <h3>&#127795; Sahne</h3>
+        <div id="hier" class="scroll"></div>
+      </div>
+    </div>
+    <div class="ed-center">
+      <div class="ed-bar" style="flex-wrap:nowrap;margin-bottom:6px">
+        <button class="secondary" onclick="zoomBy(-1)" title="Uzaklaş">&minus;</button>
+        <span class="status" id="zoomLabel" style="min-width:44px;text-align:center">%100</span>
+        <button class="secondary" onclick="zoomBy(1)" title="Yakınlaş">+</button>
+        <button class="secondary" onclick="frameView();draw()" title="Sahneyi pencereye sığdır">&zigrarr;</button>
+        <span class="sep"></span>
+        <span class="status">Izgara</span>
+        <select id="sceneGrid" style="width:auto;background:#0b0d11;border:1px solid #2c313c;color:#dfe6f2;border-radius:8px;padding:6px">
+          <option value="4">4 px</option><option value="8" selected>8 px</option>
+          <option value="16">16 px</option><option value="32">32 px</option></select>
+      </div>
+      <canvas id="cv" width="1280" height="560"></canvas>
+      <div class="ed-panel" style="margin-top:8px;padding:6px 10px">
+        <span class="status" id="statusBar">Kanvasa tıkla veya Sahne listesinden nesne seç. Tıklama ipuçları için farenin altına gel.
+          Izgara %GRID% px, teker = yakınlaş, ok tuşları = gez.</span>
+      </div>
+    </div>
+    <div class="ed-right">
+      <div class="ed-panel" style="margin-bottom:10px">
+        <h3>&#128295; Inspector</h3>
+        <div id="props">Bir nesne seç.</div>
+        <div class="ed-bar" style="margin-top:8px;margin-bottom:0">
+          <button class="secondary" onclick="duplicateSelected()">&cong; Çoğalt</button>
+          <button class="secondary" onclick="moveObj(-1)" title="Çizim sırasında yukarı (daha üstte)">&uarr;</button>
+          <button class="secondary" onclick="moveObj(1)" title="Çizim sırasında aşağı (daha altta)">&darr;</button>
+          <button class="danger" onclick="deleteSelected()">Sil</button>
+        </div>
+      </div>
+      <div class="ed-panel">
+        <h3>&#9881; Seviye Ayarları</h3>
+        <div class="prop"><label>Ad</label><input id="metaName" type="text"></div>
+        <div class="prop"><label>Arka plan rengi</label><input id="metaBg" type="color" value="#101822"></div>
+        <div class="prop"><label>Parallax teması</label><select id="metaTheme"></select></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DEEP-TOOL ============ -->
+<div class="panel" id="scan">
+  <div class="ed-panel" style="margin:0 0 10px 0">
+    <h3 style="margin:0 0 6px 0">1) Tarama &mdash; modüle tıkla veya hepsini çalıştır</h3>
+    <div class="ed-bar">
+      <select id="scanLang" style="width:auto" onchange="loadMods()"><option value="tr">Türkçe</option><option value="en">English</option></select>
+      <button class="run" onclick="runScan('all')">Tümünü tara (13 modül)</button>
+      <span class="status" id="scanStatus"></span>
+    </div>
+    <div id="scanMods" style="margin-top:6px"></div>
+  </div>
+  <pre id="scanOut" style="min-height:120px">Henüz taramadınız.</pre>
+
+  <div class="ed-panel" style="margin:10px 0">
+    <h3 style="margin:0 0 6px 0">2) Bul &mdash; kelime &rarr; dosya:satır listesi</h3>
+    <div class="ed-bar">
+      <input id="findKw" placeholder="arama kelimesi, ör. Rigidbody2D" style="flex:1">
+      <input id="findFolder" placeholder="klasör (boş = hepsi)" style="width:140px">
+      <button class="run" onclick="runFind()">Bul</button>
+      <span class="status" id="findStatus"></span>
+    </div>
+    <pre id="findOut" style="margin-top:6px;min-height:70px"></pre>
+  </div>
+
+  <div class="ed-panel" style="margin:0 0 10px 0">
+    <h3 style="margin:0 0 6px 0">3) Üret &mdash; script şablonu veya boş dizin</h3>
+    <div class="ed-bar">
+      <select id="newKind" style="width:auto"><option value="script">script</option><option value="dir">dir</option></select>
+      <input id="newPath" placeholder="ör. tools/deneme.py" style="flex:1">
+      <button class="run" onclick="runNew()">Üret</button>
+      <span class="status" id="newStatus"></span>
+    </div>
+    <div class="hint" style="margin-top:4px">Var olan bir yol <span class="err">silinmez</span> &mdash; koruma hatası verir.</div>
+  </div>
+
+  <div class="ed-panel">
+    <h3 style="margin:0 0 6px 0">4) Başlat &mdash; oyunu veya bir .py dosyasını çalıştır</h3>
+    <div class="ed-bar">
+      <button class="run" onclick="runFile('main.py')">Oyun (main.py)</button>
+      <input id="runPath" placeholder=".py yolu, ör. tools/webpanel.py" style="flex:1">
+      <button class="secondary" onclick="runFile(document.getElementById('runPath').value)">Çalıştır</button>
+    </div>
+    <pre id="runOut" style="margin-top:6px;min-height:70px"></pre>
+  </div>
+</div>
+
+<div class="panel" id="log">
+  <div class="row">
+    <button class="secondary" onclick="loadLog()">Yenile</button>
+    <label style="margin-left:10px;color:#95a5c6"><input type="checkbox" id="logAuto" onchange="toggleLogAuto()"> canlı izle (2 sn)</label>
+    <span class="status">motor.log son 200 satır</span>
+  </div>
+  <pre id="logOut">Yükleniyor...</pre>
+</div>
+
+<div class="panel" id="script">
+  <div class="row"><span class="status">Kısa bir Python komutu koş - çıktıyı burada gör.</span></div>
+  <textarea id="scriptSrc">import deep_engine
+print("DerinEngine", deep_engine.__version__)</textarea>
+  <div class="row" style="margin-top:8px">
+    <button class="run" onclick="runScript()">Çalıştır</button>
+    <span class="status" id="scriptStatus"></span>
+  </div>
+  <pre id="scriptOut"></pre>
+</div>
+
+<div class="panel" id="game">
+  <div class="row">
+    <button class="run" onclick="launchGame()">main.py başlat</button>
+    <span class="status">Oyun ayrı bir pencere/pygame olarak açılır.</span>
+  </div>
+  <pre id="gameOut"></pre>
+</div>
+
+<!-- Save As dialog: names the current level and saves into custom_levels/ -->
+<div id="saveAsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:50;align-items:center;justify-content:center">
+  <div class="ed-panel" style="width:380px">
+    <h3>Farklı Kaydet (custom_levels/)</h3>
+    <div class="prop"><label>Seviye adı (uzantısız, örn: benim_bolum)</label>
+      <input id="saveAsName" type="text" placeholder="benim_bolum"></div>
+    <div class="hint">Kaydedilir: <b>custom_levels/<span id="saveAsPreview">benim_bolum</span>.json</b><br>
+      Aynı isimde seviye varsa üzerine yazılır. default.json korunur.</div>
+    <div style="display:flex;gap:8px">
+      <button class="run" onclick="doSaveAs()">Kaydet</button>
+      <button class="secondary" onclick="closeSaveAs()">Vazgeç</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- shared state ---------- */
+let level = null;       // {meta, objects}
+let sel = -1;           // index of selected object, -1 = none
+let currentTool = null; // template object to place
+let gridSize = 8;
+// camera offset in world px (origin at top-left of the canvas view)
+let camX = 0, camY = 0, zoom = 1;
+const GRID = %GRID%;
+const TEMPLATES = %TEMPLATES%;
+const SCHEMAS = %SCHEMAS%;
+const THEMES = %THEMES%;
+
+/* ---------- undo / redo ---------- */
+let undoStack = [];
+let redoStack = [];
+const UNDO_MAX = 60;
+function record() {
+  undoStack.push(JSON.stringify(level));
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  redoStack.length = 0;
+}
+function afterRestore() {
+  if (!level) return;
+  if (sel < 0 || sel >= level.objects.length) sel = -1;
+  metaToControls(); updateProps(); updateTree(); draw(); zoomLabel();
+}
+function undo() {
+  if (!undoStack.length) return;
+  redoStack.push(JSON.stringify(level));
+  level = JSON.parse(undoStack.pop());
+  document.getElementById('edStatus').textContent = 'Geri alındı.';
+  afterRestore();
+}
+function redo() {
+  if (!redoStack.length) return;
+  undoStack.push(JSON.stringify(level));
+  level = JSON.parse(redoStack.pop());
+  document.getElementById('edStatus').textContent = 'Yinelendi.';
+  afterRestore();
+}
+
+const tabs = document.querySelectorAll('.tab');
+tabs.forEach(t => t.onclick = () => {
+  tabs.forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  document.getElementById(t.dataset.tab).classList.add('active');
+  if (t.dataset.tab === 'editor') draw();
+});
+
+/* ---------- palette ---------- */
+function buildPalette() {
+  const pal = document.getElementById('palette');
+  pal.innerHTML = '';
+  TEMPLATES.forEach((tpl) => {
+    const b = document.createElement('button');
+    b.className = 'tool-btn';
+    const c = tpl.color || [200,200,200];
+    b.innerHTML = '<span class="tool-dot" style="background:rgb(' + c.join(',') + ')"></span>' + tpl.name;
+    b.onclick = () => {
+      document.querySelectorAll('.tool-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      currentTool = JSON.parse(JSON.stringify(tpl));
+      sel = -1; updateProps(); updateTree();
+      draw();
+    };
+    pal.appendChild(b);
+  });
+}
+
+/* ---------- object helpers ---------- */
+function colorOf(o) { return o.color && o.color.length === 3 ? o.color : [180, 180, 190]; }
+function rgbStr(c) { return 'rgb(' + Math.round(c[0]) + ',' + Math.round(c[1]) + ',' + Math.round(c[2]) + ')'; }
+function snap(v) { return Math.round(v / gridSize) * gridSize; }
+function keyOf(o) { return (o.tag || '') + ':' + (o.name || ''); }
+
+/* ---------- rendering ---------- */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+function draw() {
+  ctx.fillStyle = rgbStr(level.meta.background_color || [16,24,34]);
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  // grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  const step = gridSize * zoom;
+  for (let gx = ((camX % gridSize) * zoom); gx < cv.width; gx += step) {
+    ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, cv.height); ctx.stroke();
+  }
+  for (let gy = ((camY % gridSize) * zoom); gy < cv.height; gy += step) {
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(cv.width, gy); ctx.stroke();
+  }
+  // world -> screen
+  const sx = o => (o.x - camX) * zoom;
+  const sy = o => (o.y - camY) * zoom;
+  level.objects.forEach((o, i) => {
+    const x = sx(o), y = sy(o), w = o.w * zoom, h = o.h * zoom;
+    if (x + w < 0 || y + h < 0 || x > cv.width || y > cv.height) return;
+    ctx.globalAlpha = (o.hidden) ? 0.22 : 1;
+    ctx.fillStyle = rgbStr(colorOf(o));
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = i === sel ? '#ffffff' : 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = i === sel ? 2 : 1;
+    ctx.strokeRect(x, y, w, h);
+    // label
+    ctx.fillStyle = i === sel ? '#fff' : 'rgba(255,255,255,0.55)';
+    ctx.font = '11px system-ui';
+    ctx.fillText(o.name || o.tag, x + 3, y + 12);
+    // selection handles
+    if (i === sel) {
+      ctx.fillStyle = '#fff';
+      const hs = 5, pts = [[x,y],[x+w/2,y],[x+w,y],[x,y+h/2],[x+w,y+h/2],[x,y+h],[x+w/2,y+h],[x+w,y+h]];
+      pts.forEach(p => { ctx.fillRect(p[0]-hs/2, p[1]-hs/2, hs, hs); });
+    }
+    if (o.hidden) {
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.font = '10px system-ui';
+      ctx.fillText('gizli', x + 3, y - 4);
+    }
+    if (o.locked && i === sel) {
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'rgba(255,230,80,1)';
+      ctx.font = '12px system-ui';
+      ctx.fillText('\u{1F512}', x + w - 14, y - 4);
+    }
+    ctx.globalAlpha = 1;
+  });
+}
+
+/* ---------- mouse interaction ---------- */
+let drag = null; // {mode:'move'|'resize'|'place', index, dx, dy, w, h, corner}
+function evtPos(e) {
+  const r = cv.getBoundingClientRect();
+  const x = (e.clientX - r.left) * (cv.width / r.width);
+  const y = (e.clientY - r.top) * (cv.height / r.height);
+  return { wx: camX + x / zoom, wy: camY + y / zoom, sx: x, sy: y };
+}
+function hitIndex(wx, wy) {
+  for (let i = level.objects.length - 1; i >= 0; i--) {
+    const o = level.objects[i];
+    if (o.hidden) continue;
+    if (wx >= o.x && wx <= o.x + o.w && wy >= o.y && wy <= o.y + o.h) return i;
+  }
+  return -1;
+}
+function cornerAt(wx, wy, o) {
+  const tol = 6 / zoom;
+  const c = o.x + o.w, r = o.y + o.h;
+  const near = (a, b) => Math.abs(wx - a) < tol && Math.abs(wy - b) < tol;
+  if (near(o.x, o.y)) return 'nw';
+  if (near(c, o.y)) return 'ne';
+  if (near(o.x, r)) return 'sw';
+  if (near(c, r)) return 'se';
+  return null;
+}
+
+cv.addEventListener('mousedown', e => {
+  e.preventDefault();
+  const p = evtPos(e);
+  if (e.button === 1) { return; } // middle = reserved
+  if (sel >= 0 && sel < level.objects.length) {
+    const o = level.objects[sel];
+    const corner = cornerAt(p.wx, p.wy, o);
+    if (corner && !o.locked) {
+      record();
+      drag = { mode: 'resize', index: sel, corner, ox: o.x, oy: o.y, ow: o.w, oh: o.h };
+      draw(); return;
+    }
+  }
+  const i = hitIndex(p.wx, p.wy);
+  if (i >= 0) {
+    const o = level.objects[i];
+    sel = i;
+    if (!o.locked) {
+      record();
+      drag = { mode: 'move', index: i, dx: p.wx - o.x, dy: p.wy - o.y };
+    }
+    updateProps(); updateTree();
+  } else if (currentTool) {
+    // place a new object snapped to grid
+    record();
+    const t = JSON.parse(JSON.stringify(currentTool));
+    t.x = snap(p.wx);
+    t.y = snap(p.wy);
+    level.objects.push(t);
+    sel = level.objects.length - 1;
+    drag = { mode: 'place', index: sel };
+    updateProps(); updateTree();
+  } else {
+    sel = -1; updateProps(); updateTree();
+  }
+  draw();
+});
+cv.addEventListener('mousemove', e => {
+  const p = evtPos(e);
+  const sb = document.getElementById('statusBar');
+  let msg = 'İmleç: ' + Math.round(p.wx) + ', ' + Math.round(p.wy);
+  if (sel >= 0 && level.objects[sel]) {
+    const o = level.objects[sel];
+    msg += '  ·  Seçili: ' + (o.name || o.tag) + ' (' + Math.round(o.w) + '×' + Math.round(o.h) + ')';
+  }
+  sb.textContent = msg;
+  if (drag) {
+    if (drag.mode === 'move' || drag.mode === 'place') {
+      const o = level.objects[drag.index];
+      o.x = snap(p.wx - drag.dx);
+      o.y = snap(p.wy - drag.dy);
+    } else if (drag.mode === 'resize') {
+      const o = level.objects[drag.index];
+      let x1 = drag.ox, y1 = drag.oy, x2 = drag.ox + drag.ow, y2 = drag.oy + drag.oh;
+      if (drag.corner.includes('w')) x1 = Math.min(p.wx, x2 - 4);
+      if (drag.corner.includes('e')) x2 = Math.max(p.wx, x1 + 4);
+      if (drag.corner.includes('n')) y1 = Math.min(p.wy, y2 - 4);
+      if (drag.corner.includes('s')) y2 = Math.max(p.wy, y1 + 4);
+      o.x = snap(x1); o.y = snap(y1); o.w = snap(x2) - o.x; o.h = snap(y2) - o.y;
+      if (o.w < 4) o.w = 4; if (o.h < 4) o.h = 4;
+    }
+    updateProps(); draw();
+  }
+});
+window.addEventListener('mouseup', () => { if (drag) updateProps(); drag = null; draw(); });
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  const p = evtPos(e);
+  const f = e.deltaY < 0 ? 1.12 : 0.893;
+  const nz = Math.min(3, Math.max(0.25, zoom * f));
+  camX = p.wx - (p.sx / nz);
+  camY = p.wy - (p.sy / nz);
+  zoom = nz;
+  draw(); zoomLabel();
+}, { passive: false });
+// canvas pan via arrow keys + engine-style shortcuts
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,select,textarea')) return;
+  const ctrl = e.ctrlKey || e.metaKey;
+  if (ctrl && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
+  if (ctrl && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); redo(); return; }
+  if (ctrl && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); duplicateSelected(); return; }
+  if (ctrl && (e.key === 's' || e.key === 'S')) { e.preventDefault(); saveLevel(); return; }
+  const mv = 40 / zoom;
+  if (e.key === 'ArrowRight') camX += mv;
+  else if (e.key === 'ArrowLeft') camX -= mv;
+  else if (e.key === 'ArrowDown') camY += mv;
+  else if (e.key === 'ArrowUp') camY -= mv;
+  else if (e.key === 'Delete') { deleteSelected(); }
+  else if (e.key === 'Escape') { sel = -1; updateProps(); updateTree(); }
+  else return;
+  draw();
+});
+
+/* ---------- property panel ---------- */
+function updateProps() {
+  const box = document.getElementById('props');
+  if (sel < 0 || !level.objects[sel]) { box.innerHTML = 'Bir nesne seç.'; return; }
+  const o = level.objects[sel];
+  const key = keyOf(o);
+  const schema = SCHEMAS[key] || SCHEMAS[o.tag] || [];
+  let html = '<div class="prop"><label>Tip</label><input value="' + (o.name || o.tag) + '" disabled></div>';
+  if (o.locked) {
+    html += '<p class="hint">\u{1F512} Kilitli: düzenlemek için listeden kilidi aç.</p>';
+  }
+  html += '<div class="prop"><label>X</label><input type="number" value="' + o.x + '" onchange="setNum(' + sel + ',\'x\',this.value)"></div>';
+  html += '<div class="prop"><label>Y</label><input type="number" value="' + o.y + '" onchange="setNum(' + sel + ',\'y\',this.value)"></div>';
+  html += '<div class="prop"><label>Genişlik W</label><input type="number" value="' + o.w + '" onchange="setNum(' + sel + ',\'w\',this.value)"></div>';
+  html += '<div class="prop"><label>Yükseklik H</label><input type="number" value="' + o.h + '" onchange="setNum(' + sel + ',\'h\',this.value)"></div>';
+  if (key === 'Player:Player') {
+    html += '<p class="hint">Tek Player olmalı: oyuncunun doğduğu yer (x, y). Eğer hiç yoksa oyun başlarken hata verir.</p>';
+  }
+  schema.forEach(f => {
+    const [name, label, type, extra] = f;
+    if (type === 'bool') {
+      html += '<div class="prop"><label>' + label + '</label><select onchange="setVal(' + sel + ',\'' + name + '\',this.value === \'true\')"><option value="false"' + (o[name] ? '' : ' selected') + '>Kapalı</option><option value="true"' + (o[name] ? ' selected' : '') + '>Açık</option></select></div>';
+    } else if (type === 'select') {
+      html += '<div class="prop"><label>' + label + '</label><select onchange="setVal(' + sel + ',\'' + name + '\',this.value)">';
+      extra.forEach(v => { html += '<option value="' + v + '"' + (o[name] === v ? ' selected' : '') + '>' + v + '</option>'; });
+      html += '</select></div>';
+    } else if (type === 'text') {
+      html += '<div class="prop"><label>' + label + '</label><input value="' + (o[name] || '') + '" onchange="setVal(' + sel + ',\'' + name + '\',this.value)"></div>';
+    } else if (type === 'num' || type === 'int') {
+      const step = type === 'num' ? '0.1' : '1';
+      const mn = typeof extra === 'number' ? ' min="' + extra + '"' : '';
+      html += '<div class="prop"><label>' + label + '</label><input type="number" step="' + step + '"' + mn + ' value="' + (o[name] ?? '') + '" onchange="setNum(' + sel + ',\'' + name + '\',this.value)"></div>';
+    } else if (type === 'color') {
+      const c = colorOf(o);
+      const hex = '#' + c.map(v => (Math.round(v).toString(16)).padStart(2, '0')).join('');
+      html += '<div class="prop"><label>' + label + '</label><input type="color" value="' + hex + '" onchange="setColor(' + sel + ',this.value)"></div>';
+    }
+  });
+  box.innerHTML = html;
+}
+window.setNum = (i, k, v) => { if (L(i).locked) return; const n = parseFloat(v); if (!isNaN(n)) { record(); level.objects[i][k] = n; draw(); } };
+window.setVal = (i, k, v) => { if (L(i).locked) return; record(); level.objects[i][k] = v; draw(); };
+window.setColor = (i, hex) => {
+  if (L(i).locked) return;
+  const m = hex.match(/[a-f0-9]{2}/ig);
+  record();
+  level.objects[i].color = m.map(x => parseInt(x, 16));
+  draw();
+};
+function L(i) { return (i >= 0 && i < level.objects.length) ? level.objects[i] : {}; }
+function deleteSelected() {
+  if (sel >= 0 && sel < level.objects.length && !level.objects[sel].locked) {
+    record();
+    level.objects.splice(sel, 1);
+    sel = -1;
+    updateProps(); updateTree(); draw();
+    document.getElementById('edStatus').innerHTML = '<span class="ok">Nesne silindi.</span>';
+  }
+}
+function duplicateSelected() {
+  if (sel < 0 || sel >= level.objects.length) return;
+  record();
+  const o = level.objects[sel];
+  const c = JSON.parse(JSON.stringify(o));
+  c.name = (o.name || o.tag) + ' (kopya)';
+  c.x = snap(o.x + 8); c.y = snap(o.y + 8);
+  level.objects.splice(sel + 1, 0, c);
+  sel = sel + 1;
+  updateProps(); updateTree(); draw();
+  document.getElementById('edStatus').innerHTML = '<span class="ok">Nesne çoğaltıldı.</span>';
+}
+function moveObj(d, idx) {
+  const i = (idx === undefined) ? sel : idx;
+  const j = i + d;
+  if (i < 0 || i >= level.objects.length || j < 0 || j >= level.objects.length) return;
+  record();
+  const o = level.objects.splice(i, 1)[0];
+  level.objects.splice(j, 0, o);
+  sel = j;
+  updateProps(); updateTree(); draw();
+}
+function zoomBy(dir) {
+  const f = dir > 0 ? 1.2 : 1 / 1.2;
+  zoom = Math.min(3, Math.max(0.25, zoom * f));
+  draw(); zoomLabel();
+}
+function zoomLabel() {
+  const el = document.getElementById('zoomLabel');
+  if (el) el.textContent = Math.round(zoom * 100) + '%';
+}
+
+/* ---------- object list (scene tree) ---------- */
+function updateTree() {
+  const box = document.getElementById('hier');
+  box.innerHTML = '';
+  level.objects.forEach((o, i) => {
+    const row = document.createElement('div');
+    row.className = 'hi' + (i === sel ? ' active' : '') + (o.locked ? ' locked' : '');
+    row.draggable = true;
+    row.ondragstart = (ev) => { ev.dataTransfer.setData('text/plain', i); row.classList.add('dragging'); };
+    row.ondragend = () => row.classList.remove('dragging');
+    row.ondragover = (ev) => { ev.preventDefault(); };
+    row.ondrop = (ev) => {
+      ev.preventDefault();
+      const from = parseInt(ev.dataTransfer.getData('text/plain'), 10);
+      if (isNaN(from) || from === i) return;
+      record();
+      const o2 = level.objects.splice(from, 1)[0];
+      level.objects.splice(i, 0, o2);
+      sel = i;
+      updateProps(); updateTree(); draw();
+    };
+    row.onclick = () => { sel = i; updateProps(); updateTree(); draw(); };
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.style.background = rgbStr(colorOf(o));
+    dot.title = o.tag || '';
+    const name = document.createElement('span');
+    name.className = 'hname';
+    name.textContent = (o.name || o.tag || '?') + (o.hidden ? ' (gizli)' : '');
+    name.title = o.tag || '';
+    const pos = document.createElement('span');
+    pos.className = 'hpos';
+    pos.textContent = '@' + Math.round(o.x) + ',' + Math.round(o.y);
+    row.appendChild(dot); row.appendChild(name); row.appendChild(pos);
+    const gh = document.createElement('button');
+    gh.textContent = o.hidden ? '\u25C8' : '\u25C9';
+    gh.title = o.hidden ? 'Göster (tıkla)' : 'Gizle (tıkla)';
+    gh.onclick = (ev) => {
+      ev.stopPropagation();
+      record();
+      o.hidden = !o.hidden;
+      if (o.hidden && sel === i) { sel = -1; updateProps(); }
+      updateTree(); draw();
+    };
+    row.appendChild(gh);
+    const lk = document.createElement('button');
+    lk.textContent = o.locked ? '\u{1F512}' : '\u{1F513}';
+    lk.title = o.locked ? 'Kilidi aç' : 'Kilitle (düzenleme yok)';
+    lk.onclick = (ev) => {
+      ev.stopPropagation();
+      record();
+      o.locked = !o.locked;
+      updateTree(); draw();
+    };
+    row.appendChild(lk);
+    if (i > 0) {
+      const up = document.createElement('button');
+      up.textContent = '\u2191';
+      up.title = 'Yukarı taşı (çizim üstte)';
+      up.onclick = (ev) => { ev.stopPropagation(); moveObj(-1, i); };
+      row.appendChild(up);
+    }
+    if (i < level.objects.length - 1) {
+      const dn = document.createElement('button');
+      dn.textContent = '\u2193';
+      dn.title = 'Aşağı taşı (çizim altta)';
+      dn.onclick = (ev) => { ev.stopPropagation(); moveObj(1, i); };
+      row.appendChild(dn);
+    }
+    box.appendChild(row);
+  });
+}
+
+/* ---------- meta ---------- */
+function metaToControls() {
+  document.getElementById('metaName').value = level.meta.name || '';
+  const bg = level.meta.background_color || [16,24,34];
+  document.getElementById('metaBg').value = '#' + bg.map(v => (Math.round(v).toString(16)).padStart(2, '0')).join('');
+  const selTheme = document.getElementById('metaTheme');
+  selTheme.innerHTML = '';
+  THEMES.forEach(t => {
+    const op = document.createElement('option');
+    op.value = t; op.textContent = t;
+    if ((level.meta.parallax_theme || 'none') === t) op.selected = true;
+    selTheme.appendChild(op);
+  });
+}
+function controlsToMeta() {
+  if (!level) return;
+  level.meta.name = document.getElementById('metaName').value || 'Custom Level';
+  const hex = document.getElementById('metaBg').value.replace('#', '');
+  level.meta.background_color = [parseInt(hex.slice(0,2),16), parseInt(hex.slice(2,4),16), parseInt(hex.slice(4,6),16)];
+  level.meta.parallax_theme = document.getElementById('metaTheme').value;
+}
+document.getElementById('metaName').addEventListener('change', () => { record(); controlsToMeta(); });
+document.getElementById('metaBg').addEventListener('change', () => { record(); controlsToMeta(); draw(); });
+document.getElementById('metaTheme').addEventListener('change', () => { record(); controlsToMeta(); draw(); });
+document.getElementById('sceneGrid').addEventListener('change', e => { gridSize = parseInt(e.target.value, 10); camX = Math.round(camX / gridSize) * gridSize; camY = Math.round(camY / gridSize) * gridSize; draw(); });
+
+/* ---------- load / save ---------- */
+function refreshLevelSelect(levels, keep) {
+  const sel = document.getElementById('levelSelect');
+  sel.innerHTML = '';
+  (levels || []).forEach(n => {
+    const op = document.createElement('option');
+    op.value = n; op.textContent = n;
+    if (n === keep) op.selected = true;
+    sel.appendChild(op);
+  });
+}
+function frameView() {
+  let maxX = 1200, maxY = 480;
+  level.objects.forEach(o => {
+    if (o.x + o.w > maxX) maxX = o.x + o.w;
+    if (o.y + o.h > maxY) maxY = o.y + o.h;
+  });
+  zoom = Math.min(cv.width / (maxX + 80), cv.height / (maxY + 80), 1.5);
+  zoom = Math.max(0.25, zoom);
+  camX = 0; camY = 0;
+  zoomLabel();
+}
+async function loadLevel() {
+  const r = await fetch('/api/level');
+  const d = await r.json();
+  level = d.level;
+  gridSize = 8;
+  camX = 0; camY = 0; zoom = 1;
+  frameView();
+  sel = -1;
+  undoStack = []; redoStack = [];
+  refreshLevelSelect(d.levels, (d.level && d.level._name) || 'default.json');
+  metaToControls();
+  updateProps(); updateTree(); zoomLabel();
+  draw();
+  document.getElementById('edStatus').textContent = '';
+}
+async function openLevel(name) {
+  if (!name) return;
+  const r = await fetch('/api/level?name=' + encodeURIComponent(name));
+  const d = await r.json();
+  if (!d.ok) { document.getElementById('edStatus').innerHTML = '<span class="err">HATA: ' + (d.error || '') + '</span>'; return; }
+  level = d.level;
+  refreshLevelSelect(d.levels, name);
+  frameView();
+  sel = -1;
+  undoStack = []; redoStack = [];
+  metaToControls(); updateProps(); updateTree(); zoomLabel(); draw();
+  document.getElementById('edStatus').innerHTML = '<span class="ok">Açıldı: ' + name + '</span>';
+}
+function saveLevelAs() {
+  controlsToMeta();
+  level._name = document.getElementById('levelSelect').value;
+  document.getElementById('saveAsName').value = (level._name || '').replace(/\.json$/i, '');
+  document.getElementById('saveAsModal').style.display = 'flex';
+  document.getElementById('saveAsModal').style.alignItems = 'center';
+  document.getElementById('saveAsModal').style.justifyContent = 'center';
+  updateSavePreview();
+  document.getElementById('saveAsName').focus();
+}
+function updateSavePreview() {
+  const v = document.getElementById('saveAsName').value.trim();
+  document.getElementById('saveAsPreview').textContent = (v || 'seviye');
+}
+document.getElementById('saveAsName').addEventListener('input', updateSavePreview);
+function closeSaveAs() {
+  document.getElementById('saveAsModal').style.display = 'none';
+}
+async function doSaveAs() {
+  const name = document.getElementById('saveAsName').value.trim();
+  if (!name) { document.getElementById('edStatus').innerHTML = '<span class="err">İsim boş olamaz.</span>'; return; }
+  controlsToMeta();
+  const body = JSON.parse(JSON.stringify(level));
+  delete body._name;
+  const r = await fetch('/api/level/save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name, meta: body.meta, objects: body.objects })
+  });
+  const d = await r.json();
+  closeSaveAs();
+  if (!d.ok) { document.getElementById('edStatus').innerHTML = '<span class="err">HATA: ' + (d.error || '') + '</span>'; return; }
+  const lv = await (await fetch('/api/level?name=' + encodeURIComponent(d.name))).json();
+  refreshLevelSelect(lv.levels, d.name);
+  document.getElementById('edStatus').innerHTML = '<span class="ok">Kaydedildi: custom_levels/' + d.name + '</span>';
+}
+async function saveLevel() {
+  const cur = document.getElementById('levelSelect').value;
+  if (!cur || cur === 'default.json') { saveLevelAs(); return; }
+  controlsToMeta();
+  const body = JSON.parse(JSON.stringify(level));
+  delete body._name;
+  const r = await fetch('/api/level/save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: cur, meta: body.meta, objects: body.objects })
+  });
+  const d = await r.json();
+  if (!d.ok) { document.getElementById('edStatus').innerHTML = '<span class="err">HATA: ' + (d.error || '') + '</span>'; return; }
+  document.getElementById('edStatus').innerHTML = '<span class="ok">Kaydedildi: custom_levels/' + d.name + '</span>';
+}
+async function resetLevel() {
+  const d = await postJson('/api/level/reset', {});
+  if (!d.ok) { document.getElementById('edStatus').innerHTML = '<span class="err">' + (d.error || 'hata') + '</span>'; return; }
+  level = d.level;
+  refreshLevelSelect(d.levels || [], 'default.json');
+  sel = -1;
+  undoStack = []; redoStack = [];
+  gridSize = 8; camX = 0; camY = 0; zoom = 1;
+  frameView();
+  metaToControls(); updateProps(); updateTree(); zoomLabel(); draw();
+  document.getElementById('edStatus').innerHTML = '<span class="ok">Şablon (default.json) editöre yüklendi — kaydetmedikçe diskte bir şey değişmez.</span>';
+}
+async function deleteLevel() {
+  const cur = document.getElementById('levelSelect').value;
+  if (!cur) { document.getElementById('edStatus').innerHTML = '<span class="err">Seviye seçili değil.</span>'; return; }
+  if (cur === 'default.json') { document.getElementById('edStatus').innerHTML = '<span class="err">default.json şablonu silinemez.</span>'; return; }
+  if (!confirm('"' + cur + '" seviyesini sil? İşlem geri alınamaz.')) return;
+  const d = await postJson('/api/level/delete', { name: cur });
+  document.getElementById('edStatus').innerHTML = d.ok ? '<span class="ok">Silindi: ' + cur + '</span>' : '<span class="err">' + (d.error || 'hata') + '</span>';
+  loadLevel();
+}
+
+/* ---------- scan / log / script / game ---------- */
+async function postJson(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  return r.json();
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+let MODLIST = [];
+function buildScanMods() {
+  const box = document.getElementById('scanMods');
+  box.textContent = '';
+  MODLIST.forEach((m, i) => {
+    const ch = document.createElement('button');
+    ch.textContent = m.num + '  ' + m.name;
+    ch.title = 'modül ' + m.num + ' tarar';
+    ch.style.cssText = 'font-size:11px;padding:3px 8px;margin:2px;border-radius:6px;background:#0b0d11;border:1px solid #2c313c;color:#95a5c6;cursor:pointer';
+    ch.onclick = () => runScan(String(m.num));
+    box.appendChild(ch);
+  });
+}
+async function loadMods() {
+  const lang = document.getElementById('scanLang').value;
+  const d = await (await fetch('/api/modules?lang=' + lang)).json();
+  if (d.ok && d.result && d.result.ok) { MODLIST = d.result.modules; buildScanMods(); }
+}
+loadMods();
+let scanId = 0;
+async function runScan(nums) {
+  const out = document.getElementById('scanOut');
+  const st = document.getElementById('scanStatus');
+  const my = ++scanId;
+  out.textContent = 'Tarama sürüyor...';
+  st.textContent = '';
+  const d = await postJson('/api/scan', { lang: document.getElementById('scanLang').value, mods: nums });
+  if (my !== scanId) return;
+  if (!d.ok || !d.result) { out.textContent = 'HATA: ' + (d.error || 'sunucu yanıtı yok'); st.innerHTML = '<span class="err">hata</span>'; return; }
+  const res = d.result;
+  if (!res.ok) { out.textContent = 'deep-tool hatası: ' + (res.error || '?'); st.innerHTML = '<span class="err">hata</span>'; return; }
+  let txt = '';
+  const tota = res.totals;
+  txt += '<span style="color:#9fb4d9;font-weight:bold">TOPLAM: ' + tota.WARN + ' WARN | ' + tota.BUG + ' BUG | ' + tota.ERR + ' ERR</span>\n\n';
+  res.modules.forEach(m => {
+    txt += '<span style="color:#c9d6ef">\u2500\u2500 ' + esc(m.name) + ' \u2500\u2500</span>\n';
+    if (!m.findings.length) { txt += '  <span style="color:#6fbf73">(temiz)</span>\n'; return; }
+    m.findings.forEach(f => {
+      const col = f.lvl === 'ERR' ? '#ff6b6b' : f.lvl === 'BUG' ? '#ffd166' : f.lvl === 'WARN' ? '#ffa94d' : '#7f8fa6';
+      const tag = f.lvl === 'ERR' ? ' E' : f.lvl === 'BUG' ? ' B' : f.lvl === 'WARN' ? ' W' : ' i';
+      txt += ' <span style="color:' + col + '">[' + tag + ']</span> ' + esc(f.msg) + '\n';
+    });
+  });
+  out.innerHTML = txt;
+  st.innerHTML = '<span class="ok">bitti (' + tota.WARN + '/' + tota.BUG + '/' + tota.ERR + ')</span>';
+}
+let findId = 0;
+async function runFind() {
+  const out = document.getElementById('findOut');
+  const st = document.getElementById('findStatus');
+  const kw = document.getElementById('findKw').value.trim();
+  const my = ++findId;
+  if (!kw) { st.innerHTML = '<span class="err">kelime boş</span>'; return; }
+  out.textContent = 'Aranıyor...';
+  st.textContent = '';
+  const d = await postJson('/api/find', { kw: kw, folder: document.getElementById('findFolder').value.trim() });
+  if (my !== findId) return;
+  const res = d.result;
+  if (!d.ok || !res || !res.ok) { out.textContent = 'HATA: ' + ((res && res.error) || d.error || '?' ); st.innerHTML = '<span class="err">hata</span>'; return; }
+  if (!res.total) { out.textContent = 'Sonuç yok: ' + res.keyword; st.innerHTML = '<span class="err">0</span>'; return; }
+  st.innerHTML = '<span class="ok">' + res.total + ' eşleşme</span>';
+  out.textContent = res.hits.map(h => h.file + ':' + h.line + ': ' + h.text).join('\n');
+}
+async function runNew() {
+  const st = document.getElementById('newStatus');
+  const path = document.getElementById('newPath').value.trim();
+  const kind = document.getElementById('newKind').value;
+  if (!path) { st.innerHTML = '<span class="err">yol boş</span>'; return; }
+  st.textContent = '...';
+  const d = await postJson('/api/new', { kind: kind, path: path });
+  const res = d.result;
+  if (!d.ok || !res || !res.ok) {
+    st.innerHTML = '<span class="err">' + (((res && res.exists) ? 'zaten var (silinmedi): ' : '') + (path)) + '</span>';
+    return;
+  }
+  st.innerHTML = '<span class="ok">oluşturuldu: ' + res.path + '</span>';
+}
+let runId = 0;
+async function runFile(path) {
+  const out = document.getElementById('runOut');
+  const my = ++runId;
+  if (!path) return;
+  out.textContent = 'Çalışıyor: ' + path + ' ...';
+  const d = await postJson('/api/run', { path: path });
+  if (my !== runId) return;
+  out.textContent = (d.stdout || '') + (d.stderr ? '\n[stderr]\n' + d.stderr : '') || '(çıktı yok)';
+}
+async function loadLog() {
+  const out = document.getElementById('logOut');
+  const d = await (await fetch('/api/log')).json();
+  out.textContent = d.log;
+}
+let logTimer = null;
+function toggleLogAuto() {
+  const on = document.getElementById('logAuto').checked;
+  if (on) { loadLog(); logTimer = setInterval(loadLog, 2000); }
+  else { if (logTimer) clearInterval(logTimer); logTimer = null; }
+}
+async function runScript() {
+  const out = document.getElementById('scriptOut');
+  const st = document.getElementById('scriptStatus');
+  const src = document.getElementById('scriptSrc').value;
+  out.textContent = 'Çalışıyor...';
+  st.textContent = '';
+  const d = await postJson('/api/script', { src });
+  out.textContent = (d.stdout || '') + (d.stderr ? '\n[stderr]\n' + d.stderr : '') || '(çıktı yok)';
+  st.innerHTML = d.ok ? '<span class="ok">bitti (kod ' + d.code + ')</span>' : '<span class="err">hata kod ' + d.code + '</span>';
+}
+let gameId = 0;
+async function launchGame() {
+  const out = document.getElementById('gameOut');
+  const my = ++gameId;
+  out.textContent = 'main.py başlatılıyor... (konsol çıktısı)';
+  const d = await postJson('/api/launch', {});
+  if (my !== gameId) return;
+  out.textContent = (d.stdout || '') + (d.stderr ? '\n[stderr]\n' + d.stderr : '') || '(konsol çıktısı yok)';
+}
+
+/* ---------- boot ---------- */
+buildPalette();
+loadLevel();
+</script>
+</body>
+</html>
