@@ -8,6 +8,18 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[HTML MOTOR] G10 — input tam denkliği (28.09.2026, `01_strategy.md`).**
+  kullanıcı isteği: "html motoru py motora denk istedim, yarım yamalak değil".
+  `input.js` artık `input.py` ile birebir: **(a)** oyun kumandası (Gamepad API,
+  `begin_frame()` kare başında tarama, analog eksen + ölü bölge 0.2, D-Pad→hat,
+  buton kenar algılama, **Python BUTTON_MAP ile aynı** SPACE/ENTER→A·F→X·LSHIFT→LB·
+  ESCAPE→Start), **(b)** `get_key_up`, **(c)** fare 3 buton, **(d)** klavye haritası
+  (LSHIFT/RSHIFT·TAB·BACKQUOTE·QUOTEDBL·KPENTER·F1–F12), **(e)** `get_axis`/
+  `get_hat`/`get_horizontal_axis`. **`test_input.js` 58/58 ALL OK**; 11 motor süiti
+  353/353 + `test_browser.js` 23/23 + `test_tools.js` 24/24. Etkilenen:
+  `deep_engine_html/engine/input.js` (yeniden yazıldı) + `core.js` (begin_frame);
+  Py motor ve oyun değişmedi. **HTML motor artık bağımsız & py'ye denk** — [2] SCH
+  tam portu sırada.
 - **[ARAÇ] HTML motor denklik + gerçek tarayıcı davranışı testi (28.09.2026,
   `04_tools.md` madde 17).** kullanıcı raporu "web panelde diğer pencerelere
   tıklanmıyor, demo oyunda zıplanmıyor" → üç gerçek hata bulunup düzeltildi:

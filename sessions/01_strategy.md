@@ -220,6 +220,26 @@ zıplama demosu. Doğrulama: `node deep_engine_html\test_core.js` = 12/12 `ALL O
 - **G9 ARKA/ROOT:** ✅ (28.09) `DE.__version__ = "1.0.0"`, `DE.__engine_name__`
   core.js'e eklendi (Python `__init__.__version__` eşdeğeri — zaten namespace vardı).
   **G grupları tamamlandı: G1–G9 HTML motor eşitliği bitti.**
+- **G10 INPUT DENKLİĞİ (28.09, kullanıcı isteği: "html motoru py motora denk, yarım
+  yamalak değil"):** `input.js` artık Python `input.py` ile **birebir**. Daha önce
+  "is_ui/axis yok (ilk sürüm)" yorumuyla yarım kalanlar kapatıldı: (a) **oyun
+  kumandası (gamepad)** — Gamepad API (window.navigator.getGamepads), kare başında
+  `begin_frame()` ile tarama (core.js `Engine._frame` başına eklendi), analog
+  eksen (8, ölü bölge 0.2), D-Pad → hat üretimi (standart buton 12-15), buton
+  kenar algılama (down/up), mantıksal eşleme **Python BUTTON_MAP ile aynı**
+  (SPACE/ENTER→A, F→X, LSHIFT→LB, ESCAPE→Start; Python-numara→standart index
+  çevirici). (b) **get_key_up** eklendi (klavye + kumanda, kare özel). (c) **fare 3
+  buton** (sol/orta/sağ: get_mouse_button/get_mouse_button_down). (d) **klavye
+  haritası** genişletildi: LSHIFT/RSHIFT (e.location 1/2), TAB, BACKSPACE,
+  BACKQUOTE(`), QUOTEDBL("), KPENTER (numpad Enter), F1–F12. (e) **get_axis /
+  get_hat / get_horizontal_axis** (Python ile aynı birleşim sırası: analog →
+  D-Pad → klavye A/D/ok override). end_frame artık _joy_buttons_down/up'ı da
+  temizler. **Yeni `test_input.js` 58/58 ALL OK** (klavye eşlemesi, one-shot,
+  fare, scroll, typed, kumanda: ölü bölge/hat/kenar/BUTTON_MAP/horizontal).
+  Doğrulama: `node deep_engine_html\test_input.js`.
+  **Etkilenen:** `deep_engine_html/engine/input.js` (yeniden yazıldı), `core.js`
+  (begin_frame çağrısı). Py motor değişmedi. Tüm 11 motor süiti ALL OK
+  (353/353) + `test_browser.js` 23/23 + `test_tools.js` 24/24.
 
 **Sonuç kriteri:** `node deep_engine_html\test_core.js` + her grup için eşlik eden
 birim test dosyaları; port sonunda **Python mantık testleriyle aynı sonuçlar**.

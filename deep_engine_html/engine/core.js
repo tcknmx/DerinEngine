@@ -276,6 +276,9 @@ DE.Engine = class Engine {
         const dt = Math.min(1 / 30, (now - (this._last || now)) / 1000);
         this._last = now;
         this._frame_count += 1;
+        // Python Engine._frame -> Input._update_events eşdeğeri: kumanda durumunu
+        // kare başında tazele (analog eksen/hat/buton kenar algılama).
+        if (DE.Input && DE.Input.instance) DE.Input.instance.begin_frame();
         if (this.active_scene) {
             this.active_scene.update(dt);
             this.active_scene.draw(this.ctx);
