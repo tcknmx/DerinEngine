@@ -112,6 +112,17 @@ DE.Scene = class Scene {
         this.camera_zoom = 1.0;
         this.time_scale = 1.0;
         this._shake_trauma = 0.0;
+        this.camera_target = null;
+        this.camera_manual = false;
+        this.camera_position = new DE.Vector2(0, 0);
+        this.camera_smoothness = 5.0;
+        this.screen_width = 900;
+        this.screen_height = 600;
+        this.parallax_background = null;
+    }
+    set_camera_target(obj) {
+        this.camera_target = obj;
+        return this;
     }
     add_object(obj) {
         this._objects_to_add.push(obj);
@@ -191,15 +202,36 @@ DE.Scene = class Scene {
             }
         }
 
-        if (DE.Physics) DE.Physics.resolve(this, dt);
+        if (DE.Physics) DE.Physics.resolve(this, sim_dt);
+
+        // Kamera takibi (Python Scene._update_camera mantığı — sadeleştirilmiş)
+        if (this.camera_target && !this.camera_manual) {
+            let target_x = this.camera_target.position.x - this.screen_width / 2 + this.camera_target.size.x / 2;
+            let target_y = this.camera_target.position.y - this.screen_height / 2 + this.camera_target.size.y / 2;
+            const rb = this.camera_target.get_component(DE.Rigidbody2D);
+            if (rb) {
+                const look = Math.max(-1.0, Math.min(1.0, rb.velocity.x / 260.0)) * 70.0;
+                target_x += look;
+            }
+            const alpha = Math.min(dt * this.camera_smoothness, 1.0);
+            this.camera_position.x += (target_x - this.camera_position.x) * alpha;
+            this.camera_position.y += (target_y - this.camera_position.y) * alpha;
+        }
+        if (this._shake_trauma > 0.001) {
+            const sh = this._shake_trauma * this._shake_trauma * 18.0;
+            this._shake_trauma = Math.max(0, this._shake_trauma - dt * 1.4);
+        }
     }
     draw(ctx) {
         if (this.background_color) {
             ctx.fillStyle = `rgb(${this.background_color[0]},${this.background_color[1]},${this.background_color[2]})`;
             ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
         }
+        if (this.parallax_background) {
+            this.parallax_background.draw(ctx, ctx.canvas.width, ctx.canvas.height, this.camera_position);
+        }
         const sorted = [...this.game_objects].sort((a, b) => a.z_index - b.z_index);
-        for (const o of sorted) o.draw(ctx, this.camera_offset);
+        for (const o of sorted) o.draw(ctx, this.camera_position);
     }
 }
 

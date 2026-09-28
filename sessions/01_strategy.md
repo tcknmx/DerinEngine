@@ -191,10 +191,16 @@ zıplama demosu. Doğrulama: `node deep_engine_html\test_core.js` = 12/12 `ALL O
   BouncePad, Health, Projectile, PowerUp, BreakablePlatform, SpawnIn, _AutoRemove;
   Scene.update artık spatial grid + on_collision bildirimi + statik solid çözümü (Python
   `_handle_physics_and_collisions` mantığı). `test_components.js` 27/27.
-- **G4 Tween + olay:** tween.js (ease_* + Tween + TweenComponent + zincir).
-- **G5 Partikül + görsel katman:** particles.js ✅ (28.09, Particle + ParticleEmitter),
-  parallax.js (ParallaxLayer, ParallaxBackground), lighting.js (LightSource,
-  LightingEngine — Canvas compositing ile "carve").
+- **G4 Tween + olay:** ✅ (28.09) tween.js — ease_* (9 fonksiyon), Tween (skaler/Vector2/
+  renk, in-place referans stabilitesi), TweenComponent (to/to_vec/after zincir/do_after/
+  delay/clear/running), _Chain, Tweener takma adı. `test_tween.js` 33/33.
+- **G5 Partikül + görsel katman:** ✅ (28.09) particles.js + parallax.js (6 tema: forest/
+  lava/cave/ice/desert/astro + kayan yıldızlar + astro kozmik) + lighting.js (LightSource
+  pulse + LightingEngine mask önbelleği + destination-out carve). `test_visual.js` 16/16.
+- **G6 Tilemap + seviye:** ✅ (28.09) tilemap.js (get/set/place_at_world/solid_at/
+  to_data/from_data/to_segments edge-cull + culled draw) + levelfile.js (register_builder/
+  place_object/save_level/load_level + extractor) + Scene'e kamera takibi & parallax_background
+  bağlandı. `test_tilemap_levelfile.js` 32/32.
 - **G6 Tilemap + seviye:** tilemap.js (katman/get-set/place_at_world/solid_at/
   to_data/from_data/to_segments), levelfile.js (builder/extractor/place_object/
   load_level/save_level).

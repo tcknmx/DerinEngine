@@ -8,6 +8,16 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[HTML MOTOR] G4+G5+G6 tamam (28.09.2026, `01_strategy.md`).** **G4:** tween.js
+  (ease_* 9 fn + Tween + TweenComponent + _Chain zinciri) `test_tween.js` 33/33.
+  **G5:** parallax.js (6 tema + kayan yıldız) + lighting.js (LightSource pulse +
+  LightingEngine carve, mask önbelleği) `test_visual.js` 16/16. **G6:** tilemap.js
+  (katman/get-set/place_at_world/solid_at/to_data/from_data/to_segments + culled draw)
+  + levelfile.js (register_builder/place_object/save_level/load_level/extractor) +
+  Scene'e kamera takibi + parallax_background bağlandı. `test_tilemap_levelfile.js`
+  32/32. Tüm gerileme: test_core 12/12, test_math2d 38/38, test_components 27/27.
+  13 dosya tam tarayıcı yüklemesi OK. **Etkilenen:** strateji (G7–G9 kaldı).
+
 - **[HTML MOTOR] G2 + G3 tamam (28.09.2026, `01_strategy.md`).** **G2:** math2d.js
   (SAT/polygon/circle/segment) + physics.js'te CircleCollider + PolygonCollider —
   `test_math2d.js` 38/38 OK. **G3:** engine/components.js — Animator, KeyframeAnimator,
