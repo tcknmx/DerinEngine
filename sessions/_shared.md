@@ -8,6 +8,30 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[OYUN-HTML] M3.1 görsel kontrol + gerçek boot testi — gizli MenuFX bug'ı
+  yakalandı (28.09.2026, `01_strategy.md` [2] M3 sonrası; M1 KALAN kapanışı).**
+  M1 "tarayıcıda görsel kontrol" görevi **tamamlandı**: `test_game.js`'e **TEST13
+  görsel çizim smoke** — her sahne türü (prosedürel+tilemap, boss arenası, menü
+  zoom+vinyet, sonsuz, zafer, oyun sonu, pause, FadeOverlay) Proxy stub canvas'a
+  çizilir (`makeDrawCtx`), 78/78. `tools_html/test_browser.js`'e **`bootGame()`**:
+  index.html sırasıyla engine+oyun dosyaları vm'de yüklenir, DOMContentLoaded ile
+  `main.js` gerçekten boot edilir, rAF pump + keydown/up dispatch → yeni **BÖLÜM 4**
+  (8 check). Bu boot testi **iki gerçek bug** yakaladı: (1) `builders.js`
+  top-level `const _rgb` ↔ `engine/ui.js` top-level `function _rgb` paylaşılan
+  global scope'ta `SyntaxError: Identifier '_rgb' has already been declared`
+  fırlatıyordu → builders.js `_rgb` → `_rgb_arr` (10 kullanım) çözüldü; (2)
+  `build_main_menu_scene`'de `scene._hud_ui` hesaplanırken `...scene._objects_to_add`
+  dağıtılması **MenuFX'i** `_hud_ui`'ye sokuyordu → `MenuController.start()`
+  `active=false` yapınca menü klavye girişleri hiç çalışmıyordu (P/SPACE menüden
+  çıkamıyordu!). Çözüm: Python `ui.py:529` ile birebir — `_hud_ui` yalnızca
+  `scene.game_objects`'ten filtrelenir (MenuFX henüz `_objects_to_add`'tedir →
+  hariç kalır; HUD objeleri `_build_player`'dan gelip `game_objects`'tedir →
+  gizleme korunur). İzole repro ile doğrulandı: 2 pump sonrası menü kamerası
+  yakınlaşır, `P` sonrası `camera_manual=false`+`zoom_to(1.0)`+`set_vignette(0.22)`,
+  HUD 0/7 gizli, menü 12/12 gizli. **test_browser.js 31/31, test_game 78/78, motor
+  353/353, tools 24/24.** Etkilenen: `ui.js`, `builders.js`, `test_game.js`,
+  `test_browser.js`; **Py motor ve Py oyun DEĞİŞMEDİ**. M4 sıra: `game/commands.py`
+  + pygbag onaylı `main.py` giriş dalı.
 - **[OYUN-HTML] M3 UI derinliği (28.09.2026, `01_strategy.md` [2] port planı
   M3).** `ui.js`: menü kamerası CLOSE-UP zoom (`MENU_ZOOM=1.8`,
   `camera_manual`, `_place_menu_camera`) + `set_vignette(0.5)`; kampanya
@@ -59,8 +83,10 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
   browser 23/23, tools 24/24. Motor ekleri: `core.js` `_frame` ESC/`on_escape`
   (Python `_handle_escape` karşılığı), `input.js` statik `get_mouse_position`.
   Etkilenen: HTML oyun+2 motor dosyası; **Py motor ve Py oyun DEĞİŞMEDİ**.
-  M1 KALAN: tarayıcıda görsel kontrol; ayrıca `Scene.draw` kamera zoom
-  uygulamıyor → M3'te menü yakınlaştırma/vinyet/FadeOverlay eklenecek.
+  M1 KALAN: tarayıcıda görsel kontrol ✅ (M3.1'de TEST13 draw smoke + gerçek boot
+  testiyle kapatıldı — üstteki kayıt; iki gizli bug bulundu); ayrıca `Scene.draw`
+  kamera zoom uygulamıyor → M3'te menü yakınlaştırma/vinyet/FadeOverlay eklendi
+  (M3.0).
 - **[HTML MOTOR] G10 — input tam denkliği (28.09.2026, `01_strategy.md`).**
   kullanıcı isteği: "html motoru py motora denk istedim, yarım yamalak değil".
   `input.js` artık `input.py` ile birebir: **(a)** oyun kumandası (Gamepad API,

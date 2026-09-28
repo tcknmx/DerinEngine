@@ -5,13 +5,13 @@
 var DE_GAME = DE_GAME || {};
 
 const _g = (data, key, def) => (data[key] !== undefined && data[key] !== null ? data[key] : def);
-const _rgb = (c) => ([c[0] | 0, c[1] | 0, c[2] | 0]);
+const _rgb_arr = (c) => ([c[0] | 0, c[1] | 0, c[2] | 0]);
 
 function _build_breakable(scene, data) {
     const x = _g(data, "x", 0), y = _g(data, "y", 0);
     const w = _g(data, "w", 48), h = _g(data, "h", 48);
     const plat = new DE.GameObject("Breakable", x, y, w, h, "Breakable");
-    plat.add_component(new DE.SpriteRenderer(_rgb(_g(data, "color", [150, 120, 90])), "rect", 4));
+    plat.add_component(new DE.SpriteRenderer(_rgb_arr(_g(data, "color", [150, 120, 90])), "rect", 4));
     // Trigger (boss kalkanı parçaları) fiziksel engel olmaz; saldırıyla kırılır.
     plat.add_component(new DE.BoxCollider(!!_g(data, "trigger", false)));
     plat.add_component(new DE.ParticleEmitter());
@@ -24,7 +24,7 @@ function _build_platform(scene, data) {
     const x = _g(data, "x", 0), y = _g(data, "y", 0);
     const w = _g(data, "w", 32), h = _g(data, "h", 32);
     const plat = new DE.GameObject("Platform", x, y, w, h, "Ground");
-    plat.add_component(new DE.SpriteRenderer(_rgb(_g(data, "color", [60, 90, 130])), "rect", 4));
+    plat.add_component(new DE.SpriteRenderer(_rgb_arr(_g(data, "color", [60, 90, 130])), "rect", 4));
     // Tek yönlü platform: üstten zıplanabilir, alttan/yandan geçilir.
     plat.add_component(new DE.BoxCollider(false, !!_g(data, "one_way", false)));
     scene.add_object(plat);
@@ -42,8 +42,8 @@ DE_GAME.RampVisual = class RampVisual extends DE.Component {
     constructor(points, color, edge_color = null) {
         super();
         this.points = points;
-        this.color = _rgb(color);
-        this.edge_color = edge_color ? _rgb(edge_color) : _rgb(this.color.map(c => Math.max(0, c - 40)));
+        this.color = _rgb_arr(color);
+        this.edge_color = edge_color ? _rgb_arr(edge_color) : _rgb_arr(this.color.map(c => Math.max(0, c - 40)));
     }
     draw(ctx, camera_offset) {
         if (!this.game_object.active) return;
@@ -123,7 +123,7 @@ function _build_enemy(scene, data) {
     const x = _g(data, "x", 0), y = _g(data, "y", 0);
     const w = _g(data, "w", 28), h = _g(data, "h", 28);
     const enemy = new DE.GameObject("Enemy", x, y, w, h, "Enemy");
-    const base = _rgb(_g(data, "color", [235, 55, 75]));
+    const base = _rgb_arr(_g(data, "color", [235, 55, 75]));
     enemy.add_component(new DE.SpriteRenderer(base, "rect", 6));
     const anim = enemy.add_component(new DE.Animator(6));
     const darker = base.map(c => Math.max(0, c - 50));
@@ -142,7 +142,7 @@ function _build_flyer(scene, data) {
     const x = _g(data, "x", 0), y = _g(data, "y", 40);
     const w = _g(data, "w", 26), h = _g(data, "h", 22);
     const enemy = new DE.GameObject("Flyer", x, y, w, h, "Enemy");
-    const base = _rgb(_g(data, "color", [90, 220, 200]));
+    const base = _rgb_arr(_g(data, "color", [90, 220, 200]));
     enemy.add_component(new DE.SpriteRenderer(base, "circle", 0));
     const anim = enemy.add_component(new DE.Animator(7));
     const light = base.map(c => Math.min(255, c + 40));
@@ -167,7 +167,7 @@ function _build_hopper(scene, data) {
     const x = _g(data, "x", 0), y = _g(data, "y", 0);
     const w = _g(data, "w", 28), h = _g(data, "h", 28);
     const enemy = new DE.GameObject("Hopper", x, y, w, h, "Enemy");
-    enemy.add_component(new DE.SpriteRenderer(_rgb(_g(data, "color", [250, 170, 60])), "rect", 6));
+    enemy.add_component(new DE.SpriteRenderer(_rgb_arr(_g(data, "color", [250, 170, 60])), "rect", 6));
     enemy.add_component(new DE.Rigidbody2D(1300.0, true, 1800));
     enemy.add_component(new DE.BoxCollider(false, false));
     enemy.add_component(new DE.Health(_g(data, "hp", 22), false, null, 0.2));
@@ -189,7 +189,7 @@ function _build_turret(scene, data) {
     }
     fire_interval = Math.max(1.4, fire_interval);
     const enemy = new DE.GameObject("Turret", x, y, w, h, "Enemy");
-    enemy.add_component(new DE.SpriteRenderer(_rgb(_g(data, "color", [170, 60, 220])), "rect", 5));
+    enemy.add_component(new DE.SpriteRenderer(_rgb_arr(_g(data, "color", [170, 60, 220])), "rect", 5));
     enemy.add_component(new DE.BoxCollider(false, false));
     enemy.add_component(new DE.Health(_g(data, "hp", 30), false, null, 0.2));
     enemy.add_component(new DE_GAME.TurretEnemy(
@@ -205,7 +205,7 @@ function _build_sniper(scene, data) {
     const x = _g(data, "x", 0), y = _g(data, "y", 0);
     const w = _g(data, "w", 24), h = _g(data, "h", 26);
     const enemy = new DE.GameObject("Sniper", x, y, w, h, "Enemy");
-    enemy.add_component(new DE.SpriteRenderer(_rgb(_g(data, "color", [120, 200, 90])), "rect", 5));
+    enemy.add_component(new DE.SpriteRenderer(_rgb_arr(_g(data, "color", [120, 200, 90])), "rect", 5));
     enemy.add_component(new DE.BoxCollider(false, false));
     enemy.add_component(new DE.Health(_g(data, "hp", 30), false, null, 0.2));
     enemy.add_component(new DE_GAME.SniperEnemy(_g(data, "fire_interval", 2.8)));

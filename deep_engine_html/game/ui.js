@@ -449,7 +449,7 @@ DE_GAME.build_main_menu_scene = function build_main_menu_scene() {
     scene.add_object(bg_fx);
 
     scene._menu_ui = _menu_ui;
-    scene._hud_ui = [...scene.game_objects, ...scene._objects_to_add]
+    scene._hud_ui = scene.game_objects
         .filter(o => o.components.some(c => c.is_ui) && _menu_ui.indexOf(o) === -1);
 
     return scene;

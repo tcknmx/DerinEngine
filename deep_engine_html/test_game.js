@@ -388,6 +388,62 @@ console.log("TEST12 FadeOverlay:");
   check("nesne sahneden silindi", sc.find_by_tag("FadeIn") === null);
 }
 
+// ---- TEST 13: görsel çizim smoke (M1 KALAN "tarayıcıda görsel kontrol" kapanışı) ----
+console.log("TEST13 görsel çizim smoke:");
+function makeDrawCtx() {
+  const t = {
+    canvas: { width: 900, height: 600 },
+    fillStyle: "", strokeStyle: "", lineWidth: 1, font: "", globalAlpha: 1, textAlign: "left",
+  };
+  return new Proxy(t, {
+    get(o, p) {
+      if (p in o) return o[p];
+      if (p === "createRadialGradient" || p === "createLinearGradient") return () => ({ addColorStop() {} });
+      if (p === "measureText") return () => ({ width: 100 });
+      return () => {};
+    },
+    set(o, p, v) { o[p] = v; return true; },
+  });
+}
+function drawSafe(scene) {
+  try { scene.draw(makeDrawCtx()); return true; } catch (e) { return false; }
+}
+{
+  const lvl = DE_GAME.build_procedural_level("forest", 42, 8, 0);
+  use(lvl);
+  step(lvl, 5, 1 / 60);                       // tilemap zemini + boss patlamasız normal kare
+  DE_GAME.start_campaign();                    // kampanya zincirini kurar (chain)
+  const chain = DE_GAME.state.campaign_state["chain"];
+  const arena = DE_GAME.build_campaign_boss(chain[0], 1, 0);
+  const menu = DE_GAME.build_main_menu_scene();
+  use(menu);
+  menu.start();                               // MenuController.start -> camera_zoom = MENU_ZOOM (1.8)
+  const scenes = [
+    ["prosedürel + tilemap zemin", lvl],
+    ["boss arenası (bar/aura çizimi)", arena],
+    ["ana menü (zoom + vinyet yolu)", menu],
+    ["endless", DE_GAME.build_endless_level(2, 0)],
+    ["zafer ekranı", DE_GAME.build_victory_scene()],
+    ["oyun sonu", DE_GAME.build_game_over_scene(function () {})],
+    ["pause overlay", DE_GAME.build_pause_scene()],
+  ];
+  let ok = 0;
+  const broken = [];
+  for (const [name, sc] of scenes) {
+    if (drawSafe(sc)) ok++; else broken.push(name);
+  }
+  check("7 sahne türü çizilebilir (istisnasız)", ok === scenes.length,
+    broken.length ? "çizilemez: " + broken.join(", ") : "");
+  check("menü zoom çizim yolu aktif", Math.abs(menu.camera_zoom - DE_GAME.MENU_ZOOM) < 1e-9 && drawSafe(menu));
+  // FadeOverlay karanlık katmanı da çizilebiliyor mu (255->0 öncesi)
+  const fadeScene = new DE.Scene("FadeDraw", [0, 0, 0]);
+  const fo = new DE.GameObject("FadeIn", 0, 0, 0, 0, "Default");
+  fo.add_component(new DE_GAME.FadeOverlay(500));
+  fadeScene.add_object(fo);
+  fadeScene.start();
+  check("FadeOverlay katmanı çizilebilir", drawSafe(fadeScene));
+}
+
 // Toplam
 console.log("----------------------------------------");
 console.log("SONUÇ: " + pass + " geçti, " + fail + " kaldı");

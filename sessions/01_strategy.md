@@ -273,6 +273,19 @@ Kaynaklar: `game/*.py`, `main.py` (pygbag dalı hariç).
   duyurusu İPTAL — Python'da karşılığı yok (grep: intro/duyuru/announce yok);
   parite korunur.** **`test_game.js` 75/75 ALL OK** (tilemap rasterize + gizleme,
   menü zoom/vinyet dönüşü, FadeOverlay kendini siler).
+- **M3.1 Görsel kontrol + gerçek boot testi (✅ 28.09):** M1 KALAN "tarayıcıda
+  görsel kontrol" kapatıldı — `test_game.js` **TEST13** görsel çizim smoke (7 sahne
+  türü + menü zoom yolu + FadeOverlay; Proxy stub canvas `makeDrawCtx`) ve
+  `tools_html/test_browser.js` **`bootGame()`** + **BÖLÜM 4** (8 check: index.html
+  sırasıyla tüm dosyalar vm'de, DOMContentLoaded → gerçek `main.js` boot, rAF pump
+  + keydown/up). Boot testi **iki gizli bug** yakaladı: (1) `builders.js` `const
+  _rgb` ↔ `engine/ui.js` `function _rgb` global çakışması → `_rgb_arr` (10
+  kullanım); (2) `_hud_ui` hesabına `..._objects_to_add` dağıtılınca **MenuFX**
+  `_hud_ui`'ye girip `MenuController.start()`'ta `active=false` oluyor → **menü
+  klavye girişleri (P/SPACE) hiç çalışmıyordu**; Python `ui.py:529` ile birebir
+  (`_hud_ui` yalnız `game_objects`) düzeltildi. **test_browser 31/31, test_game
+  78/78, motor 353/353, tools 24/24.** M4 sıra: `game/commands.py` + pygbag
+  onaylı `main.py` giriş dalı + son 1:1 davranış farkları düzeltmesi.
 - **M4+ Davranış:** `game/commands.py` (konsol komutları) + pygbag onaylı
   `main.py` giriş dalı + son 1:1 davranış farkları düzeltmesi.
 - **M5 İnce ayar:** menüde kampanya ilerleme rozetleri (yazıldı), deneyim

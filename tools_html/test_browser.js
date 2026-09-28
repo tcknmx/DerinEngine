@@ -191,6 +191,60 @@ function bootDemo() {
   };
 }
 
+/* ---------------- vm dünyası: Star Collector Hero (index.html seti) ---------------- */
+function bootGame() {
+  const dom = makeDom();
+  const canvas = new El("canvas");
+  canvas.width = 900; canvas.height = 600;
+  dom.byId["game"] = canvas;
+  const rAF = [];
+  const handlers = {};
+  dom.window.addEventListener = (t, f) => { (handlers[t] = handlers[t] || []).push(f); };
+  dom.window.requestAnimationFrame = (f) => { rAF.length = 0; rAF.push(f); };
+  const sandbox = {
+    window: dom.window, document: dom.document, console,
+    requestAnimationFrame: dom.window.requestAnimationFrame,
+  };
+  sandbox.window.window = sandbox.window;
+  sandbox.globalThis = sandbox;
+  vm.createContext(sandbox);
+  const ENGS = [
+    "engine/core.js", "engine/math2d.js", "engine/render.js", "engine/parallax.js",
+    "engine/physics.js", "engine/particles.js", "engine/components.js", "engine/tween.js",
+    "engine/lighting.js", "engine/tilemap.js", "engine/levelfile.js", "engine/ui.js",
+    "engine/log.js", "engine/scenemanager.js", "engine/i18n.js", "engine/savegame.js",
+    "engine/console.js", "engine/audio.js", "engine/procedural.js", "engine/input.js",
+  ];
+  const GAMES = [
+    "game/state.js", "game/entities.js", "game/bosses.js", "game/ui.js",
+    "game/scenes.js", "game/builders.js", "game/main.js",
+  ];
+  ENGS.concat(GAMES).forEach(f => {
+    const src = fs.readFileSync(path.join(HTML, f), "utf8");
+    vm.runInContext(src, sandbox, { filename: f });
+  });
+  (handlers["DOMContentLoaded"] || []).forEach(f => f());
+  if (!sandbox.DE || !sandbox.DE.Engine.instance) throw new Error("oyun motoru kurulamadi");
+  const engine = sandbox.DE.Engine.instance;
+  let cur = 0;
+  return {
+    sandbox, engine, rAF, handlers,
+    pump(dtms) {
+      const cb = rAF[0];
+      if (!cb) throw new Error("rAF beklemede yok");
+      rAF.length = 0;
+      cur += (dtms === undefined ? 1000 / 60 : dtms);
+      cb(cur);
+    },
+    press(key) {
+      (handlers["keydown"] || []).forEach(f => f({ key, preventDefault() {} }));
+    },
+    release(key) {
+      (handlers["keyup"] || []).forEach(f => f({ key, preventDefault() {} }));
+    },
+  };
+}
+
 /* ---------------- vm dünyası: webpanel sayfası ---------------- */
 function bootPanel(html, { offline = false, port } = {}) {
   const dom = makeDom();
@@ -286,6 +340,36 @@ console.log("=== 1) demo: input one-shot + gercek zip lama (SPACE) ===");
     d.pump();
     check("gerceten yukseldi (y azaldi)", player.position.y < yAtJump - 1);
     d.release(" ");
+  }
+}
+
+/* ---------- BÖLÜM 4: gerçek oyun açılışı (index.html seti; M1 KALAN görsel kontrol) ---------- */
+console.log("=== 4) oyun: gerçek açılış + çizim + P ile kampanya ===");
+{
+  let g;
+  try { g = bootGame(); check("oyun motoru kuruldu (main.js)", true); }
+  catch (e) { check("oyun motoru kuruldu (main.js)", false, String(e)); }
+  if (g) {
+    const DE = g.sandbox.DE, DE_GAME = g.sandbox.DE_GAME;
+    const menu = g.engine.active_scene;
+    check("ana menü sahnesi açık", !!menu && menu.name === "Main Menu");
+    check("menü CLOSE-UP zoom çizim yolu", Math.abs(menu.camera_zoom - DE_GAME.MENU_ZOOM) < 1e-9,
+      "zoom=" + (menu && menu.camera_zoom));
+    let ok = true, threw = "";
+    for (let i = 0; i < 30; i++) { try { g.pump(); } catch (e) { ok = false; threw = String(e); break; } }
+    check("30 kare sorunsuz (menü zoom + vinyet + zemin)", ok, threw);
+    g.press("P");
+    g.pump();
+    g.release("P");
+    check("P -> kampanya başladı", DE_GAME.state.game_mode === "campaign");
+    check("kamera oyun moduna döndü", menu.camera_manual === false && menu.camera_zoom_target === 1.0,
+      "manual=" + menu.camera_manual + " target=" + menu.camera_zoom_target);
+    ok = true; threw = "";
+    for (let i = 0; i < 30; i++) { try { g.pump(); } catch (e) { ok = false; threw = String(e); break; } }
+    check("oyun kareleri sorunsuz (tilemap + portallar)", ok, threw);
+    const portal = menu.find_all_by_tag("Portal")[0];
+    const gp = portal ? portal.get_component(DE_GAME.GoalPortal) : null;
+    check("portal oyuna bağlı (next_factory)", !!gp && typeof gp.next_scene_factory === "function");
   }
 }
 
