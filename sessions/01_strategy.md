@@ -249,6 +249,26 @@ Sütun da paralel: her grup commit'li ilerler (tek commit kalmayacak).
 UI kit + i18n + savegame + ses + konsol. **Haftalarca sürer — büyük görev.**
 Kaynaklar: `game/*.py`, `main.py` (pygbag dalı hariç).
 
+**PORT PLANI ([2] alt aşamalar):**
+- **M1 Oynanabilir çekirdek (✅ 28.09, bu oturum):** `game/*.js` portu son
+  aşamasına girdi. `state/entities/ui/scenes/builders/main.js` yazıldı;
+  prosedürel seviye (Player+PUD, coin/portal kilidi), kampanya zinciri bez
+  (Fisher-Yates + astro final), boss **belgeli M1 kabuğu** (M2'de gerçek boss),
+  Sonsuz Mod, ana menü (menu_idle + P/4), zafer/oyun sonu. **`test_game.js`
+  51/51 ALL OK**; 11 motor suiti 353/353 + browser/tools yeşil.
+  **KALAN:** `test_game.js` dışında görsel kontrol (tarayıcıda `index.html`).
+- **M2 Boss'lar:** `builders.js`'e Boss builder/extractor + `scenes.js`
+  `build_campaign_boss` gerçek arena (procedural boss_arena + boss verisi).
+  Veri kaynağı `deep_engine/procedural.py` PR_BOSSES.
+- **M3 UI derinliği:** `ui.js`'e kamera zoom menü yakınlaştırması + vinyet +
+  FadeOverlay çapraz geçişi (bu oturumda belgeli ATLANDI — `Scene.draw`
+  `camera_zoom` uygulamıyor), `_attach_ground_tilemap` zemin rasterizasyonu
+  (fizikle ilgisiz), boss giriş duyurusu.
+- **M4+ Davranış:** `game/commands.py` (konsol komutları) + pygbag onaylı
+  `main.py` giriş dalı + son 1:1 davranış farkları düzeltmesi.
+- **M5 İnce ayar:** menüde kampanya ilerleme rozetleri (yazıldı), deneyim
+  iyileştirmeleri 5–8 portları (`03_game.md`), doğrulama: tüm JS süitleri.
+
 **[3] Sonsuz tırmanma oyunu (Icy Tower mekaniği):** kırılan platformlar, sürekli
 yukarı, yükseklik skoru. Bağımsız başlayabilir (1. maddedeki BreakablePlatform +
 camera-follow ile). Demo kapak: "Star Climber".

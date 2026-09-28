@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DerinEngine HTML — Demo</title>
+<title>DerinEngine HTML — Star Collector Hero</title>
 <style>
   body { margin: 0; background: #0e1220; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: monospace; }
   canvas { image-rendering: pixelated; border: 2px solid #2a3350; border-radius: 6px; }
@@ -12,7 +12,7 @@
 </head>
 <body>
 <canvas id="game" width="900" height="600"></canvas>
-<div id="info">DerinEngine HTML · A/D hareket · SPACE zıpla · F12 konsol</div>
+<div id="info">Star Collector Hero · A/D hareket · SPACE zıpla · F ateş · P kampanya · 4 Sonsuz Mod</div>
 
 <!-- DerinEngine HTML çekirdeği (sıra önemli) -->
 <script src="engine/core.js"></script>
@@ -35,7 +35,12 @@
 <script src="engine/audio.js"></script>
 <script src="engine/procedural.js"></script>
 <script src="engine/input.js"></script>
-<!-- Demo oyunu -->
-<script src="demo/main.js"></script>
+<!-- Oyun (Star Collector Hero) -->
+<script src="game/state.js"></script>
+<script src="game/entities.js"></script>
+<script src="game/ui.js"></script>
+<script src="game/scenes.js"></script>
+<script src="game/builders.js"></script>
+<script src="game/main.js"></script>
 </body>
 </html>

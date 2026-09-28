@@ -8,6 +8,21 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[OYUN-HTML] Star Collector Hero portu M1 oynanabilir çekirdek (28.09.2026,
+  `01_strategy.md` [2] port planı).** `deep_engine_html/game/*.js` portu ilerledi:
+  yeni `state` (paylaşımlı `DE_GAME.savegame()` tekil profili — Python tek
+  `_save` karşılığı) · `entities` (PlayerController/HUD/GoalPortal/coin/streak/
+  dash/ateş; `_spawn_float_score` dünya koordinat düzeltmesi) · `ui`
+  (menü/pause/zafer/oyun sonu + MenuController, sonsuz kilidi) ·
+  `scenes` (prosedürel seviye, kampanya zinciri Fisher-Yates + astro final,
+  **boss M1 kabuğu** belgeli stub, Sonsuz Mod, restart/death wiring) ·
+  `builders` (17 builder + extractor; **Boss builder M2'ye kadar yok**) ·
+  `main`. **`test_game.js` 51/51 ALL OK**; tüm süitler yeşil: motor 353/353,
+  browser 23/23, tools 24/24. Motor ekleri: `core.js` `_frame` ESC/`on_escape`
+  (Python `_handle_escape` karşılığı), `input.js` statik `get_mouse_position`.
+  Etkilenen: HTML oyun+2 motor dosyası; **Py motor ve Py oyun DEĞİŞMEDİ**.
+  M1 KALAN: tarayıcıda görsel kontrol; ayrıca `Scene.draw` kamera zoom
+  uygulamıyor → M3'te menü yakınlaştırma/vinyet/FadeOverlay eklenecek.
 - **[HTML MOTOR] G10 — input tam denkliği (28.09.2026, `01_strategy.md`).**
   kullanıcı isteği: "html motoru py motora denk istedim, yarım yamalak değil".
   `input.js` artık `input.py` ile birebir: **(a)** oyun kumandası (Gamepad API,

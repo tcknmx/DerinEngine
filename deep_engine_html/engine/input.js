@@ -232,3 +232,35 @@ DE.Input = class Input {
         this._joy_buttons_up = new Set();
     }
 }
+
+/* --- Python Input (statik) köprüsü ---
+ * Oyun kodu (game/*.js) Python'daki gibi `DE.Input.get_key_down("F")` biçiminde
+ * çağırır; bu statik passthrough'lar `DE.Input.instance` üzerinden döner.
+ * (Python deep_engine/input.py Input sınıfı statik metodlarla aynı API'yi sunar.) */
+DE.Input.get_key = function (k) {
+    const i = DE.Input.instance; return i ? i.get_key(k) : false;
+};
+DE.Input.get_key_down = function (k) {
+    const i = DE.Input.instance; return i ? i.get_key_down(k) : false;
+};
+DE.Input.get_key_up = function (k) {
+    const i = DE.Input.instance; return i ? i.get_key_up(k) : false;
+};
+DE.Input.get_axis = function (i) {
+    const inst = DE.Input.instance; return inst ? inst.get_axis(i) : 0;
+};
+DE.Input.get_hat = function (h) {
+    const inst = DE.Input.instance; return inst ? inst.get_hat(h) : [0, 0];
+};
+DE.Input.get_horizontal_axis = function () {
+    const i = DE.Input.instance; return i ? i.get_horizontal_axis() : 0;
+};
+DE.Input.get_mouse_position = function () {
+    const i = DE.Input.instance; return i ? i.get_mouse_position() : { x: 0, y: 0 };
+};
+DE.Input.get_mouse_button = function (b) {
+    const i = DE.Input.instance; return i ? i.get_mouse_button(b) : false;
+};
+DE.Input.get_mouse_button_down = function (b) {
+    const i = DE.Input.instance; return i ? i.get_mouse_button_down(b) : false;
+};

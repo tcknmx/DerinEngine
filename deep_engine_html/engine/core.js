@@ -57,10 +57,13 @@ DE.Component = class Component {
 }
 
 DE._slow_dt = function (dt) {
-    // Python _slow_dt: aktif sahne slow-mo ise zamanı yavaşlatır.
+    // Python components.py _slow_dt birebir: yalnızca motorun time-slow katmanı
+    // aktifken yavaşlatır (Engine._time_slow_remaining/_factor). Oyun tarafında
+    // düşmanlar/düşman mermileri bu fonksiyonu çağırır; oyuncu çağırmaz -> güç
+    // çubuğu 'slow' yalnız düşman dünyasını yavaşlatır (Python davranışı).
     const eng = DE.Engine && DE.Engine.instance;
-    if (eng && eng.active_scene && eng.active_scene.time_scale !== undefined) {
-        return dt * eng.active_scene.time_scale;
+    if (eng && eng._time_slow_remaining > 0) {
+        return dt * (eng._time_slow_factor || 0.4);
     }
     return dt;
 }
@@ -121,6 +124,7 @@ DE.Scene = class Scene {
         this.camera_manual = false;
         this.camera_position = new DE.Vector2(0, 0);
         this.camera_smoothness = 5.0;
+        this.camera_kick = new DE.Vector2(0, 0);   // Python Scene.camera_kick (dash kamera zıplaması)
         this.screen_width = 900;
         this.screen_height = 600;
         this.parallax_background = null;
@@ -152,6 +156,12 @@ DE.Scene = class Scene {
     }
     add_shake(amount) {
         this._shake_trauma = Math.min(1.0, this._shake_trauma + amount);
+    }
+    kick_camera(x, y) {
+        // Python Scene.kick_camera: geçici bir kamera 'poke' (dash vb. yönünde).
+        this.camera_kick.x += x;
+        this.camera_kick.y += y;
+        return this;
     }
     update(dt) {
         const sim_dt = dt * this.time_scale;
@@ -222,6 +232,16 @@ DE.Scene = class Scene {
             this.camera_position.x += (target_x - this.camera_position.x) * alpha;
             this.camera_position.y += (target_y - this.camera_position.y) * alpha;
         }
+        // Kamera kick (Python _update_camera'da same): sıfırlanana kadar küçülür.
+        if (this.camera_kick.x !== 0 || this.camera_kick.y !== 0) {
+            this.camera_position.x += this.camera_kick.x;
+            this.camera_position.y += this.camera_kick.y;
+            const dec = Math.min(dt * 10.0, 1.0);
+            this.camera_kick.x *= (1.0 - dec);
+            this.camera_kick.y *= (1.0 - dec);
+            if (Math.abs(this.camera_kick.x) < 0.05) this.camera_kick.x = 0;
+            if (Math.abs(this.camera_kick.y) < 0.05) this.camera_kick.y = 0;
+        }
         if (this._shake_trauma > 0.001) {
             const sh = this._shake_trauma * this._shake_trauma * 18.0;
             this._shake_trauma = Math.max(0, this._shake_trauma - dt * 1.4);
@@ -267,6 +287,11 @@ DE.Engine = class Engine {
         this.is_running = false;
         this._last = 0;
         this._frame_count = 0;
+        // Python Engine: bekleyen sahne değişimi + time-slow katmanı (sadece
+        // düşman dünyasını yavaşlatır; DE._slow_dt okuyucusu).
+        this._next_scene = null;
+        this._time_slow_remaining = 0.0;
+        this._time_slow_factor = 0.4;
     }
     set_scene(scene) {
         this.active_scene = scene;
@@ -276,12 +301,33 @@ DE.Engine = class Engine {
         const dt = Math.min(1 / 30, (now - (this._last || now)) / 1000);
         this._last = now;
         this._frame_count += 1;
+        // Python Engine._frame: sahne değişimi bekleyen switch_scene varsa uygula.
+        if (this._next_scene) {
+            this.set_scene(this._next_scene);
+            this._next_scene = null;
+        }
+        // Python Engine._frame: time-slow sayacını motorda erit (menü/ölümde bile akar).
+        if (this._time_slow_remaining > 0) {
+            this._time_slow_remaining = Math.max(0.0, this._time_slow_remaining - dt);
+        }
         // Python Engine._frame -> Input._update_events eşdeğeri: kumanda durumunu
         // kare başında tazele (analog eksen/hat/buton kenar algılama).
         if (DE.Input && DE.Input.instance) DE.Input.instance.begin_frame();
         if (this.active_scene) {
             this.active_scene.update(dt);
             this.active_scene.draw(this.ctx);
+        }
+        // Python Engine._frame -> _handle_escape: ESC, aktif sahnenin on_escape
+        // olayını tetikler (duraklatma overlay'i, menüde çıkış). on_escape yoksa
+        // veya false dönerse oyun kapanır.
+        const esc = (DE.Input && DE.Input.get_key_down) ? DE.Input.get_key_down("ESCAPE") : false;
+        if (esc) {
+            const sc = this.active_scene;
+            if (sc && sc.on_escape) {
+                if (sc.on_escape() === false) this.is_running = false;
+            } else {
+                this.is_running = false;
+            }
         }
         // Python Engine._frame -> Input._update_events eşdeğeri: one-shot durumu
         // (get_key_down / get_mouse_button_down / get_mouse_scroll) her kare sonunda
@@ -297,5 +343,13 @@ DE.Engine = class Engine {
             requestAnimationFrame(step);
         };
         requestAnimationFrame(step);
+    }
+}
+
+/* Python Engine.switch_scene classmethod karşılığı: herhangi bir yerden sahne
+ * değiştirmeye izin verir (kare başında uygulanır — Python davranışı). */
+DE.Engine.switch_scene = function (scene) {
+    if (DE.Engine.instance) {
+        DE.Engine.instance._next_scene = scene;
     }
 }
