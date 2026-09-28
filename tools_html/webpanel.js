@@ -156,16 +156,16 @@ function readBody(req) {
 }
 
 function page_html() {
-  const tpl = JSON.stringify(requireSafeTemplates());
-  const schemas = JSON.stringify(requireSafeSchemas());
-  const themes = JSON.stringify(["none", "forest", "lava", "cave", "ice", "desert", "astro"]);
-  const grid = "8";
+  const data = JSON.stringify({
+    grid: 8,
+    templates: requireSafeTemplates(),
+    schemas: requireSafeSchemas(),
+    themes: ["none", "forest", "lava", "cave", "ice", "desert", "astro"],
+  });
   return fs.readFileSync(PAGE_PATH, "utf8")
     .replaceAll("%PORT%", String(PORT))
-    .replaceAll("%TEMPLATES%", tpl)
-    .replaceAll("%SCHEMAS%", schemas)
-    .replaceAll("%THEMES%", themes)
-    .replaceAll("%GRID%", grid);
+    .replaceAll("%DATA%", data)
+    .replaceAll("%GRID%", "8");
 }
 
 function requireSafeTemplates() { return TEMPLATES; }

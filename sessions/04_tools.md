@@ -141,6 +141,96 @@ new üret+koruma), `--lang en all` 0/0/0. Eski 8765 süreçleri kapatılıp sunu
   (`%GRID%` vb.) temizlenince `node --check` **JS_SYNTAX_OK**; `wp_logic_test.js`
   node testi — hidden tıklanamaz, locked algılanır, drag sıralaması çalışır.
   **Etkilenen:** araç dışı kod yok. ⏳ **COMMIT BEKLİYOR.**
+16. **JS araç portu — deep-tool.js + webpanel.js (28.09.2026, kullanıcı isteği
+    "oyun dışı her şeyi JS/HTML'e taşı, iki motor aynı güçte olsun"):** `tools_html/`
+    klasöründe Node sürümleri.
+    - **`deep-tool.js`** — 13 tarama modülü + find/new/run + `--api` + TR/EN.
+      Fark: **hem `*.py` hem `*.js` tarar** (iki motor aynı denetimden geçer):
+      Modül 8 motor saflığı `deep_engine/` + `deep_engine_html/engine/`; Modül 4
+      i18n `i18n.py` + `i18n.js`; Modül 9 seed determinizm py + JS `procedural.js`;
+      Modül 1 smoke = JS `procedural.generate` (headless). Modül 1 syntax yalnız
+      `.js` (py derlenemez) → import INFO "skipped", Modül 4 hem py hem js anahtar
+      sayısı (73/73). Port zorlukları çözüldü: Python `(?i)` regex flag → JS
+      olmaz (SEKRET ve TYPO düzeltildi); global regex'siz `exec` sonsuz döngü →
+      `_TODO`/`_TYPO` + `g` flag'i (bellek taşması yaşandı, heap out of memory);
+      `usedEdges.get` dir'de yok → obj indeksi; `require(procedural.js)` global DE
+      yazmıyor → `load_engine()` `(0,eval)`. Modül 7 parity: Python AST'ten boş
+      except buluyordu, JS port boş `pass`/`catch` ilk sürümde kaçırdı → satır
+      tabanlı regex; `return {`/`(`, `&&` devam satırları unreachable yanlış
+      pozitif veriyordu → multi-line return skip + operatör devamı skip; sonuç
+      314 WARN → 13 WARN (py-orijinale yakın: 14 unused import + empty except).
+      Doğrulama: `--lang en all` 13 modül çalışır, Modül 13 crash trendi py ile
+      BİREBİR aynı çıktı. Kısayol: `deep-tool-js.bat`.
+    - **`webpanel.js`** — Node http sunucusu, **8766** (py 8765'te kalır).
+      Gömülü PAGE ayrı dosyaya çıkarıldı (`tools_html/webpanel.html`, %PORT%/
+      %TEMPLATES%/%SCHEMAS%/%THEMES%/%GRID% yer tutucuları sunucuda doldurulur).
+      Route'lar birebir: `/`, `/api/level(s)`, `/api/log`, `/api/modules`,
+      `/api/level/save|reset|delete`, `/api/scan`, `/api/find`, `/api/new`,
+      `/api/script`, `/api/run`, `/api/launch`. `/api/scan|find|new|modules`
+      **subprocess değil, doğrudan deep-tool.js `require` + `api_dispatch`**
+      (aynı süreç, dil set_lang ile). `/api/script|run|launch` hâlâ python spawn
+      eder (oyun henüz JS'e port edilmedi — doğal bağımlılık). `readBody`'de
+      `json.body` bug'ı → JSON.parse (save round-trip ilk denemede "meta/objects
+      eksik" veriyordu, düzeltildi). Kısayol: `webpanel-js.bat`. Testler
+      (`test_tools.js`, **24/24 PASS**): deep-tool 13 modül + modül 8'de 0 leak,
+      modül 13 parity; webpanel HTTP round-trip — save→load→delete, scan/find/
+      new/script/log/levels, page placeholder dolgusu.
+    - **Doğrulama komutları:** `node tools_html\test_tools.js` → 24/24;
+      `node tools_html\deep-tool.js --lang en all`;
+      `node tools_html\webpanel.js` → http://127.0.0.1:8766.
+    **Etkilenen:** araç dışı kod YOK (oyun ve motor Py/JS tarafı değişmedi).
+    ✅ **COMMIT: `ef73b42`** (push `88cfdcb..ef73b42`).
+17. **HTML motor denklik + gerçek tarayıcı davranışı testi — test_browser.js
+    (28.09.2026, kullanıcı raporu: "web panelde diğer pencerelere tıklanmıyor,
+    demo oyunda zıplanmıyor. Kalite kontrol yapıyor musun? Html motoru py motorla
+    denk yapmak istiyoruz").** JS tarafında üç gerçek bug bulundu ve düzeltildi:
+    - **Bug 1 — `Input.end_frame()` hiçbir zaman çağrılmıyordu** (`deep_engine_html/
+      engine/core.js`): `_frame()` kare sonunda `DE.Input.instance.end_frame()`
+      eklenmediğinden `_down`/`_mouse_down`/`_mouse_scroll` one-shot durumları hiç
+      temizlenmiyor → tuşa KERESİNDE basınca karelerce devam eden basılı durum,
+      çift zıplama hakkı tükenince zıplama "ölü". Düzeltme: `_frame(now)` kare
+      sonunda `end_frame()` çağırır (py `Input._update_events` kare-başı temizleme
+      ile eşdeğer).
+    - **Bug 2 — `Scene.update` is_grounded'ı yanlış zamanda sıfırlıyordu** (core.js):
+      objeler `PlayerController.update` çalışmadan ÖNCE `rb.is_grounded=false`
+      yapılıyordu → PlayerController zıplama anında hep "havada" görüyor.
+      Py sırası: önce objelerin update'i (**geçen karenin çözüm değerini okur**),
+      sonra `Physics.resolve` KARE SONUNDA tüm rb'leri sıfırlayıp yeniden çözer
+      (`deep_engine/scene.py` 187-267). HTML tarafı buna eşitlendi.
+      (`components.js` BouncePad `on_collision`'daki reset BUG DEĞİL — doğru.)
+    - **Bug 3 — webpanel.html doğrudan dosya (file://) açılınca çöküyor:**
+      düz metin olarak kalan `%TEMPLATES%` vs. placeholder'ları `const TEMPLATES =
+      %TEMPLATES%;` içinde **SyntaxError** → betik tamamen ölür → hiçbir sekmeye
+      tıklanamaz. (İlk deneme `_jsonOr([], "%TEMPLATES%")` tırnaklı yama SAVED
+      sayfada JSON'u tırnak içine gömdüğü için SBOCUS — geri alındı.)
+      **Çözüm:** tipik `application/json` veri bloğu
+      `<script id="panel-data" ...>%DATA%</script>` (tarayıcı çalıştırmaz, metin
+      okunur) + güvenli varsayılanlar (GRID=8, TEMPLATES=[], SCHEMAS={}, THEMES=
+      [...]); `webpanel.js page_html()` tek `%DATA%` blob üretir (`%GRID%` yalnız
+      durum çubuğu metni). Boot: `loadMods().catch(()=>{})` +
+      `loadLevel().catch(()=>{...})` → sunucu yoksa boş seviyeyle editör ayağa
+      kalkar, "Sunucuya bağlanılamadı — önizleme modu" mesajı; ayrıca kazara kalan
+      takipsiz `loadMods();` çağrısı silindi (unhandled rejection → process çökmesi).
+    - **`tools_html/test_browser.js` (YENİ — sıfır bağımlılık, `vm` tabanlı**
+      tarayıcı davranışı testi): fakeCtx Proxy + El DOM stub + `makeDom` (tembel
+      getElementById, token'lı querySelectorAll, 5 sekme/panel) + `bootDemo()`
+      (21 dosyayı vm'e yükler, DOMContentLoaded + rAF yakalama, monoton `pump`/
+      `press`/`release`) + `bootPanel()` (panel-data içeriğini regex'le ayıklar,
+      fetch stub → gerçek HTTP 8798 veya offline fırlatır). Bölüm 1: input
+      one-shot edge + yere iniş (is_grounded) + yerdeyken SPACE zıplama (vy<0,
+      y azalır) — **iki motor bug'ını canlı kanıtlar ve düzeltmeyi doğrular**;
+      Bölüm 2: served sayfa — palet 14, seviye listesi (HTTP round-trip), sekme
+      geçişi, Farklı Kaydet modal aç/kapa; Bölüm 3: raw file:// — syntax hatası
+      YOK, boş palet, durum mesajı, sekme yine tıklanır. Test koşumunda çıkan
+      hatalar: engine yolu `__dirname` değil `../`; ana `<script>`'in açılış
+      etiketini de ayıklamak, panel-data'ya `gid` ile enjekte, demo zaman akışı
+      monoton olmalı (negatif dt veriyordu). Doğrulama: `node tools_html\
+      test_browser.js` → **23/23 PASS**; `node tools_html\test_tools.js` → 24/24
+      PASS (degrade yok).
+    **Etkilenen:** oyun Py/JS kodunda değişiklik YOK; HTML motor `core.js` (+
+    `input.js` zaten end_frame tanıyordu) ve `webpanel.html/js` değişti. Py motor
+    DEĞİŞMEDİ (zaten doğru sıra + `_update_events`).
+    ⏳ **Bu madde için COMMIT sırada (kullanıcı onayıyla push).**
 
 ---
 
@@ -262,6 +352,30 @@ korundu (komutlar game katmanında kayıtlı). Doğrulama: py_compile OK, `impor
    bağımsız tasarım alanı).
 
 ---
+
+## **HEDEF — Araçların JS portu (iki motor eşit güçte) (28.09.2026) — DEVAM EDİYOR**
+
+Kullanıcı: "deep-tool'u ve webpanel gibi oyun dışında her şeyi JS/HTML'e port et;
+iki motor olsun, ikisi de aynı güçte — biri py biri js." HTML motor (G1–G9)
+tamamlanınca araçlar da JS'e taşınıyor: **`tools_html/`** klasörü.
+
+- **HEDEF 1 — `tools_html/deep-tool.js`** (Node CLI): ✅ **Tamamlandı (madde 16).**
+  Python deep-tool.py'nin
+  birebir portu — 13 tarama modülü + find/new/run + `--api` JSON + TR/EN. Fark:
+  **hem `*.py` hem `*.js` dosyalarını tarar** (iki motor da aynı denetimden geçer:
+  Modül 8 motor saflığı `deep_engine/` VE `deep_engine_html/engine/` için; Modül 4
+  i18n `i18n.py` VE `i18n.js` için; Modül 9 seed determinizm py procedural +
+  JS procedural). Doğrulama: `node tools_html\deep-tool.js --lang en all` →
+  py ve js tarafı için ayrı/ortak bulgu; parity testi py sonucuyla eş.
+- **HEDEF 2 — `tools_html/webpanel.js`** (Node http, 8766): ✅ **Tamamlandı (madde 16).**
+  aynı panel + editör
+  sayfası (`webpanel.html` — py'deki gömülü PAGE'in kopyası), route'lar birebir
+  (/api/level…, /api/scan, /api/find, /api/new, /api/modules, /api/log, /api/script,
+  /api/run, /api/launch). `/api/scan|find|new|modules` artık **subprocess değil**
+  doğrudan deep-tool.js çağrısı. `/api/launch` py oyunu (henüz JS portu yok)
+  `python main.py` spawn eder — bu doğal bağımlılık kalır. kadar.
+- Doğrulama: `test_tools.js` — modül sayıları/çıktı parity + HTTP round-trip
+  (levels/save/delete).
 
 ## ARAÇ KALAN (bekleyen araç işleri)
 

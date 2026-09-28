@@ -234,6 +234,9 @@ print("DerinEngine", deep_engine.__version__)</textarea>
   </div>
 </div>
 
+<!-- Sunucu tarafı dolgulu veri bloğu (tarayıcı BUNU çalıştırmaz, sadece metindir) -->
+<script id="panel-data" type="application/json">%DATA%</script>
+
 <script>
 /* ---------- shared state ---------- */
 let level = null;       // {meta, objects}
@@ -242,10 +245,19 @@ let currentTool = null; // template object to place
 let gridSize = 8;
 // camera offset in world px (origin at top-left of the canvas view)
 let camX = 0, camY = 0, zoom = 1;
-const GRID = %GRID%;
-const TEMPLATES = %TEMPLATES%;
-const SCHEMAS = %SCHEMAS%;
-const THEMES = %THEMES%;
+// Sunucu tarafı %DATA% etiketi JSON olarak doldurur; dosya doğrudan açılırsa
+// (file://) etiket bozuk JSON içerir ve parse hata verir → güvenli varsayılanlar.
+// Sayfa bu sayede asla sözdizimi hatasıyla ÖLMEZ (tıklanabilirlik kaybolamaz).
+const _DATA = (function () {
+  try {
+    const el = document.getElementById('panel-data');
+    return JSON.parse(el && el.textContent ? el.textContent : 'null');
+  } catch (e) { return null; }
+})();
+const GRID = (_DATA && _DATA.grid) || 8;
+const TEMPLATES = (_DATA && _DATA.templates) || [];
+const SCHEMAS = (_DATA && _DATA.schemas) || {};
+const THEMES = (_DATA && _DATA.themes) || ["none", "forest", "lava", "cave", "ice", "desert", "astro"];
 
 /* ---------- undo / redo ---------- */
 let undoStack = [];
@@ -822,7 +834,6 @@ async function loadMods() {
   const d = await (await fetch('/api/modules?lang=' + lang)).json();
   if (d.ok && d.result && d.result.ok) { MODLIST = d.result.modules; buildScanMods(); }
 }
-loadMods();
 let scanId = 0;
 async function runScan(nums) {
   const out = document.getElementById('scanOut');
@@ -924,7 +935,17 @@ async function launchGame() {
 
 /* ---------- boot ---------- */
 buildPalette();
-loadLevel();
+loadMods().catch(() => {});
+loadLevel().catch(() => {
+  // Sunucuya ulaşılamadı (ör. sayfa doğrudan açıldı): editör boş seviyeyle
+  // çalışmaya devam eder — butonlar/sekmeler asla kitlenmez.
+  level = { meta: { name: "Custom Level", background_color: [16, 24, 34], parallax_theme: "none" }, objects: [], _name: "default.json" };
+  gridSize = 8; camX = 0; camY = 0; zoom = 1;
+  frameView();
+  metaToControls(); updateProps(); updateTree(); zoomLabel(); draw();
+  document.getElementById('edStatus').textContent =
+    'Sunucuya bağlanılamadı — önizleme modu (kaydetmek için webpanel.js ile aç).';
+});
 </script>
 </body>
 </html>

@@ -162,10 +162,10 @@ DE.Scene = class Scene {
             if (!o.active) continue;
             const col = o.get_component(DE.BoxCollider) || o.get_component(DE.CircleCollider) || o.get_component(DE.PolygonCollider);
             if (col) colliders.push(col);
-            const rb = o.get_component(DE.Rigidbody2D);
-            if (rb) rb.is_grounded = false;
         }
-        // update fazı (Rigidbody pozisyonu taşır)
+        // GÜNCELLEME fazı (Rigidbody pozisyonu taşır). is_grounded burada SIFIRLANMAZ:
+        // Python ile aynı — güncelleme fazı bir önceki karenin çözüm değerini okur,
+        // kare sonunda Physics.resolve sıfırlar + yeniden hesaplar.
         for (const o of this.game_objects) o.update(sim_dt);
 
         // Çarpışma çiftleri: uniform grid (CELL=128), aynı hücrede overlap → on_collision
@@ -273,12 +273,17 @@ DE.Engine = class Engine {
         scene.start();
     }
     _frame(now) {
-        if (!this.active_scene) return;
         const dt = Math.min(1 / 30, (now - (this._last || now)) / 1000);
         this._last = now;
         this._frame_count += 1;
-        this.active_scene.update(dt);
-        this.active_scene.draw(this.ctx);
+        if (this.active_scene) {
+            this.active_scene.update(dt);
+            this.active_scene.draw(this.ctx);
+        }
+        // Python Engine._frame -> Input._update_events eşdeğeri: one-shot durumu
+        // (get_key_down / get_mouse_button_down / get_mouse_scroll) her kare sonunda
+        // sıfırlanır, böylece bir tuş basışı tam olarak bir kare görünür.
+        if (DE.Input && DE.Input.instance) DE.Input.instance.end_frame();
     }
     run() {
         this.is_running = true;

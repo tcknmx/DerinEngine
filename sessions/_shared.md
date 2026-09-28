@@ -8,6 +8,33 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[ARAÇ] HTML motor denklik + gerçek tarayıcı davranışı testi (28.09.2026,
+  `04_tools.md` madde 17).** kullanıcı raporu "web panelde diğer pencerelere
+  tıklanmıyor, demo oyunda zıplanmıyor" → üç gerçek hata bulunup düzeltildi:
+  (1) `end_frame()` hiç çağrılmıyordu (one-shot input durumları hiç temizlenmiyor);
+  (2) `Scene.update` is_grounded'ı obje update'LERİNDEN ÖNCE sıfırlıyordu (py sırası
+  kare-sonu çözüm); (3) `webpanel.html` file:// ile açılınca ham `%TEMPLATES%` →
+  SyntaxError → tüm tıklamalar ölü. Çözüm: `core.js` `_frame` kare-sonu `end_frame`,
+  is_grounded sırası py'ye eşitlendi; webpanel tipik `panel-data` JSON bloğu +
+  güvenli varsayılanlar + `loadMods/loadLevel().catch` fallback. **Yeni
+  `tools_html/test_browser.js`** (vm tabanlı, sıfır bağımlılık): demo zıplama/
+  is_grounded/input edge + served sekme/modal/HTTP + raw file:// → **23/23 PASS**,
+  `test_tools.js` 24/24 (degrade yok). **Etkilenen:** HTML motor `core.js` +
+  `webpanel.html/js`; **oyun Py/JS koduna ve Py motoruna dokunulmadı.** ⏳ madde 17
+  COMMIT sırada.
+- **[ARAÇ] Oyun dışı araçlar JS/HTML'e port edildi — iki motor aynı güçte
+  (28.09.2026, `04_tools.md` madde 16).** `tools_html/`: **deep-tool.js** (13 modül +
+  find/new/run + `--api` + TR/EN; **hem `*.py` hem `*.js` tarar** — Modül 8 motor
+  saflığı hem `deep_engine/` hem `deep_engine_html/engine/` için, Modül 4 i18n
+  ikili, Modül 9 seed determinizm js `procedural.js`), **webpanel.js** (Node http,
+  port **8766**; `webpanel.html`; route'lar birebir, `/api/scan|find|new|modules`
+  aynı süreçte deep-tool.js çağrısı, `/api/script|run|launch` hâlâ python spawn),
+  **test_tools.js** (24/24 PASS). Kısayollar: `deep-tool-js.bat`, `webpanel-js.bat`,
+  `test-tools-js.bat`. Modül 1 syntax yalnız `.js` (py derlenemez), Modül 7 parity
+  (AST-boş-except + unreachable multi-line skip; 314→13 WARN). **Etkilenen:** araç
+  (py sürümleri 8765'te aynen durur), oyun/motor Py ve JS tarafı DEĞİŞMEDİ.
+  ✅ COMMIT: `ef73b42` (push `88cfdcb..ef73b42`).
+
 - **[HTML MOTOR] G8 (sistemler) + G9 (sürüm) tamam — G1–G9 bitti (28.09.2026,
   `01_strategy.md`).** scenemanager.js (SceneManager register/switch/push/pop +
   overlay), log.js (MotorLogger eşik + handler), i18n.js (TR/EN birebir tablo),
