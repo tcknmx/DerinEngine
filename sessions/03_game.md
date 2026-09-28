@@ -199,6 +199,14 @@
 - **Motor-UI kiti oyuna taşındı (grup görevi, TAMAMLANDI)**: pause ekranı
   `deep_engine/ui.Button` + `Panel` + `UITheme` ile kuruldu (ilk somut kullanım);
   i18n `pause_title/pause_hint/pause_resume_btn/pause_menu_btn` tr+en.
+- **Menü Sonsuz Mod satırı UI kitine taşındı (28.09.2026, TAMAMLANDI)**: `build_main_menu_scene`
+  M_RND artık metin satırı değil, Kit `Button`'ı (`game/ui.py` + yeni `KitLabelSync` bileşeni):
+  kilitliyse `enabled=False` gri buton + LockIcon + kilit uyarısı; açıkken hover/press
+  görünümü + tıkla endless başlar (tıklama yolları değişmedi: `_click_rect/_click_action` →
+  MenuController `_dispatch_action`; durum değişmedi). `KitLabelSync` Button metnini i18n
+  key ile her frame senkron tutar (dil değişiminde buton metni de güncellenir). Doğrulama:
+  MENU_BUTTON_OK + MENU_UNLOCKED_OK + KIT_SYNC_OK + menü 90 frame headless OK + deep-tool
+  `--lang en all` 0 WARN/0 BUG/0 ERR.
 - **Müzik tema bağlama derinliği**: `scenes.py`'de merkezi `_play_theme(biome, is_boss=False,
   fallback="level")`; procedural, boss (`is_boss=True`) ve endless (`fallback="level"`)
   artık tek yerden tema seçiyor; ui.py victory yerinde. py_compile OK.

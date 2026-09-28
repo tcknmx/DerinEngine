@@ -8,6 +8,17 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[OYUN] Menü Sonsuz Mod satırı motor UI kitine taşındı (28.09.2026, `03_game.md`).**
+  `build_main_menu_scene`'de M_RND satırı (`_menu_item` metin satırı) artık Kit `Button`
+  ('deep_engine/ui.Button') ile kuruluyor: kilitliyken `enabled=False` gri buton +
+  LockIcon + kilit uyarısı, açıkken hover/press durumları + tıkla endless. Tıklama yine
+  aynı `_click_rect/_click_action` üzerinden MenuController `_dispatch_action` ile yürüyor
+  (kit'in kendi on_click yok; davranış değişmedi). Yeni küçük bileşen `KitLabelSync`
+  (Button metnini i18n key ile senkron tutar — T ile dil değişince buton metni güncellenir).
+  Doğrulama: py_compile OK, task test MENU_BUTTON_OK + MENU_UNLOCKED_OK + KIT_SYNC_OK +
+  menü 90 frame headless OK, deep-tool `--lang en all` **0 WARN / 0 BUG / 0 ERR**.
+  commit `TBD`.
+
 - **[MOTOR+OYUN] 4'lü grup işi tamamlandı (27.09.2026, `02_engine.md` + `03_game.md`).**
   Kullanıcı: "yap hepsini" (tilemap zeminleri + overlay pause + motor-UI kiti + Event/Tween
   test). **(A) Gerçek tilemap zeminler:** `build_procedural_level` artık Ground rect'lerini

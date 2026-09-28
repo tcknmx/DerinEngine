@@ -48,6 +48,26 @@ class LocalizedLabel(Component):
             self._text.text = I18n.t(self.key)
 
 
+class KitLabelSync(Component):
+    """Keeps a UI Kit Button's label in sync with an I18n key.
+
+    The menu language can be switched at runtime (T on pause / lang row click);
+    Button has no i18n built-in, so this small component refreshes its text
+    whenever the translation changes.
+    """
+    is_ui = True
+
+    def __init__(self, button, key):
+        super().__init__()
+        self._button = button
+        self._key = key
+
+    def update(self, dt: float):
+        text = I18n.t(self._key)
+        if self._button.text != text:
+            self._button.set_text(text)
+
+
 class LockIcon(Component):
     """Draws a small padlock in place of '4' on a locked menu option (e.g. Endless Mode).
 
@@ -423,10 +443,44 @@ def build_main_menu_scene() -> Scene:
             _menu_ui.append(lock)
 
     _menu_item("M_KAMP", "menu_campaign", 610, 180, 28, (120, 255, 120), action="campaign")
+
+    # Endless Mode row rebuilt with the engine UI Kit (Button): hover/press look,
+    # grey disabled look when locked (savegame flag); clicking still routes through
+    # the same _click_rect/_click_action used by the rows above.
     _endless_locked = not bool(_profile.get("endless_unlocked", False))
-    _menu_item("M_RND", "menu_random", 610, 236, 23, (100, 255, 180),
-               action=None if _endless_locked else "endless", locked=_endless_locked,
-               lock_key="menu_random_locked")
+    _endless_key = "menu_random_locked" if _endless_locked else "menu_random"
+    _endless_theme = UITheme(
+        button_bg=(28, 66, 96),
+        button_hover=(42, 88, 128),
+        button_press=(20, 40, 64),
+        button_focus=(150, 200, 235),
+        button_text=(100, 255, 180),
+        button_disabled=(58, 60, 70),
+    )
+    _rnd_go = GameObject(name="M_RND", x=610, y=214, width=280, height=44)
+    _rnd_btn = Button(text=I18n.t(_endless_key), on_click=None, theme=_endless_theme,
+                      font_size=23)
+    _rnd_btn.enabled = not _endless_locked
+    _rnd_go.add_component(_rnd_btn)
+    _rnd_go.add_component(KitLabelSync(_rnd_btn, _endless_key))
+    _rnd_go._click_rect = pygame.Rect(610, 210, 290, 52)
+    _rnd_go._click_action = None if _endless_locked else "endless"
+    scene.add_object(_rnd_go)
+    _menu_ui.append(_rnd_go)
+    if _endless_locked:
+        # Lock icon + unlock hint below the row (same layout as the old text row).
+        icon = GameObject(name="M_RND_icon", x=580, y=230)
+        icon.add_component(LockIcon(size=16))
+        scene.add_object(icon)
+        _menu_ui.append(icon)
+        lock = GameObject(name="M_RND_lock", x=610, y=263)
+        lock.add_component(TextRenderer(text=I18n.t("menu_endless_locked"),
+                                        font_size=12, color=(125, 120, 135), is_ui=True,
+                                        shadow=(0, 0, 0)))
+        lock.add_component(LocalizedLabel("menu_endless_locked"))
+        scene.add_object(lock)
+        _menu_ui.append(lock)
+
     _menu_item("M4", "menu_lang", 610, 292, 23, (255, 230, 120), action="lang")
 
     # Controls info + High Score — bottom-center, aligned
