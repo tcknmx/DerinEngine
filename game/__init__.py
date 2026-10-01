@@ -8,6 +8,7 @@ this package:
     - ui:        menu, victory, game over, UI components
     - builders:  JSON level builder/extractor functions
     - scenes:    procedural + campaign + endless + level builders
+    - climber:   Star Climber (Icy Tower tarzı sonsuz tırmanma oyunu)
 
 Names that need to be exposed are re-exported below.
 """
@@ -15,7 +16,7 @@ Names that need to be exposed are re-exported below.
 from . import state
 from .state import campaign_state, game_mode, endless_state
 
-from . import entities, bosses, ui, builders, scenes, commands
+from . import entities, bosses, ui, builders, scenes, commands, climber
 
 # --- entities ---
 from .entities import (
@@ -68,4 +69,12 @@ from .scenes import (
     build_campaign_entrance,
     build_campaign_boss,
     build_endless_level,
+)
+
+# --- climber (Star Climber) ---
+from .climber import (
+    ClimbPlatform,
+    ClimberPlayer,
+    ClimbGame,
+    build_climber_scene,
 )

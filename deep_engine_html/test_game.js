@@ -32,7 +32,7 @@ function loadGame(name) {
   const code = fs.readFileSync(path.join(__dirname, "game", name), "utf8");
   new Function("DE", "window", "document", "DE_GAME", code)(global.DE, windowStub, documentStub, global.DE_GAME);
 }
-for (const f of ["state.js", "entities.js", "bosses.js", "ui.js", "scenes.js", "builders.js", "commands.js"]) loadGame(f);
+for (const f of ["state.js", "entities.js", "bosses.js", "ui.js", "scenes.js", "builders.js", "climber.js", "commands.js"]) loadGame(f);
 
 // --- Input stub: tarayıcı yok; get_key/get_key_down/get_horizontal_axis vb. statikleri. ---
 class FakeInput {
@@ -659,6 +659,224 @@ function countCtx() {
     check("8: tamamlanan biyom dolu yıldız, kilitli soluk", c8All.fills > filled, "fills " + filled + " -> " + c8All.fills);
   }
   prof.set("completed_biomes", savedDone);   // temizlik
+}
+
+// TEST16: spawn grace (SpawnIn sürerken düşman zararsız) + menü çıkış kamera snap
+console.log("TEST16 spawn grace:");
+{
+  // 1) Yanıp sönen düşman oyuncuya hasar vermez (telegraf yalan söylemez)
+  const { lvl, player, ctrl } = freshLevel("forest", 7, 8, 0);
+  const enemies = lvl.game_objects.concat(lvl._objects_to_add).filter(o => o.tag === "Enemy");
+  const enemy = enemies.filter(o => o.get_component(DE.SpawnIn))[0] || enemies[0];
+  check("16: prosedürel düşmanda SpawnIn telegrafı var", !!enemy && !!enemy.get_component(DE.SpawnIn),
+    enemies.map(o => o.name).join(","));
+  if (enemy) {
+    const spawnIn = enemy.get_component(DE.SpawnIn);
+    if (spawnIn) spawnIn.timer = 0.0;        // 1 sn step edildiği için blink'i yeniden başlat
+    check("16: düşman telegraf sırasında (done=false)", spawnIn !== null && spawnIn.done === false);
+    // düşmanı oyuncunun üstüne koy
+    enemy.position.x = player.position.x;
+    enemy.position.y = player.position.y;
+    const hp = player.get_component(DE.Health);
+    hp.current_hp = hp.max_hp;
+    hp.invulnerable_timer = 0;
+    ctrl.dash_timer = 0; ctrl.dash_momentum = 0;
+    const rb = player.get_component(DE.Rigidbody2D);
+    if (rb) rb.velocity.set(0, 0);
+    ctrl.on_collision(enemy);
+    check("16: SpawnIn sırasında hasar yok", hp.current_hp === hp.max_hp,
+      "hp=" + hp.current_hp + "/" + hp.max_hp);
+    // blink bitince düşman gerçekten hasar verir
+    spawnIn.done = true;
+    spawnIn.timer = 999;
+    hp.invulnerable_timer = 0;
+    ctrl.dash_timer = 0; ctrl.dash_momentum = 0;
+    if (rb) rb.velocity.set(0, 0);
+    ctrl.on_collision(enemy);
+    check("16: blink bitince hasar verir", hp.current_hp < hp.max_hp,
+      "hp=" + hp.current_hp + "/" + hp.max_hp);
+  }
+
+  // 2) Menüden çıkış: kamera hedefe ışınlar -> çıkışta kayma yok
+  const menu = DE_GAME.build_main_menu_scene();
+  use(menu);
+  menu.start();
+  const menuCtrl = menu.game_objects.map(o => o.get_component(DE_GAME.MenuController)).filter(Boolean)[0];
+  check("16: menüde MenuController var", !!menuCtrl);
+  if (menuCtrl) {
+    menuCtrl.player = menu.find_by_tag("Player");
+    menuCtrl._place_menu_camera();
+    const parkedX = menu.camera_position.x;
+    menuCtrl._start_campaign();
+    const pt = menu.camera_follow_point();
+    check("16: menü çıkışı kamerayı oyuncuya ışınlar",
+      menu.camera_manual === false && menu.camera_position.x === pt.x && menu.camera_position.y === pt.y,
+      "park=" + parkedX + " hedef=" + pt.x);
+    check("16: menü çıkışı zoom hedefi 1.0", menu.camera_zoom_target === 1.0);
+  }
+}
+
+// TEST17: STAR CLIMBER (game/climber.js — Icy Tower tarzı sonsuz tırmanma)
+console.log("TEST17 Star Climber:");
+{
+  const cl = DE_GAME.build_climber_scene(1234);
+  use(cl);
+  const game = cl.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame);
+  const player = cl.find_by_tag("Player");
+  const ctrl = player.get_component(DE_GAME.ClimberPlayer);
+  const rb = player.get_component(DE.Rigidbody2D);
+
+  // 1) 17 katman üretildi (0..16) + katmanlar yukarı doğru yükseliyor
+  check("17: AHEAD+1 katman üretildi", Object.keys(game.floors).length === 17,
+    "n=" + Object.keys(game.floors).length);
+  check("17: top_index = 16", game.top_index === 16, "top=" + game.top_index);
+  const ys = [];
+  for (let i = 0; i < 6; i++) ys.push(game.floors[i].position.y);
+  check("17: katmanlar yukarı yükseliyor", ys.every((y, i) => i === 0 || y < ys[i - 1]), ys.join(","));
+  check("17: oyuncu 0. katmanın üstünde", player.position.y < game.floors[0].position.y);
+
+  // 2) her katman tek yönlü + ClimbPlatform var
+  const f0 = game.floors[0];
+  const bc = f0.get_component(DE.BoxCollider);
+  check("17: katmanlar one_way (alttan geçilir)", bc !== null && bc.one_way === true);
+  check("17: katmanda ClimbPlatform", f0.get_component(DE_GAME.ClimbPlatform) !== null);
+
+  // 3) kontrol noktası: her 10. katman kırılmaz
+  const cp = game.floors[10];
+  const cpComp = cp.get_component(DE_GAME.ClimbPlatform);
+  check("17: 10. katman kontrol noktası", cpComp !== null && cpComp.checkpoint === true
+    && cpComp.hits_to_break === 0 && cp.size.x >= 220);
+
+  // 4) üstten düşünce sekiş + hız seviyesi
+  player.position.x = f0.position.x + f0.size.x / 2 - 15;
+  player.position.y = f0.position.y - player.size.y - 2;
+  rb.velocity.x = 0; rb.velocity.y = 40;
+  const lv0 = ctrl.level;
+  f0.get_component(DE_GAME.ClimbPlatform).on_collision(player);
+  check("17: üstten düşünce sekiş", rb.velocity.y < -500, "vy=" + rb.velocity.y);
+  check("17: sekiş hız seviyesi artırdı", ctrl.level === Math.min(5, lv0 + 1), "lv=" + ctrl.level);
+
+  // 5) yukarı geçiş sekiş YAPMAZ (tek yönlü mantığı)
+  const vy0 = rb.velocity.y;
+  rb.velocity.y = -300;
+  f0.get_component(DE_GAME.ClimbPlatform).on_collision(player);
+  check("17: yukarı geçişte sekiş yok", rb.velocity.y === -300, "vy=" + rb.velocity.y);
+  rb.velocity.y = vy0;
+
+  // 6) kırılabilir katman sekiş sonrası kırılır (delik)
+  let brk = null;
+  for (const k of Object.keys(game.floors)) {
+    const c = game.floors[k].get_component(DE_GAME.ClimbPlatform);
+    if (c.hits_to_break > 0) { brk = game.floors[k]; break; }
+  }
+  check("17: kırılabilir katman var", brk !== null);
+  if (brk) {
+    check("17: motor BreakablePlatform eklendi", brk.get_component(DE.BreakablePlatform) !== null);
+    player.position.y = brk.position.y - player.size.y - 2;
+    rb.velocity.y = 30;
+    brk.get_component(DE_GAME.ClimbPlatform).on_collision(player);
+    check("17: kırıldı (delik oluştu)", brk.active === false);
+  }
+
+  // 7) kamera SADECE yukarı gider
+  rb.use_gravity = false;
+  const cam0 = cl.camera_position.y;
+  player.position.y -= 200;
+  for (let i = 0; i < 30; i++) step(cl, 1);
+  const camUp = cl.camera_position.y;
+  check("17: kamera yukarı gitti", camUp <= cam0 + 0.001, cam0 + " -> " + camUp);
+  player.position.y = camUp + 500;          // ekran altı, ölüm çizgisinin üstü
+  for (let i = 0; i < 30; i++) step(cl, 1);
+  check("17: kamera aşağı inmiyor", cl.camera_position.y <= camUp + 0.001,
+    "cam=" + cl.camera_position.y);
+  rb.use_gravity = true;
+
+  // 8) tırmanınca yeni katmanlar üretilir
+  player.position.y = game.floors[10].position.y - 700;
+  for (let i = 0; i < 5; i++) step(cl, 1);
+  check("17: tırmanınca katman üretildi", game.top_index >= 26, "top=" + game.top_index);
+
+  // 9) ekran altına DÜŞÜNCE kontrol noktasına dönüş (oyuncu boşlukta olmalı)
+  game.max_floor = 25; game.best_floor = 25; game.checkpoint_floor = 20;
+  ctrl.add_level();
+  player.position.y = game.floors[0].position.y + 260;   // tüm platformların altı
+  rb.velocity.y = 400;
+  const falls0 = game.falls;
+  step(cl, 1);
+  check("17: düştü (düşme sayacı arttı)", game.falls === falls0 + 1, "falls=" + game.falls);
+  check("17: kontrol noktasına ışınlandı",
+    Math.abs(player.position.y - (game.floors[20].position.y - player.size.y)) < 1,
+    "y=" + player.position.y);
+  check("17: düşünce hız seviyesi sıfırlandı", ctrl.level === 0, "lv=" + ctrl.level);
+  check("17: düşünce yükseklik ilerlemesi sıfırlandı (rekor korunur)",
+    game.max_floor === 20 && game.best_floor === 25,
+    "maxf=" + game.max_floor + " best=" + game.best_floor);
+  check("17: düşünce kamera kontrol noktasına döndü",
+    Math.abs(cl.camera_position.y - (game._camera_anchor_y() - 600 * 0.62)) < 1,
+    "cam=" + cl.camera_position.y);
+
+  // 9b) ZEMİNDE duran oyuncu ölmez (yoksa aynı ölüm sonsuz tekrarlanır)
+  cl.camera_position.y = game.floors[0].position.y + 900;
+  player.position.y = game.floors[0].position.y - player.size.y;
+  rb.velocity.y = 0;
+  rb.is_grounded = true;
+  const falls1 = game.falls;
+  step(cl, 1);
+  check("17: zemindeki oyuncu ölmez", game.falls === falls1, "falls=" + game.falls);
+
+  // 10) skor + HUD metni
+  game.on_platform_bounce(game.floors[20].get_component(DE_GAME.ClimbPlatform), player);
+  const hud = cl.find_by_tag("ClimbHUD").get_component(DE.TextRenderer);
+  const spd = cl.find_by_tag("ClimbSpeed").get_component(DE.TextRenderer);
+  check("17: HUD katman+skor yazar", hud !== null && hud.text.indexOf("25") >= 0
+    && hud.text.indexOf(String(game.score)) >= 0, hud ? hud.text : "yok");
+  check("17: HUD hız seviyesi yazar", spd !== null && spd.text.indexOf("x") >= 0, spd ? spd.text : "yok");
+  check("17: skor = rekor katman*10 + seviye*5", game.score === game.best_floor * 10 + ctrl.level * 5,
+    "score=" + game.score);
+  check("17: 20. katman sekişi ilerlemeyi korur", game.max_floor === 20, "maxf=" + game.max_floor);
+
+  // 11) hız seviyesi zamanla söner
+  ctrl.add_level();
+  const lv1 = ctrl.level;
+  for (let i = 0; i < 200; i++) ctrl.update(1 / 60);
+  check("17: hız seviyesi söndü", ctrl.level < lv1, lv1 + " -> " + ctrl.level);
+
+  // 12) hız çarpanı seviye ile artar
+  ctrl.reset_level();
+  const base = ctrl.speed_mult;
+  ctrl.level = 5;
+  ctrl.add_level();
+  check("17: hız çarpanı artar", ctrl.speed_mult > base, base + " -> " + ctrl.speed_mult);
+  check("17: seviye tavanı 5", ctrl.level === 5, "lv=" + ctrl.level);
+
+  // 13) deterministik tohum: aynı seed aynı kule
+  const a = DE_GAME.build_climber_scene(777);
+  const b = DE_GAME.build_climber_scene(777);
+  use(a); a.start();
+  use(b); b.start();
+  const ga = a.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame);
+  const gb = b.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame);
+  check("17: aynı seed = aynı kule", ga.floors[3].position.x === gb.floors[3].position.x
+    && ga.floors[3].size.x === gb.floors[3].size.x,
+    ga.floors[3].position.x + " vs " + gb.floors[3].position.x);
+
+  // 14) menüden açılabilir (C tuşu / tıklama)
+  const menu = DE_GAME.build_main_menu_scene();
+  use(menu);
+  menu.start();
+  const mctrl = menu.game_objects.map(o => o.get_component(DE_GAME.MenuController)).filter(Boolean)[0];
+  const climbRow = menu.game_objects.filter(o => o.name === "M_CLIMB")[0] || null;
+  check("17: menüde Star Climber satırı", climbRow !== null && !!mctrl);
+  if (climbRow) {
+    const tr = climbRow.get_component(DE.TextRenderer);
+    check("17: menü satırı yerelleştirilmiş", tr !== null && tr.text.indexOf("Climber") >= 0,
+      tr ? tr.text : "yok");
+  }
+  if (mctrl) {
+    mctrl._start_climber();
+    check("17: menü C -> fade ile tırmanış sahnesi",
+      mctrl._fading_out === true && typeof mctrl._pending_factory === "function");
+  }
 }
 
 // Toplam

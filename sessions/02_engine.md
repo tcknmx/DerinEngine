@@ -272,13 +272,21 @@ bozuk dosyalar için `py_compile`, her değişiklikte "oyun X sn çökmeden boot
   > (dict DEĞİL — test `SimpleNamespace`).
 - (Bekliyor) motor özelliği 6 — **veri katmanı**: tilemap verilerini dosyaya
 
+> NOT (30.09.2026, kayıt temizliği): Yukarıdaki satır, 27.09 tarihli TAMAMLANDI
+> kaydının yarım kalan mükerreridir (aynı iş iki kez yazılmış). Geçerli kayıt
+> L246-252'deki TAMAMLANDI bloğudur; oyun tarafındaki karşılığı (`tilemap_save` /
+> `tilemap_load` konsol komutları) `03_game.md`'de durur.
+
 ---
 
-## DEVİR GÖREVİ — DeepTool tarama WARN'ları (deep_engine/ tarafı)
+## DEVİR GÖREVİ — DeepTool tarama WARN'ları (deep_engine/ tarafı) — KAPANDI
 
 > Kaynak: `python tools\deep-tool.py --lang tr all` (ARAÇ oturumu). BUG/ERR yok,
 > yalnızca WARN var. Bu görev tamamlanınca `sessions/04_tools.md` + `_shared.md`'ye
 > sonuç kaydedilir.
+>
+> **SONUÇ (27.09.2026):** Motor tarafındaki tüm WARN'lar giderildi (14 modül × 0/0/0).
+> Aşağıdaki liste TARİHSİZ bir deneme listesi olarak duruyor; artık açık iş yok.
 
 1. **Sessiz `except Exception: pass` → bilinçli hale getir** (yaklaşık 22 satır):
    - `deep_engine/audio.py`: L33, L43, L281, L295, L313
@@ -324,10 +332,36 @@ bozuk dosyalar için `py_compile`, her değişiklikte "oyun X sn çökmeden boot
 > zaten uzaysal grid CELL=128 ile karededir). Kod değişikliği GEREKMEDİ. ARAÇ tarayıcı
 > ayarı önerisi: Modül 6 küçük-sabit listeleri (ör. `< 32` hücre/satır) yanlış-pozitif
 > notuyla yumuşatabilir → `04_tools.md` KALAN'a eklendi.
-> **Doğrulama:** py_compile 32 dosya OK; `deep-tool --lang tr all` → **0 WARN, 0 BUG,
+> **Doğrulama:** `py_compile` ile derleme OK; `deep-tool --lang tr all` → **0 WARN, 0 BUG,
 > 0 ERR**; headless menü 180 frame + ses/log best-effort yolları OK (MENU_BOOT_OK,
 > AUDIO_LOG_OK). Oyun davranışı değişmedi (yalnız görünürlük/niyet).
 > ⏳ KALAN commit+push (kullanıcı onayı).
+>
+> **KAPANDI (27.09.2026):** commit + push yapıldı (`fix: sessiz except...`).
+> "⏳ KALAN commit+push" satırı tarihsel not olarak duruyor, açık iş DEĞİLDİR.
+> Modül 6 yumuşatma önerisi de 27.09'da `tools/deep-tool.py`'de uygulandı
+> (`_const_loop_size`, `< 32` küçük-sabit döngü INFO'ya iner → 8 döngü INFO).
+
+19. **Kamera takibi + sarsıntı motoru (madde 44, 01.10.2026):**
+    - `Scene.set_camera_target()` artık **ilk takip karesinde hedefe snap** eder
+      (`_camera_snap_pending`); sonraki kareler lerp ile yumuşatır. Yeni yardımcılar:
+      `camera_follow_point()`, `snap_camera_to_target()` (hedefe ışınlar ve
+      kick/shake ofsetini **temizler**).
+    - `_update_shake(dt)`: trauma `1.4 * dt` ile söner, ofset kamera *+* konum
+      toplamıdır (çizimde uygulanır, mantıkta biriktirilmez).
+    - `render_camera` **yalnız** çizim içindir (kamera + ofset); mantık her zaman
+      `camera_position` kullanır → zoom/pan sarsıntıyla kaymaz.
+    - JS eşi birebir (`deep_engine_html/engine/core.js`): `shake_offset`,
+      `shake_max_offset = 14.0`, `snap_camera_to_target()`, `render_camera` getter,
+      ve Python API'si için `shake_trauma` getter/setler takma adı.
+    - `GameObject.get_component()` geçersiz tipte (None/str) `None` döndürür —
+      JS motoru tek başına yüklenip test edildiğinde sessizce patlıyordu.
+    - **ÖNEMLİ TESPİT (03.10.2026):** motorun "stable ground" adımı
+      (`scene.py::_handle_physics_and_collisions`) çarpışma bildiriminden **önce**
+      çalışır: oyuncuyu zemine yapıştırıp `velocity.y = 0` yapar. Bu yüzden
+      `BoxCollider(one_way=True)` platformlarda **`overlap_check` hiç True olmaz**
+      ve `on_collision` tetiklenmez. Tek yönlü platforma dayanan oynanış
+      (`ClimbPlatform` sekmesi) `is_grounded` durumundan sürmek ZORUNLADIR.
 
 ---
 

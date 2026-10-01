@@ -286,4 +286,79 @@ function done() {
     check("konsolda help calisti", engine.console.output.some(l => l.indexOf("help") >= 0));
 }
 
+// ================= S6 Kamera: ilk kare snap + dt tabanli sarsinti =================
+{
+    const scene = new DE.Scene("Test");
+    scene.screen_width = 900;
+    scene.screen_height = 600;
+    const player = new DE.GameObject("Player", 2000, 500, 32, 48, "Player");
+    scene.add_object(player);
+    scene.update(1 / 60);
+
+    // 1) ilk kare: kamera (0,0)'dan kaymaz, dogrudan hedefe gider (snap)
+    scene.set_camera_target(player);
+    check("kamera (0,0)'dan basliyor", scene.camera_position.x === 0 && scene.camera_position.y === 0);
+    scene.update(1 / 60);
+    const ex = player.position.x - scene.screen_width / 2 + player.size.x / 2;
+    const ey = player.position.y - scene.screen_height / 2 + player.size.y / 2;
+    check("ilk kare kaymadi (snap)", Math.abs(scene.camera_position.x - ex) < 1e-9
+        && Math.abs(scene.camera_position.y - ey) < 1e-9,
+        scene.camera_position.x + " vs " + ex);
+
+    // 2) hedef yoksa camera_follow_point guvenli
+    const noTarget = new DE.Scene("Bos");
+    noTarget.camera_target = null;
+    const p0 = noTarget.camera_follow_point();
+    check("hedef yoksa takip noktasi guvenli", isFinite(p0.x) && isFinite(p0.y));
+    check("hedef yoksa snap false", noTarget.snap_camera_to_target() === false);
+
+    // 3) snap_camera_to_target: kick + shake temizler, hedefe isinlar
+    scene.camera_kick.x = 12; scene.camera_kick.y = -5;
+    scene.add_shake(0.8);
+    scene.update(1 / 60);
+    check("sarsinti birikti", scene.shake_trauma > 0 && scene.shake_trauma === scene._shake_trauma,
+        "trauma=" + scene.shake_trauma);
+    const snapped = scene.snap_camera_to_target();
+    const pt = scene.camera_follow_point();
+    check("snap hedefe isinladi", snapped === true && scene.camera_position.x === pt.x
+        && scene.camera_position.y === pt.y);
+    check("snap kick/shake sifirladi", scene.camera_kick.x === 0 && scene.camera_kick.y === 0
+        && scene.shake_offset.x === 0 && scene.shake_offset.y === 0);
+
+    // 4) sarsinti gercek zamana gore soner (kare hizindan bagimsiz)
+    scene.add_shake(1.0);
+    scene.update(1 / 60);
+    check("trauma bir karede sondu", scene._shake_trauma > 0 && scene._shake_trauma < 1,
+        "trauma=" + scene._shake_trauma);
+    check("sarsintida ofset uretildi", scene.shake_offset.x !== 0 || scene.shake_offset.y !== 0);
+    for (let i = 0; i < 120; i++) scene.update(1 / 60);
+    check("2 saniyede trauma bitti", scene._shake_trauma === 0
+        && scene.shake_offset.x === 0 && scene.shake_offset.y === 0);
+
+    // 5) render_camera = kamera + ofset (JS'te sarsinti GERCEKTEN cizime giriyor)
+    scene.camera_position = new DE.Vector2(100, 100);
+    scene.shake_offset = new DE.Vector2(3, -4);
+    const rc = scene.render_camera;
+    check("render_camera shake'i toplar", rc.x === 103 && rc.y === 96, rc.x + "," + rc.y);
+    // ... ve draw() bu ofseti dunya nesnelerine gecirir
+    const camUsed = [];
+    const spy = new DE.GameObject("Spy", 0, 0, 4, 4, "Spy");
+    spy.draw = (ctx, cam) => camUsed.push(cam.x, cam.y);
+    scene.add_object(spy);
+    scene.start();                          // siraya alinan nesne sahneye gecer
+    const ctxStub = { canvas: { width: 900, height: 600 }, save() {}, restore() {},
+        translate() {}, scale() {}, fillRect() {} };
+    scene.draw(ctxStub);
+    check("draw() render_camera kullanir", camUsed.length >= 2 && camUsed[0] === 103 && camUsed[1] === 96,
+        camUsed.join(","));
+
+    // 6) kamera kick kare hizindan bagimsiz soner
+    scene.camera_kick.x = 20; scene.camera_kick.y = 0;
+    const k0 = scene.camera_kick.x;
+    scene.update(1 / 60);
+    check("kick azaldi", scene.camera_kick.x < k0 && scene.camera_kick.x > 0, "k=" + scene.camera_kick.x);
+    for (let i = 0; i < 60; i++) scene.update(1 / 60);
+    check("kick bitti", scene.camera_kick.x === 0 && scene.camera_kick.y === 0);
+}
+
 done();

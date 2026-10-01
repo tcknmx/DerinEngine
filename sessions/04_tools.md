@@ -414,12 +414,11 @@ tamamlanınca araçlar da JS'e taşınıyor: **`tools_html/`** klasörü.
 ## ARAÇ KALAN (bekleyen araç işleri)
 
 - **HTML MOTOR SIRADAKİ (DerinEngine HTML) — bakınız `01_strategy.md` MASTER SIRADAKİ
-  (28.09.2026).** Yeni ana hat: saf tarayıcı JS. A1–A4 bitti (çekirdek + render + fizik +
-  input + kutu demosu; commit `7606579`). **SIRADA G2–G9 motor eşitliği:** çarpışma hat
-  etleri + math2d (SAT), oynanış bileşenleri (Animator/KeyframeAnimator/BouncePad/Health/
-  Projectile/PowerUp/BreakablePlatform/SpawnIn), Tween, partikül+parallax+lighting,
-  tilemap+levelfile, UI kit, SceneManager+console+log+i18n+audio+savegame+procedural.
-  Sonra: SCH tam portu + tırmanma oyunu (Icy Tower mekaniği).
+  (28.09.2026).** ~~SIRADA G2–G9~~ **KAPANDI (28.09.2026):** G2–G9 motor eşitliği
+  bitti (G1–G9 tamam; ardından G10 INPUT denkliği + Modül 7 JS eşi de kapandı).
+  Bu oturumun açık kalanı artık yalnızca tarayıcı interaktif playtest (aşağıda).
+  Kalan yeni hat: SCH tam portu + **Star Climber** (tırmanma oyunu, Icy Tower
+  mekaniği) → `01_strategy.md` MASTER SIRADAKİ kuyruğuna işaretli.
   Doğrulama komutu: `node deep_engine_html\test_core.js` → `ALL OK`.
 - **Modül 7 kullanılmayan import WARN temizliği** (`game/*.py`) — ~~KALAN~~ **KAPANDI
   (01.10.2026):** tarama zaten temiz; araçtaki uyarı mekanizması geçici

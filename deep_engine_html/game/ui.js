@@ -236,6 +236,9 @@ DE_GAME.MenuController = class MenuController extends DE.Component {
         // Oyun başlıyor: CLOSE-UP -> normal oyun büyüklüğü, vinyet hafifler.
         this.scene.camera_manual = false;   // otomatik takip -> oyuncuya odaklan
         this.scene.zoom_to(1.0);
+        // Menü kamerası oyuncuya uzak bir noktaya park edilmişti: ışınla, böylece
+        // çıkış tek temiz bir zoom-out olur (zoom + dünya kayması birlikte olmaz).
+        this.scene.snap_camera_to_target();
         this.scene.set_vignette(0.22);
         if (this.player) {
             const pc = this.player.get_component(DE_GAME.PlayerController);
@@ -252,10 +255,19 @@ DE_GAME.MenuController = class MenuController extends DE.Component {
             return !!profile.get("endless_unlocked", false);
         } catch (e) { return false; }
     }
+    // Star Climber: Icy Tower tarzı tırmanış oyunu (ayrı sahne, fade ile açılır)
+    _start_climber() {
+        DE.SoundFX.play("win");
+        DE_GAME.state.game_mode = "climber";
+        this._pending_factory = DE_GAME.build_climber_scene;
+        this._fading_out = true;
+    }
     _dispatch_action(action) {
         if (action === "campaign") {
             DE_GAME.state.game_mode = "campaign";
             this._start_campaign();
+        } else if (action === "climber") {
+            this._start_climber();
         } else if (action === "endless") {
             if (this._endless_unlocked()) {
                 DE_GAME.state.game_mode = "endless";
@@ -313,6 +325,8 @@ DE_GAME.MenuController = class MenuController extends DE.Component {
                 DE.SoundFX.play("click");
                 console.log(DE.I18n.t("endless_locked_warn"));
             }
+        } else if (DE.Input.get_key_down("C")) {   // Star Climber (climb game)
+            this._start_climber();
         } else if (DE.Input.get_key_down("P") || DE.Input.get_key_down("SPACE") || DE.Input.get_key_down("ENTER")) {
             DE_GAME.state.game_mode = "campaign";
             this._start_campaign();
@@ -413,6 +427,7 @@ DE_GAME.build_main_menu_scene = function build_main_menu_scene() {
     }
 
     _menu_item("M4", "menu_lang", 610, 292, 23, [255, 230, 120], "lang");
+    _menu_item("M_CLIMB", "menu_climber", 610, 344, 21, [150, 225, 255], "climber");
 
     // Kontrol bilgisi + yüksek skor (alt-orta, hizalı).
     const cinfo = new DE.GameObject("M5", 450, 520, 0, 0, "UI");

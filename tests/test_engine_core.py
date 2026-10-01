@@ -132,8 +132,81 @@ def test_tween():
     assert curr == 0, f"clear sonrası {curr} tween kalmış"
 
 
+def test_camera():
+    """Kamera: ilk karede kayma yok (snap), snap_camera_to_target, dt tabanli sarsinti."""
+    from deep_engine.game_object import GameObject
+    from deep_engine.scene import Scene
+    from deep_engine.components import Rigidbody2D
+
+    scene = Scene("Test")
+    scene.screen_width = 900
+    scene.screen_height = 600
+    player = GameObject("Player", 2000.0, 500.0, 32, 48, "Player")
+    rb = Rigidbody2D()
+    player.add_component(rb)
+    scene.add_object(player)
+    scene.update(0.016)          # oyuncu sahneye girsin
+
+    # 1) ilk kare: kamera (0,0)'dan kaymaz, dogrudan hedefe gider
+    scene.set_camera_target(player)
+    assert scene.camera_position.x == 0.0 and scene.camera_position.y == 0.0, "test baslangici (0,0)"
+    scene.update(1.0 / 60.0)
+    expect_x = player.position.x - scene.screen_width / 2 + player.size.x / 2
+    assert abs(scene.camera_position.x - expect_x) < 0.001, \
+        f"ilk kare kaymamali (snap): {scene.camera_position.x} != {expect_x}"
+    expect_y = player.position.y - scene.screen_height / 2 + player.size.y / 2
+    assert abs(scene.camera_position.y - expect_y) < 0.001, "ilk kare y snap"
+
+    # 2) sonraki karelerde yumuşak takip (look-ahead: hiz 0 -> kayma yok)
+    rb.velocity.x = 0.0
+    scene.update(1.0 / 60.0)
+    assert abs(scene.camera_position.x - expect_x) < 0.001, "duruyorken kamera kaymamali"
+
+    # 3) look-ahead: saga dogru hizlaninca kamera oyunculardan ileri bakar
+    rb.velocity.x = 260.0
+    scene.update(1.0 / 60.0)
+    assert scene.camera_position.x > expect_x, "look-ahead saga dogru olmali"
+
+    # 4) snap_camera_to_target: kick + shake artigini temizleyip hedefe islar
+    scene.camera_kick = Vector2(12.0, -5.0)
+    scene.add_shake(0.8)
+    scene.update(1.0 / 60.0)
+    assert scene.shake_trauma > 0.0, "sarsinti birikmis olmali"
+    rb.velocity.x = 0.0
+    assert scene.snap_camera_to_target() is True
+    point = scene.camera_follow_point()
+    assert scene.camera_position.x == point.x and scene.camera_position.y == point.y, "snap hedefte olmali"
+    assert scene.camera_kick.x == 0 and scene.camera_kick.y == 0, "snap kick'i sifirlamali"
+    assert scene.shake_offset.x == 0 and scene.shake_offset.y == 0, "snap shake ofsetini sifirlamali"
+
+    # 5) hedef yoksa snap guvenli (False doner)
+    scene.camera_target = None
+    assert scene.snap_camera_to_target() is False, "hedef yokken snap False"
+
+    # 6) sarsinti: gercek zamana gore soner (kare hizindan bagimsiz)
+    scene.add_shake(1.0)
+    scene.update(1.0 / 60.0)
+    trauma_after_one_frame = scene.shake_trauma
+    assert 0.0 < trauma_after_one_frame < 1.0, f"trauma sonmeli: {trauma_after_one_frame}"
+    for _ in range(120):
+        scene.update(1.0 / 60.0)
+    assert scene.shake_trauma == 0.0, "2 saniyede trauma bitmeli"
+    assert scene.shake_offset.x == 0 and scene.shake_offset.y == 0, "trauma bitince ofset sifir"
+
+    # 7) render_camera = kamera + ofset; offset uygulandiginda farkli olur
+    scene.camera_position = Vector2(100.0, 100.0)
+    scene.shake_offset = Vector2(3.0, -4.0)
+    rc = scene.render_camera
+    assert (rc.x, rc.y) == (103.0, 96.0), f"render_camera toplam olmali: {rc.x},{rc.y}"
+    # ofset uretilir mi? (rastgele; en az biri farkli olmali)
+    scene.add_shake(1.0)
+    scene.update(1.0 / 60.0)
+    assert scene.shake_offset.x != 0 or scene.shake_offset.y != 0, "sarsintida ofset uretilmeli"
+
+
 if __name__ == "__main__":
     test_events()
     test_tween()
-    print("ALL OK  (Event on/once/off/emit + Tween value/vector/color/chain) -> 02_engine.md HEDEF")
+    test_camera()
+    print("ALL OK  (Event + Tween + kamera snap/sarsinti) -> 02_engine.md HEDEF")
     sys.exit(0)

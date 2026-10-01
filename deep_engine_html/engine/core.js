@@ -87,6 +87,7 @@ DE.GameObject = class GameObject {
         return component;
     }
     get_component(comp_type) {
+        if (typeof comp_type !== "function") return null;   // tip yoksa (orn. Rigidbody2D yuklenmemis) guvenli
         for (const c of this.components) {
             if (c instanceof comp_type) return c;
         }
@@ -121,11 +122,14 @@ DE.Scene = class Scene {
         this.camera_zoom = 1.0;
         this.time_scale = 1.0;
         this._shake_trauma = 0.0;
+        this.shake_offset = new DE.Vector2(0, 0);   // Python Scene.shake_offset
+        this.shake_max_offset = 14.0;               // Python Scene.shake_max_offset
         this.camera_target = null;
         this.camera_manual = false;
         this.camera_position = new DE.Vector2(0, 0);
         this.camera_smoothness = 5.0;
         this.camera_kick = new DE.Vector2(0, 0);   // Python Scene.camera_kick (dash kamera zıplaması)
+        this._camera_snap_pending = false;         // ilk kare: hedefe ısrarcı atla (kayma yok)
 
         // Kamera yakınlaştırma katmanı (Python scene.py V2.0 aynı): geniş açı ->
         // oyuna girişte yumuşak zoom-in + boss/patlama anlarında zoom punch'ı
@@ -144,7 +148,39 @@ DE.Scene = class Scene {
     }
     set_camera_target(obj) {
         this.camera_target = obj;
+        // Python Scene.set_camera_target: ilk kare hedefe ısrarcı atlar (kayma yok).
+        this._camera_snap_pending = true;
         return this;
+    }
+    camera_follow_point() {
+        // Python Scene.camera_follow_point: takip noktası + hız'a göre look-ahead.
+        const t = this.camera_target;
+        if (!t) return new DE.Vector2(this.camera_position.x, this.camera_position.y);
+        const px = t.position.x - this.screen_width / 2 + t.size.x / 2;
+        const py = t.position.y - this.screen_height / 2 + t.size.y / 2;
+        const rb = t.get_component(DE.Rigidbody2D);
+        if (rb) {
+            const look = Math.max(-1.0, Math.min(1.0, rb.velocity.x / 260.0)) * 70.0;
+            return new DE.Vector2(px + look, py);
+        }
+        return new DE.Vector2(px, py);
+    }
+    snap_camera_to_target() {
+        // Python Scene.snap_camera_to_target: kamerayı hedefe ışınlar, kick/shake
+        // artığını atar (menüden oyuna geçişte dünya hem kaymasın hem uzaklaşmasın).
+        this._camera_snap_pending = false;
+        if (!this.camera_target) return false;
+        const p = this.camera_follow_point();
+        this.camera_position.x = p.x;
+        this.camera_position.y = p.y;
+        this.camera_kick.x = 0; this.camera_kick.y = 0;
+        this.shake_offset.x = 0; this.shake_offset.y = 0;
+        return true;
+    }
+    get render_camera() {
+        // Python Scene.render_camera: kamera + sarsıntı ofseti (özellik, çizim yolu).
+        return new DE.Vector2(this.camera_position.x + this.shake_offset.x,
+            this.camera_position.y + this.shake_offset.y);
     }
     add_object(obj) {
         this._objects_to_add.push(obj);
@@ -173,6 +209,12 @@ DE.Scene = class Scene {
     }
     add_shake(amount) {
         this._shake_trauma = Math.min(1.0, this._shake_trauma + amount);
+    }
+    get shake_trauma() {
+        return this._shake_trauma;      // Python Scene.shake_trauma (genel API)
+    }
+    set shake_trauma(v) {
+        this._shake_trauma = Math.max(0.0, Math.min(1.0, v));
     }
     kick_camera(x, y) {
         // Python Scene.kick_camera: geçici bir kamera 'poke' (dash vb. yönünde).
@@ -262,18 +304,19 @@ DE.Scene = class Scene {
 
         if (DE.Physics) DE.Physics.resolve(this, sim_dt);
 
-        // Kamera takibi (Python Scene._update_camera mantığı — sadeleştirilmiş)
+        // Kamera takibi (Python Scene.update kamera bloğu — look-ahead + lerp aynı)
         if (this.camera_target && !this.camera_manual) {
-            let target_x = this.camera_target.position.x - this.screen_width / 2 + this.camera_target.size.x / 2;
-            let target_y = this.camera_target.position.y - this.screen_height / 2 + this.camera_target.size.y / 2;
-            const rb = this.camera_target.get_component(DE.Rigidbody2D);
-            if (rb) {
-                const look = Math.max(-1.0, Math.min(1.0, rb.velocity.x / 260.0)) * 70.0;
-                target_x += look;
+            const p = this.camera_follow_point();
+            if (this._camera_snap_pending) {
+                // İlk kare: ısrarcı atla, dünya köşeden kaymasın.
+                this.camera_position.x = p.x;
+                this.camera_position.y = p.y;
+                this._camera_snap_pending = false;
+            } else {
+                const alpha = Math.min(dt * this.camera_smoothness, 1.0);
+                this.camera_position.x += (p.x - this.camera_position.x) * alpha;
+                this.camera_position.y += (p.y - this.camera_position.y) * alpha;
             }
-            const alpha = Math.min(dt * this.camera_smoothness, 1.0);
-            this.camera_position.x += (target_x - this.camera_position.x) * alpha;
-            this.camera_position.y += (target_y - this.camera_position.y) * alpha;
         }
         // Kamera kick (Python _update_camera'da same): sıfırlanana kadar küçülür.
         if (this.camera_kick.x !== 0 || this.camera_kick.y !== 0) {
@@ -285,9 +328,17 @@ DE.Scene = class Scene {
             if (Math.abs(this.camera_kick.x) < 0.05) this.camera_kick.x = 0;
             if (Math.abs(this.camera_kick.y) < 0.05) this.camera_kick.y = 0;
         }
-        if (this._shake_trauma > 0.001) {
-            const sh = this._shake_trauma * this._shake_trauma * 18.0;
-            this._shake_trauma = Math.max(0, this._shake_trauma - dt * 1.4);
+        // Ekran sarsıntısı: trauma gerçek zamana göre söner ve ofset OLARAK
+        // uygulanır (Python Scene._update_shake ile aynı: güç = trauma^2, max 14 px).
+        this._shake_trauma = Math.max(0.0, this._shake_trauma - 1.4 * dt);
+        if (this._shake_trauma > 0.0) {
+            const power = this._shake_trauma * this._shake_trauma;
+            const amp = this.shake_max_offset * power;
+            this.shake_offset.x = (Math.random() * 2 - 1) * amp;
+            this.shake_offset.y = (Math.random() * 2 - 1) * amp;
+        } else {
+            this.shake_offset.x = 0;
+            this.shake_offset.y = 0;
         }
         // Kamera zoom yumuşatması + punch geri sarması (Python scene.py aynı).
         if (this._zoom_punch_timer > 0.0) {
@@ -344,6 +395,8 @@ DE.Scene = class Scene {
     }
     draw(ctx) {
         const zoom = this.camera_zoom;
+        // Çizim kamerası = kamera + sarsıntı ofseti (Python Scene.render_camera).
+        const renderCam = this.render_camera;
         if (Math.abs(zoom - 1.0) < 0.001) {
             // Normal (zoomsuz) çizim — en yaygın yol, optimize (Python aynı).
             if (this.background_color) {
@@ -351,11 +404,11 @@ DE.Scene = class Scene {
                 ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
             }
             if (this.parallax_background) {
-                this.parallax_background.draw(ctx, ctx.canvas.width, ctx.canvas.height, this.camera_position);
+                this.parallax_background.draw(ctx, ctx.canvas.width, ctx.canvas.height, renderCam);
             }
             const sorted = [...this.game_objects].sort((a, b) => a.z_index - b.z_index);
             for (const o of sorted) {
-                if (!this._is_ui_object(o)) o.draw(ctx, this.camera_position);
+                if (!this._is_ui_object(o)) o.draw(ctx, renderCam);
             }
             // UI nesneleri en üstte, kameradan bağımsız (ekran uzayı)
             for (const o of sorted) {
@@ -376,11 +429,11 @@ DE.Scene = class Scene {
         ctx.scale(zoom, zoom);
         ctx.translate(-w / 2, -h / 2);
         if (this.parallax_background) {
-            this.parallax_background.draw(ctx, w, h, this.camera_position);
+            this.parallax_background.draw(ctx, w, h, renderCam);
         }
         const sorted = [...this.game_objects].sort((a, b) => a.z_index - b.z_index);
         for (const o of sorted) {
-            if (!this._is_ui_object(o)) o.draw(ctx, this.camera_position);
+            if (!this._is_ui_object(o)) o.draw(ctx, renderCam);
         }
         ctx.restore();
         // UI nesneleri zoom'dan bağımsız ekran uzayında.

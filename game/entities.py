@@ -28,6 +28,20 @@ from deep_engine.components import _slow_dt
 from .state import campaign_state
 from . import state
 
+
+def _is_spawning_in(obj) -> bool:
+    """True while the object is still blinking in (engine SpawnIn telegraph).
+
+    Spawn grace: a telegraphed enemy cannot damage the player before its blink
+    finishes -- otherwise the "spawn telegraph" lies and the player eats a hit
+    during the very animation that is supposed to warn them.
+    """
+    for c in getattr(obj, "components", ()):
+        if isinstance(c, SpawnIn) and not c.done:
+            return True
+    return False
+
+
 class PlayerController(Component):
     """Player movement, jumping, shooting, dash, squash & stretch animation and health logic."""
     def __init__(self, speed=260.0, jump_force=560.0, restart_scene_factory=None):
@@ -654,10 +668,14 @@ class PlayerController(Component):
             self._check_all_coins_collected()
 
         elif other.tag == "Enemy" and other.active:
+            #  Spawn grace: an enemy that is still blinking in (SpawnIn) is harmless --
+            #  the telegraph is only honest if it really cannot hurt you yet.
+            if _is_spawning_in(other):
+                return
             #  Stun dash: hitting an enemy while moving fast stuns it; the player
-            # takes no damage. dash_timer lasts 0.16s; when it ends, momentum
-            # (416 px/s) remains, and if the player clips the enemy while still fast
-            # they shouldn't take damage -> momentum is also protected.
+            #  takes no damage. dash_timer lasts 0.16s; when it ends, momentum
+            #  (416 px/s) remains, and if the player clips the enemy while still fast
+            #  they shouldn't take damage -> momentum is also protected.
             if self.dash_timer > 0 or abs(self.dash_momentum) > 40:
                 self._stun_enemy_dash(other)
             elif self.rb.velocity.y > 50 and self.game_object.position.y + self.game_object.size.y <= other.position.y + 16:

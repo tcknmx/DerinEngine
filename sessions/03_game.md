@@ -146,6 +146,45 @@
     + `test_game.js` TEST14 9→11 komut ve 8 yeni check → **125/125**; iki araç
     14 modülde 0 WARN/0 BUG/0 ERR; `test_engine_core.py` ALL OK.
 
+46. **SpawnIn telegrafında hasar (oyun, 03.10.2026):** `SpawnIn.done == False` iken
+    beliren düşman oyuncuya hasar veriyordu (blink animasyonu sırasında ölmek
+    sinir bozucuydu). Çözüm: `game/entities.py::_is_spawning_in()` yardımcısı +
+    `PlayerController.on_collision()` başında erken dönüş — SpawnIn'u hâlâ
+    tamamlanmamış düşman dokunulmaz sayılır. JS eşi birebir
+    (`deep_engine_html/game/entities.js`, `_wake_up()` de aynı guard'ı kullanır).
+    Doğrulama: `test_game.js` TEST16 → **132/132**.
+
+47. **Star Climber — Icy Tower tarzı sonsuz tırmanış (oyun, 03.10.2026):**
+    Python `game/climber.py` + JS `deep_engine_html/game/climber.js` (birebir ayna),
+    menüden `[C]` ile açılır (fade geçiş, `game_mode="climber"`).
+    - **Mekanik:** tek yönlü seken platformlar (`ClimbPlatform`), kırılabilir
+      katmanlar (motor `BreakablePlatform` eşi), Icy Tower hız kombisi (seviye 0–5,
+      her sekiş +1 seviye, zamanla söner), her 10. katmanda geniş/kırılmaz
+      kontrol noktası, düşünce kontrol noktasına dönüş (**skor korunur**).
+    - **Kule üretimi:** 16 katman önden, dikey boşluk yukarı doğru artar,
+      deterministik tohum (Python `random.Random` / JS `mulberry32`).
+    - **Oynanışta bulunan 5 gerçek hata (hepsi headless oynanış testiyle bulundu):**
+      1. **0. katman oyuncunun altında değildi** → oyuncu hiçbir yere inemiyordu.
+         0. katman artık ekranı boydan boya kaplar.
+      2. **Sekiş hiç tetiklenmiyordu** (motor stable-ground bulgusu, `02_engine.md`
+         madde 19) → `is_grounded` tabanlı `_pump_bounce()` eklendi.
+      3. **Kamera zıplama tepesine takılıyordu** → oyuncu kendi katmanının ekran
+         dışına düşüp her sekişte aynı yerde ölüyordu. Kamera artık yalnız **yeni
+         katmana inildiğinde** yükselir (`_camera_anchor_y()`), Icy Tower gibi.
+      4. **Zeminde duran oyuncu ölüyordu** (kamera yukarıda kaldığı için) → sonsuz
+         ölüm döngüsü. `_standing_on_floor()` guard'ı; zemindeki oyuncu ölmez.
+      5. **Respawn'da `max_floor` sıfırlanmıyordu** → kamera eski katmana çekilip
+         oyuncuyu anında öldürüyordu. Artık düşünce yükseklik ilerlemesi sıfırlanır,
+         **rekor ayrı tutulur** (`best_floor` → skor, `max_floor` → kamera).
+    - **Ulaşılabilirlik kuralı (`_place_floor_x`):** ardışık katmanlar en az
+      `REACH_OVERLAP=70px` örtüşür; ilk 8 katman (`FREE_CLIMB`) ayrıca oyuncunun
+      sütununu kapsar → oyuncu yatay girdi vermeden de tırmanabilir (kule
+      sürüklenip oyuncudan uzaklaşamaz).
+    - **Doğrulama:** Python headless 4 seed × 30 sn **girişsiz** tırmanış (10–33
+      katman) + yönlendirmeli 60 sn (**189 katman, 0 düşüş**); JS aynı senaryolar
+      (10–30 katman / 188–189 katman). `test_game.js` TEST17 → **165/165**.
+      592 JS kontrolü + `test_engine_core.py` ALL OK; iki araç 0 WARN/0 BUG/0 ERR.
+
 ---
 
 ## OYUN KALAN (bekleyen oyun işleri, sıra kullanıcıyla)
@@ -242,10 +281,15 @@
 
 ---
 
-## DEVİR GÖREVİ — DeepTool tarama WARN'ları (game/ + main.py)
+## DEVİR GÖREVİ — DeepTool tarama WARN'ları (game/ + main.py) — KAPANDI
 
 > Kaynak: `python tools\deep-tool.py --lang tr all` (ARAÇ oturumu). BUG/ERR yok,
 > yalnızca WARN. Tamamlanınca `sessions/03_game.md` ve `_shared.md` güncellenir.
+>
+> **SONUÇ (27.09.2026):** Madde 1 (sessiz `except` → `log.debug`/`log.warn`) ve
+> Madde 2 (eksik extractor) tamamlandı; Madde 3 de 01.10.2026'da kapandı
+> (aşağıya yazılı). Oyun tarafı tarama artık **0 WARN / 0 BUG / 0 ERR**.
+> Aşağıdaki liste tarihsel deneme listesidir; açık iş DEĞİLDİR.
 
 1. **Sessiz `except Exception: pass` → bilinçli hale getir** (yaklaşık 14 satır):
    - `game/entities.py`: L1354, L1550, L1563, L1612

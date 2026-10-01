@@ -89,10 +89,9 @@ Motor, Godot/Unity gibi iki parçadan oluşur: **runtime** (oyun çalışırken 
 
 ---
 
-## REHBER: "Sorunsuz Deneyim" planı (durum: 1–3 bitti, 4 bekliyor)
+## REHBER: "Sorunsuz Deneyim" planı (durum: 1–4 TAMAM)
 
-İleriye dönük iyileştirme rehberi. İlk 3 madde 16. maddede TAMAMLANDI, yalnızca
-4. madde bekliyor:
+İleriye dönük iyileştirme rehberi. Dört maddenin de dördü bitti:
 
 1. **Görüş alanı + tepki süresi tabanlı güvenlik**: ilk tehdit, oyuncunun ilk görüş
    alanının (kamera/viewport 900px) hemen dışında başlar → "gördüğün her yer temiz" ✅
@@ -100,16 +99,25 @@ Motor, Godot/Unity gibi iki parçadan oluşur: **runtime** (oyun çalışırken 
    başlar, ölümcül çukur yok) ✅
 3. **Düşman 'tetikle' (awake) sistemi**: düşmanlar oyuncu yaklaşana dek uyur → pusu yok ✅
 4. Ek "sorunsuzluk": düşman doğuş gecikmesi, kamera ilk kare temizliği, zıplama giriş
-   tamponu, i-frames, düşme sonrası kurtarma (✅ düşme kurtarması 24. maddede yapıldı;
-   kalan detaylar bekliyor).
+   tamponu, i-frames, düşme sonrası kurtarma — **TAMAMLANDI**:
+   - düşme kurtarma: 24. madde,
+   - zıplama giriş tamponu (jump buffer) + i-frames: 25. madde,
+   - düşman doğuş gecikmesi: prosedürel + custom düşmanlarda `SpawnIn` telegrafı ve
+     **spawn grace** (telegraf sürerken düşman hasar vermez — 30.09.2026),
+   - kamera ilk kare temizliği: `set_camera_target` ilk karede **snap** yapar (kayma
+     yok) + menü çıkışında `snap_camera_to_target()` (30.09.2026).
 
 ---
 
 ## İLERİYE DÖNÜK DİĞER ÖZELLİKLER (bekliyor)
 
-- Git reposu başlatma (git kurulursa `git init` + semantic versioning; kullanıcı kararı).
+- ~~Git reposu başlatma~~ **TAMAMLANDI:** repo kurulu, `main` dalında çalışıyor; sürüm
+  modeli motor `1.0.0` / oyun `0.1.x` olarak ayrı iki satır (tek sürüm satırı fikri
+  iptal edildi — AGENTS.md "SÜRÜM MODELİ").
 - Müzik: seviye geçişinde temayı daha merkezi bağlama; gerçek stereo derinliği artırma.
-- Kamera menü/hit degrade cilası (❌ büyük kısmı 31. maddede yapıldı — kalan ince ayarlar).
+- ~~Kamera menü/hit degrade cilası~~ **TAMAMLANDI (30.09.2026):** 31. madde + kamera/
+  shake paritesi (JS'te sarsıntı artık gerçekten çizime giriyor ve `dt` tabanlı
+  sönüyor) + menü çıkışı snap.
 
 ---
 
@@ -201,9 +209,7 @@ zıplama demosu. Doğrulama: `node deep_engine_html\test_core.js` = 12/12 `ALL O
   to_data/from_data/to_segments edge-cull + culled draw) + levelfile.js (register_builder/
   place_object/save_level/load_level + extractor) + Scene'e kamera takibi & parallax_background
   bağlandı. `test_tilemap_levelfile.js` 32/32.
-- **G6 Tilemap + seviye:** tilemap.js (katman/get-set/place_at_world/solid_at/
-  to_data/from_data/to_segments), levelfile.js (builder/extractor/place_object/
-  load_level/save_level).
+  (Aşağıdaki tek satırlık mükerrer G6 kaydı 30.09'da silindi; geçerli kayıt yukarıdadır.)
 - **G7 UI kiti:** ✅ (28.09) ui.js (UITheme, Panel, Button, ScrollContainer — Python
   kopyası; Button hover/press/focus/disabled + ENTER, ScrollContainer tekerlek + drag +
   on_pick, Scene.draw UI'ı kameradan bağımsız üstte çizer) + Input API eşitlendi
@@ -336,6 +342,13 @@ Kaynaklar: `game/*.py`, `main.py` (pygbag dalı hariç).
 **[3] Sonsuz tırmanma oyunu (Icy Tower mekaniği):** kırılan platformlar, sürekli
 yukarı, yükseklik skoru. Bağımsız başlayabilir (1. maddedeki BreakablePlatform +
 camera-follow ile). Demo kapak: "Star Climber".
+> ✅ **TAMAMLANDI (03.10.2026):** "Star Climber" oyunu yazıldı — Python
+> `game/climber.py` + JS `deep_engine_html/game/climber.js` (birebir ayna), menüde
+> `[C]` ile açılıyor. Kırılabilir platformlar, sonsuz yukarı tırmanma, katman skoru,
+> hız kombisi, kontrol noktaları ve düşünce kurtarma **tamamı** çalışıyor.
+> Headless oynanış testleri 5 gerçek hata buldu ve hepsi düzeltildi (detay:
+> `03_game.md` madde 47). Motor tarafına yeni bağımlılık yok — mevcut
+> `BreakablePlatform` + `BoxCollider(one_way=True)` + `ParticleEmitter` kullanıldı.
 
 **ÖNCELİK — HATA AVI (kullanıcı raporu 23.09.2026):** "Hissiyat + Hata Avı"
 seferberliği start. İlk hedefler (03_game.md bug defterine işlendi):

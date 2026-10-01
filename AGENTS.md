@@ -79,7 +79,8 @@ python tools\deep-tool.py --lang en all
 ```
 
 Kontroller: A/D hareket, SPACE/W/↑ zıplama (+çift), LSHIFT dash, F/sol-tık ateş,
-T dil, P kampanya, 4 Sonsuz Mod (kilitli olabilir), F3 debug, ESC çıkış.
+T dil, P kampanya, 4 Sonsuz Mod (kilitli olabilir), **C Star Climber (tırmanış)**,
+F3 debug, ESC çıkış.
 Konsol: ` veya " ile aç (dev komutları: help, version, hp, god, tp, respawn, list...).
 Oyun kumandası: analòg/D-Pad + A zıpla, X ateş, LB dash, Start çıkış.
 Tarayıcı editörü: `python tools\webpanel.py` → 127.0.0.1:8765 (custom_levels/ klasörü).

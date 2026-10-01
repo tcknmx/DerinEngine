@@ -574,6 +574,9 @@ DE_GAME.PlayerController = class PlayerController extends DE.Component {
             this._check_all_coins_collected();
 
         } else if (other.tag === "Enemy" && other.active) {
+            // Spawn grace: henüz yanıp sönen (SpawnIn) düşman zararsızdır --
+            // telegraf oyuncuya gerçekten söz veriyorsa dokunma hasar vermemeli.
+            if (_is_spawning_in(other)) return;
             // Stun dash: hızlıyken düşmana çarpmak onu sersemletir; hasar alınmaz.
             if (this.dash_timer > 0 || Math.abs(this.dash_momentum) > 40) {
                 this._stun_enemy_dash(other);
@@ -876,6 +879,14 @@ DE_GAME.GoalPortal = class GoalPortal extends DE.Component {
 
 // "Sessiz Deneyim" uyanış (trigger) sistemi: düşman oyuncu wake_radius'ine
 // girinceye kadar uyur (hareketsiz/ateşsiz). Uyanan kalıcı olarak uyanır.
+function _is_spawning_in(obj) {
+    // Python game/entities.py _is_spawning_in: SpawnIn telegrafı sürerken zararsız.
+    for (const c of obj.components || []) {
+        if (c instanceof DE.SpawnIn && !c.done) return true;
+    }
+    return false;
+}
+
 function _wake_up(component) {
     const obj = component.game_object;
     if (component._awake) return true;
@@ -884,9 +895,7 @@ function _wake_up(component) {
     const player = scene.find_by_tag("Player");
     if (!player || !player.active) return false;
     // SpawnIn animasyonu sırasında uyanma yok (pusuları engeller).
-    for (const c of obj.components) {
-        if (c instanceof DE.SpawnIn && !c.done) return false;
-    }
+    if (_is_spawning_in(obj)) return false;
     const radius = component.wake_radius !== undefined ? component.wake_radius : 380.0;
     if (Math.abs(player.position.x - obj.position.x) <= radius) {
         component._awake = true;

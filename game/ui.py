@@ -283,6 +283,9 @@ class MenuController(Component):
         self.scene.name = getattr(self.scene, "_orig_name", self.scene.name)
         self.scene.camera_manual = False   # auto follow -> focus on the player
         self.scene.zoom_to(1.0)            # close-up -> normal in-game size
+        # The menu's camera was parked on a focal point (possibly far from the player).
+        # Snap it back so the exit is a single clean zoom-out, not zoom + world pan.
+        self.scene.snap_camera_to_target()
         self.scene.set_vignette(0.22)      # from the menu's strong vignette to the lighter in-game one
         if self.player:
             pc = self.player.get_component(PlayerController)
@@ -331,6 +334,8 @@ class MenuController(Component):
             else:
                 SoundFX.play("click")
                 print(I18n.t("endless_locked_warn"))
+        elif Input.get_key_down("C"):  #  Star Climber (climb game)
+            self._start_climber()
         elif (Input.get_key_down("P") or Input.get_key_down("SPACE")
               or Input.get_key_down("ENTER")):  # ▶ Campaign
             state.game_mode = "campaign"
@@ -343,11 +348,21 @@ class MenuController(Component):
         except Exception:
             return False
 
+    def _start_climber(self):
+        """Star Climber'ı (sonsuz tırmanma) fade geçişiyle başlatır."""
+        from .climber import build_climber_scene
+        SoundFX.play("win")
+        state.game_mode = "climber"
+        self._pending_factory = build_climber_scene
+        self._fading_out = True
+
     def _dispatch_action(self, action: str):
         """Executes a menu action coming from a mouse click."""
         if action == "campaign":
             state.game_mode = "campaign"
             self._start_campaign()
+        elif action == "climber":
+            self._start_climber()
         elif action == "endless":
             if self._endless_unlocked():
                 state.game_mode = "endless"
@@ -482,6 +497,9 @@ def build_main_menu_scene() -> Scene:
         _menu_ui.append(lock)
 
     _menu_item("M4", "menu_lang", 610, 292, 23, (255, 230, 120), action="lang")
+
+    # Star Climber: Icy Tower tarzı tırmanış oyunu (ayrı sahne, fade ile açılır)
+    _menu_item("M_CLIMB", "menu_climber", 610, 344, 21, (150, 225, 255), action="climber")
 
     # Controls info + High Score — bottom-center, aligned
     cinfo = GameObject(name="M5", x=450, y=520)

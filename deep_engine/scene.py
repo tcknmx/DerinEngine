@@ -96,6 +96,7 @@ class Scene:
         self.camera_manual = False       # when True automatic follow is off (menu camera)
         self._zoom_punch_timer = 0.0     # seconds left on a zoom punch
         self._zoom_punch_base = 1.0      # the target zoom to restore after the punch
+        self._camera_snap_pending = False  # first frame: jump to the target, no lerp slide
 
         # --- Camera vignette (menu/gameplay gradient + hit flash) ---
         self.vignette_intensity = 0.22   # 0..1 constant edge darkening (subtle in-game)
@@ -130,8 +131,44 @@ class Scene:
         return [obj for obj in self.game_objects if obj.active and obj.tag == tag]
 
     def set_camera_target(self, obj: GameObject):
-        """Makes the camera follow the target object."""
+        """Makes the camera follow the target object.
+
+        The first frame snaps straight to the target (no lerp from (0,0)), so a
+        fresh level never shows the world sliding in from the corner.
+        """
         self.camera_target = obj
+        self._camera_snap_pending = True
+
+    def camera_follow_point(self) -> Vector2:
+        """Where the camera wants to be for the current target (with look-ahead)."""
+        target = self.camera_target
+        if target is None:
+            return Vector2(self.camera_position.x, self.camera_position.y)
+        px = target.position.x - self.screen_width / 2 + target.size.x / 2
+        py = target.position.y - self.screen_height / 2 + target.size.y / 2
+        rb = target.get_component(Rigidbody2D)
+        if rb is not None:
+            # Look-ahead: nudge the camera toward where the target is heading.
+            look = max(-1.0, min(1.0, rb.velocity.x / 260.0)) * 70.0
+            px += look
+        return Vector2(px, py)
+
+    def snap_camera_to_target(self):
+        """Teleports the camera onto the follow target (kills the lerp slide).
+
+        Also drops the kick/shake leftover from the previous scene so the first
+        frame is clean. Used by the menu when it hands the camera back to the
+        auto-follow (otherwise the world pans *and* zooms out at the same time).
+        """
+        self._camera_snap_pending = False
+        if self.camera_target is None:
+            return False
+        point = self.camera_follow_point()
+        self.camera_position.x = point.x
+        self.camera_position.y = point.y
+        self.camera_kick = Vector2(0, 0)
+        self.shake_offset = Vector2(0, 0)
+        return True
 
     def add_shake(self, amount: float):
         """Adds screen shake (trauma). amount is between 0.0-1.0 and it stacks."""
@@ -165,9 +202,14 @@ class Scene:
                 return True
         return False
 
-    def _update_shake(self):
-        """Decays the trauma and computes a random shake offset."""
-        self.shake_trauma = max(0.0, self.shake_trauma - 1.2 / 60.0)
+    def _update_shake(self, dt: float = 0.0):
+        """Decays the trauma (frame-rate independent) and computes the shake offset.
+
+        Called from `update(dt)`; `render_camera` only reads the offset so the
+        same shake is never consumed twice per frame.
+        """
+        if dt > 0.0:
+            self.shake_trauma = max(0.0, self.shake_trauma - 1.4 * dt)
         if self.shake_trauma <= 0.0:
             self.shake_offset = Vector2(0, 0)
             return
@@ -181,7 +223,6 @@ class Scene:
     @property
     def render_camera(self) -> Vector2:
         """The camera position used for rendering (shake included)."""
-        self._update_shake()
         return self.camera_position + self.shake_offset
 
     def _handle_physics_and_collisions(self):
@@ -391,17 +432,16 @@ class Scene:
 
         # Camera follow
         if self.camera_target and not self.camera_manual:
-            target_x = self.camera_target.position.x - self.screen_width / 2 + self.camera_target.size.x / 2
-            target_y = self.camera_target.position.y - self.screen_height / 2 + self.camera_target.size.y / 2
-            # Look-ahead: nudge the camera slightly forward based on the player's speed
-            # (look ahead toward where the player is heading -> endless, more 'lively' screen)
-            rb = self.camera_target.get_component(Rigidbody2D)
-            if rb is not None:
-                look = max(-1.0, min(1.0, rb.velocity.x / 260.0)) * 70.0
-                target_x += look
-            # Smooth follow (Lerp)
-            self.camera_position.x += (target_x - self.camera_position.x) * min(dt * self.camera_smoothness, 1.0)
-            self.camera_position.y += (target_y - self.camera_position.y) * min(dt * self.camera_smoothness, 1.0)
+            point = self.camera_follow_point()
+            if self._camera_snap_pending:
+                # First frame (or an explicit re-hand-over): no lerp slide.
+                self.camera_position.x = point.x
+                self.camera_position.y = point.y
+                self._camera_snap_pending = False
+            else:
+                # Smooth follow (Lerp)
+                self.camera_position.x += (point.x - self.camera_position.x) * min(dt * self.camera_smoothness, 1.0)
+                self.camera_position.y += (point.y - self.camera_position.y) * min(dt * self.camera_smoothness, 1.0)
 
         # Camera 'kick' (punch): the instant reaction fades over time and is added to the target
         if self.camera_kick.x != 0 or self.camera_kick.y != 0:
@@ -411,6 +451,9 @@ class Scene:
             self.camera_kick.y *= decay
             if abs(self.camera_kick.x) < 0.1 and abs(self.camera_kick.y) < 0.1:
                 self.camera_kick = Vector2(0, 0)
+
+        # Screen shake: trauma decays with real time (frame-rate independent)
+        self._update_shake(dt)
 
         # Smoothly ease the camera zoom toward the target (V2.0)
         if self._zoom_punch_timer > 0.0:

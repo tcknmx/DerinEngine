@@ -8,6 +8,25 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[MOTOR+OYUN] Kamera/shake refactoru + SpawnIn koruması + STAR CLIMBER
+  (03.10.2026, "yap hepsini").** (1) **MOTOR kamera:** `Scene.set_camera_target()` ilk
+  karede hedefe **snap** eder (`camera_follow_point()`, `snap_camera_to_target()` —
+  kick/shake'i de temizler); `_update_shake(dt)` trauma `1.4*dt` ile söner;
+  `render_camera` **yalnız çizimde** kullanılır (mantık `camera_position` okur → zoom/pan
+  sarsıntıyla kaymaz). JS eşi birebir + `shake_trauma` takma adı +
+  `get_component()` geçersiz-tip guard'ı. (2) **SpawnIn koruması:** telegraf
+  (`done=False`) sırasında düşman hasar vermiyor (Py+JS). (3) **STAR CLIMBER:** yeni
+  Icy Tower tarzı sonsuz tırmanış oyunu — Python `game/climber.py` + JS
+  `deep_engine_html/game/climber.js`, menüde `[C]`, engine'de yeni bağımlılık yok
+  (mevcut `BreakablePlatform` + `BoxCollider(one_way=True)` + `ParticleEmitter`).
+  Headless oynanış testleri **5 gerçek hata** buldu (hepsi düzeltildi: 0. katman
+  oyuncunun altında değildi; sekiş hiç tetiklenmiyordu; kamera zıplama tepesine
+  takılıp ölüm döngüsü yapıyordu; zemindeki oyuncu ölüyordu; respawn'da
+  `max_floor` sıfırlanmıyordu). Toplam regresyon: **JS 592 kontrol / 0 hata,
+  `test_game.js` 165/165, `test_engine_core.py` ALL OK, tools 36/36, browser 33/33,
+  iki araç 14 modülde 0 WARN/0 BUG/0 ERR.** Tüm oturumlar uygular.
+  → Yeni çapraz tuzak **#9** aşağıya eklendi (stable-ground / one_way tuzağı).
+
 - **[ARAÇ+OYUN] Kalan backlog kapandı: Modül 6/7 denkliği + Tilemap veri katmanı
   (01.10.2026, "devam et, sıradaki tüm işi bitir").** İki iş birlikte bitti:
   (1) **Araç:** Modül 6'ya kanıtlanabilir sabit-küçük döngü tanımı (`range(4)`,
@@ -652,6 +671,18 @@ import `game/*` içinde ÇALIŞMAZ — paket dışındadırlar).
    istemli olarak yapılmaz (deep-tool Modül 5 bunları bilerek atlar).
 8. **Editör 9 aracı**: 1–9 = araçlar; Z geri al, C kopyala, V yapıştır; seçili nesnede
    ok tuşları kaydırır, `[`/`]` boyut, R renk, DEL sil.
+9. **`one_way` platformlarda `on_collision` TETİKLENMEZ (03.10.2026, kritik).**
+   `Scene._handle_physics_and_collisions()` önce çarpışma bildirimleri
+   (`on_collision`) gönderir, **sonra** stable-ground adımı oyuncuyu zemine
+   yapıştırıp `velocity.y = 0` yapar. Zemin algısı önce çalıştığı için
+   `overlap_check` çoğu karede **False** kalır ve `on_collision` hiç çağrılmaz.
+   Belirtileri: "oyuncu zeminin üstünde ama hiçbir şey olmuyor", `overlap_check`
+   elle `False` döndürür, oyuncu aynı yerde sonsuz döngüye girer.
+   **Çözüm:** tek yönlü platforma dayanan oynanışı `is_grounded` durumundan sür
+   (`ClimbGame._pump_bounce()` bkz. `03_game.md` madde 47) veya zeminde yatay
+   teması elle test et. Python: `game/climber.py`, JS:
+   `deep_engine_html/game/climber.js`. Aynı tuzak prosedürel seviyelerdeki
+   ince tek yönlü zeminler için de geçerlidir.
 
 ---
 
