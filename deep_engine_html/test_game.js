@@ -877,6 +877,95 @@ console.log("TEST17 Star Climber:");
     check("17: menü C -> fade ile tırmanış sahnesi",
       mctrl._fading_out === true && typeof mctrl._pending_factory === "function");
   }
+
+  // 15) ULAŞILABİLİRLİK KURALLARI (regresyon — kule oyuncudan kaçmasın).
+  //     Sen, 03.10.2026'da bulunan "0. katman oyuncunun altında değil" ve
+  //     "kule sürüklenip oyuncudan uzaklaşıyor" hatalarının kalıcı testi.
+  {
+    const rs = DE_GAME.build_climber_scene(7);
+    use(rs); rs.start();
+    const rg = rs.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame);
+    const rp = rs.find_by_tag("Player");
+    const pl = rp.position.x, pr = rp.position.x + rp.size.x;
+
+    const f0r = rg.floors[0];
+    check("17: 0. katman ekranı boydan boya kaplar", f0r.size.x >= 800,
+      "w=" + f0r.size.x);
+    check("17: 0. katman oyuncunun sütununu kapsar",
+      pl >= f0r.position.x && pr <= f0r.position.x + f0r.size.x,
+      "oyuncu=" + pl + ".." + pr + " katman=" + f0r.position.x + ".." +
+      (f0r.position.x + f0r.size.x));
+
+    // ilk 8 katman oyuncunun sütununda kalmalı -> yatay girdi olmadan da tırmanılır
+    let colOk = true, boundsOk = true, overlaps = [];
+    for (let i = 1; i <= 8 && rg.floors[i]; i++) {
+      const f = rg.floors[i];
+      if (pl < f.position.x || pr > f.position.x + f.size.x) colOk = false;
+      if (f.position.x < 20 || f.position.x + f.size.x > 880) boundsOk = false;
+    }
+    check("17: ilk 8 katman oyuncunun sütununda (girişsiz tırmanış)", colOk);
+    check("17: ilk 8 katman ekran içinde", boundsOk);
+
+    // ardışık katmanlar en az 70px örtüşmeli (REACH_OVERLAP)
+    let overlapOk = true, worst = 9999;
+    const keys = Object.keys(rg.floors).map(Number).sort((a, b) => a - b);
+    for (let k = 1; k < keys.length; k++) {
+      const p = rg.floors[keys[k - 1]], c = rg.floors[keys[k]];
+      const ov = Math.min(p.position.x + p.size.x, c.position.x + c.size.x)
+        - Math.max(p.position.x, c.position.x);
+      if (ov < worst) worst = ov;
+      if (ov < 70) { overlapOk = false; overlaps.push(keys[k - 1] + "->" + keys[k] + ":" + Math.round(ov)); }
+    }
+    check("17: ardışık katmanlar >=70px örtüşür", overlapOk,
+      "en dar=" + Math.round(worst) + (overlaps.length ? " " + overlaps.join(" ") : ""));
+
+    // 16) GERÇEK grounded sekiş (unit test değil, sahne update'i ile).
+    //     stable-ground bulgusu: one_way platformda on_collision tetiklenmez,
+    //     bu yüzden _pump_bounce() is_grounded'dan sürmek zorunda.
+    {
+      const gs = DE_GAME.build_climber_scene(21);
+      use(gs); gs.start();
+      const gg = gs.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame);
+      const gp = gs.find_by_tag("Player");
+      const grb = gp.get_component(DE.Rigidbody2D);
+      const g1 = gg.floors[1];
+
+      gp.position.x = g1.position.x + g1.size.x / 2 - gp.size.x / 2;
+      gp.position.y = g1.position.y - gp.size.y;
+      grb.velocity.x = 0; grb.velocity.y = 0;
+      grb.is_grounded = true;
+      step(gs, 1);
+      check("17: GERÇEK sekiş (is_grounded -> _pump_bounce)", grb.velocity.y < -500,
+        "vy=" + Math.round(grb.velocity.y));
+
+      // havadayken (zemin yok) sekiş olmamalı
+      const g2 = gg.floors[3];
+      gp.position.y = g2.position.y - gp.size.y - 200;
+      grb.velocity.y = 100; grb.is_grounded = false;
+      gg._pump_bounce();
+      check("17: havadayken sekiş yok", Math.abs(grb.velocity.y - 100) < 1,
+        "vy=" + Math.round(grb.velocity.y));
+    }
+
+    // 17) GİRİŞSİZ oynanış smoke — bu test, 5 gerçek oynanış hatasının
+    //     (0. katman yok / sekiş yok / kamera ölüm döngüsü / zeminde ölüm /
+    //     respawn max_floor) hepsini birden yakalar. 3 seed x 30 sn.
+    {
+      let climbed = [], fell = [];
+      for (const seed of [7, 99, 2024]) {
+        const ss = DE_GAME.build_climber_scene(seed);
+        use(ss); ss.start();
+        const sg = ss.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame);
+        for (let i = 0; i < 1800; i++) step(ss, 1);   // 30 sn, hiç tuş basılmıyor
+        climbed.push(sg.best_floor);
+        fell.push(sg.falls);
+      }
+      check("17: GİRİŞSİZ tırmanış (3 seed, 30sn)", climbed.every(f => f >= 8),
+        "katman=" + climbed.join(","));
+      check("17: girişsiz oynanışta ölüm döngüsü yok", fell.every(f => f <= 3),
+        "düşme=" + fell.join(","));
+    }
+  }
 }
 
 // Toplam

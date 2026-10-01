@@ -62,6 +62,8 @@ Detaylı çizelge + 2D v1 5 alan planı: `01_strategy.md`.
 - Veri: `custom_level.json` (web editörü şablon kaynağı), `custom_levels/` (web
   editörü seviyeleri: `default.json` sıfır şablon + adlı seviyeler — oyundan
   bağımsız tasarım alanı), `savegame.json`, `version.txt`.
+- `tests/` — Python testleri: `test_engine_core.py` (motor), `test_climber.py`
+  (Star Climber mekanik + headless oynanış). JS testleri `deep_engine_html/test_*.js`.
 
 ## SÜRÜM MODELİ
 
@@ -76,6 +78,15 @@ savegame sıfır kurulum: `{"lang":"tr","high_score":0}` (BOM'suz `{`).
 python C:\Users\token\Desktop\DerinEngine\main.py
 python tools\deep-tool.py            # tarama aracı (TR/EN interaktif menü)
 python tools\deep-tool.py --lang en all
+```
+
+Testler (pencere açmaz, hepsi yeşil olmalı):
+```powershell
+python tests\test_engine_core.py     # motor (Event/Tween/kamera) -> ALL OK
+python tests\test_climber.py         # Star Climber mekanik + headless oynanış -> ALL OK
+node deep_engine_html\test_game.js   # oyun (TEST17 dahil) -> SONUÇ: 174 geçti
+node tools_html\test_tools.js        # deep-tool -> 36/36
+node tools_html\test_browser.js      # tarayıcı testi -> 33/33
 ```
 
 Kontroller: A/D hareket, SPACE/W/↑ zıplama (+çift), LSHIFT dash, F/sol-tık ateş,

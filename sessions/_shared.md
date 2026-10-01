@@ -22,10 +22,13 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
   Headless oynanış testleri **5 gerçek hata** buldu (hepsi düzeltildi: 0. katman
   oyuncunun altında değildi; sekiş hiç tetiklenmiyordu; kamera zıplama tepesine
   takılıp ölüm döngüsü yapıyordu; zemindeki oyuncu ölüyordu; respawn'da
-  `max_floor` sıfırlanmıyordu). Toplam regresyon: **JS 592 kontrol / 0 hata,
-  `test_game.js` 165/165, `test_engine_core.py` ALL OK, tools 36/36, browser 33/33,
-  iki araç 14 modülde 0 WARN/0 BUG/0 ERR.** Tüm oturumlar uygular.
+  `max_floor` sıfırlanmıyordu). Toplam regresyon: **JS motor+oyun 553 kontrol / 0
+  hata, `test_game.js` 174/174, `tests/test_climber.py` 9/9 (yeni — Python'da da
+  ulaşılabilirlik + gerçek grounded sekiş + girişsiz tırmanış regresyonu),
+  `test_engine_core.py` ALL OK, tools 36/36, browser 33/33,
+  üç araç 14 modülde 0 WARN/0 BUG/0 ERR.** Tüm oturumlar uygular.
   → Yeni çapraz tuzak **#9** aşağıya eklendi (stable-ground / one_way tuzağı).
+  → Yeni tuzak **#10** aşağıya eklendi (headless oynanış testi kuralı).
 
 - **[ARAÇ+OYUN] Kalan backlog kapandı: Modül 6/7 denkliği + Tilemap veri katmanı
   (01.10.2026, "devam et, sıradaki tüm işi bitir").** İki iş birlikte bitti:
@@ -681,8 +684,19 @@ import `game/*` içinde ÇALIŞMAZ — paket dışındadırlar).
    **Çözüm:** tek yönlü platforma dayanan oynanışı `is_grounded` durumundan sür
    (`ClimbGame._pump_bounce()` bkz. `03_game.md` madde 47) veya zeminde yatay
    teması elle test et. Python: `game/climber.py`, JS:
-   `deep_engine_html/game/climber.js`. Aynı tuzak prosedürel seviyelerdeki
-   ince tek yönlü zeminler için de geçerlidir.
+    `deep_engine_html/game/climber.js`. Aynı tuzak prosedürel seviyelerdeki
+    ince tek yönlü zeminler için de geçerlidir.
+10. **YENİ OYUN/MEKANİK = headless oynanış testi zorunlu (03.10.2026).**
+   Star Climber'da unit testler 165/165 yeşildi ama oyun **hiç oynanamıyordu**
+   (oyuncu hiçbir yere inmiyordu, sekiş tetiklenmiyordu, kamera ölüm döngüsü
+   yapıyordu). Yakalayan tek şey: sahneyi saniyede 60 kez `update()` edip
+   **tuşa basmadan** oynatmak. Kural: hareket/çarpışma/kamera içeren her yeni
+   mekanik için (a) üretim/geometri değişmezlerini doğrulayan **kalıcı** kontrol,
+   (b) `is_grounded`/gerçek `scene.update` üzerinden en az bir test, (c) 2–3 seed
+   ile kısa headless smoke (düşme sayacı sınırlı kalmalı).
+   Python'da `tests/test_climber.py`, JS'de `test_game.js` TEST17 — ikisi de
+   aynı kural setini kontrol eder. Geçici probe betikleri **kalıcı teste
+   çevrilmeli** (commit'ten silinir, sonra o hataya geri dönüş olur).
 
 ---
 

@@ -180,10 +180,18 @@
       `REACH_OVERLAP=70px` örtüşür; ilk 8 katman (`FREE_CLIMB`) ayrıca oyuncunun
       sütununu kapsar → oyuncu yatay girdi vermeden de tırmanabilir (kule
       sürüklenip oyuncudan uzaklaşamaz).
-    - **Doğrulama:** Python headless 4 seed × 30 sn **girişsiz** tırmanış (10–33
+    - **Doğrulama:** Python headless 4 seed × 30 sn **girişsiz** tırmanış (12–33
       katman) + yönlendirmeli 60 sn (**189 katman, 0 düşüş**); JS aynı senaryolar
-      (10–30 katman / 188–189 katman). `test_game.js` TEST17 → **165/165**.
-      592 JS kontrolü + `test_engine_core.py` ALL OK; iki araç 0 WARN/0 BUG/0 ERR.
+      (10–30 katman / 188–189 katman). Geçici betikler silindi; **kalıcı testlere
+      çevrildi:** `deep_engine_html/test_game.js` TEST17 165→**174/174** (yeni:
+      0. katman ekranı kaplar, ilk 8 katman oyuncunun sütununda, ardışık katmanlar
+      ≥70px örtüşür, **gerçek** `is_grounded`→`_pump_bounce` sekişi, havadayken sekiş
+      yok, 3 seed × 30 sn girişsiz tırmanış) + **yeni** `tests/test_climber.py`
+      **9/9** (Python'da aynı kural seti — iki tarafın ayrışmasını yakalar).
+      Toplam: **JS motor+oyun 553 kontrol / 0 hata**, tools 36/36, browser 33/33,
+      `test_engine_core.py` ALL OK; üç araç 0 WARN/0 BUG/0 ERR.
+      *Mutasyon kanıtı:* `FREE_CLIMB = 0` yapılınca 2 test kırmızıya düştü (tırmanış
+      30→7 katman) — testler boş değil, gerçekten yakalıyor.
 
 ---
 
