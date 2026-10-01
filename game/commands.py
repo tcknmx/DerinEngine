@@ -5,10 +5,31 @@ The console itself lives in deep_engine/console.py; this module only provides
 the game-specific commands (player health, coins, speed, teleport, objects, ...).
 """
 
-from deep_engine import Health, Rigidbody2D
+import json
+import os
+
+from deep_engine import Health, Rigidbody2D, user_data_dir
 from deep_engine.console import register_command as _reg
 
 from .entities import PlayerController
+from .scenes import export_scene_tilemap as _export
+from .scenes import import_scene_tilemap as _import
+from .scenes import _tilemap_summary as _summary
+
+_SAFE_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.")
+
+
+def _safe_name(raw):
+    """Filesystem-safe level name for a saved tilemap (console input -> path)."""
+    cleaned = "".join(c if c in _SAFE_CHARS else "_" for c in str(raw))[:48].strip("._")
+    return cleaned or "level"
+
+
+def ensure_dir():
+    """Creates the user data directory (where savegame.json + tilemaps live)."""
+    path = user_data_dir()
+    os.makedirs(path, exist_ok=True)
+    return path
 
 
 def _player(ctx):
@@ -132,6 +153,40 @@ def cmd_respawn(ctx, args):
     return "spawn noktasina donuldu."
 
 
+def cmd_tilemap_save(ctx, args):
+    """Writes the current level's tilemap ground to <user_data>/<name>.tilemap.json."""
+    if not ctx:
+        return "Sahne yok."
+    name = _safe_name(args[0] if args else "level")
+    data = _export(ctx)
+    if data is None:
+        return "Bu sahnede tilemap yok (prosedurel/boss seviyesi gerekli)."
+    try:
+        ensure_dir()
+        path = os.path.join(user_data_dir(), name + ".tilemap.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, ensure_ascii=False)
+    except OSError as exc:
+        return "Yazilamadi: %s" % exc
+    return "tilemap kaydedildi: %s (%s)" % (name + ".tilemap.json", _summary(ctx))
+
+
+def cmd_tilemap_load(ctx, args):
+    """Loads a saved tilemap ground back into the current level."""
+    if not ctx:
+        return "Sahne yok."
+    name = _safe_name(args[0] if args else "level")
+    path = os.path.join(user_data_dir(), name + ".tilemap.json")
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError) as exc:
+        return "Okunamadi (%s): %s" % (name + ".tilemap.json", exc)
+    if not _import(ctx, data):
+        return "Veri gecersiz (tilemap katmani yok)."
+    return "tilemap yuklendi: %s (%s)" % (name + ".tilemap.json", _summary(ctx))
+
+
 def cmd_list(ctx, args):
     """Lists the objects currently in the scene."""
     if not ctx:
@@ -151,4 +206,6 @@ _reg("speed", "oyuncu hizini ayarla (speed 300)", cmd_speed)
 _reg("jump", "ziplama gucunu ayarla (jump 600)", cmd_jump)
 _reg("tp", "isinla (tp x y)", cmd_tp)
 _reg("respawn", "spawn noktasina don", cmd_respawn)
+_reg("tilemap_save", "seviye tilemap'ini kaydet (tilemap_save seviye1)", cmd_tilemap_save)
+_reg("tilemap_load", "tilemap'i geri yukle (tilemap_load seviye1)", cmd_tilemap_load)
 _reg("list", "sahnedeki nesneleri say", cmd_list)

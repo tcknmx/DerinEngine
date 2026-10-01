@@ -8,11 +8,32 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[ARAÇ+OYUN] Kalan backlog kapandı: Modül 6/7 denkliği + Tilemap veri katmanı
+  (01.10.2026, "devam et, sıradaki tüm işi bitir").** İki iş birlikte bitti:
+  (1) **Araç:** Modül 6'ya kanıtlanabilir sabit-küçük döngü tanımı (`range(4)`,
+  `for(let i=0;i<4;i++)`, `for…of [1,2]`, `for…in (-1,1)`, dış veya iç döngüden
+  biri `<=32`) → INFO "no O(n^2) risk"; **8 döngü** yeniden sınıflandı, dinamik
+  döngü uyarısı duruyor. Modül 7'nin JS eşi **çok satırlı `from X import (...)`
+  ve `import x as y`** biçimlerini yanlış "unused" sayıyordu → **13 yanlış pozitif**
+  silindi; kalan 2 gerçek uyarı (`const os = require("os")`) de temizlendi.
+  `deep-tool.py find` Windows konsolunda `UnicodeEncodeError` ile çöküyordu →
+  stdout/stderr UTF-8'e alındı. **İki araç da 14 modülde 0 WARN/0 BUG/0 ERR.**
+  (2) **Oyun:** `export_scene_tilemap()` / `import_scene_tilemap()`
+  (`game/scenes.py` ↔ `scenes.js`) `Tilemap.to_data()`'yı oyuna bağladı; konsola
+  `tilemap_save` / `tilemap_load` geldi (Py: `<user_data>/<isim>.tilemap.json`,
+  tarayıcı: ayrı localStorage deposu `derinengine_tilemaps_v1` — oyuncu profilini
+  kirletmez; isimler sanitize edilir). TEST14 9→11 komut + 8 check → **test_game
+  125/125**. Toplam regresyon: **motor 365/365, test_game 125/125, tools 36/36,
+  browser 33/33, `test_engine_core.py` ALL OK, iki araç 14×0/0/0.**
+  Kapanan bayat kayıtlar: webpanel gizle/kilit + sürükle-bırak zaten `48163a5`'te;
+  Modül 7 oyun tarafı zaten temiz; pygbag iframe adayı **iptal** (standalone HTML);
+  `01_strategy.md` M5 kaydındaki "30 check" → **25** düzeltildi (gerçek artış 25).
+
 - **[OYUN-HTML] M5: deneyim iyileştirmeleri 5–8 doğrulandı (28.09.2026,
   `01_strategy.md` [2] M5).** Kod tarafı (after-image, boss enrage aurası +
   zafer slow-mo 0.9/0.28 + zoom_punch, düşüş hız çizgileri, menü kampanya
   rozetleri + `completed_biomes`) **zaten birebir port edilmişti**; iş
-  doğrulamaydı: `test_game.js` **TEST15** 30 check → **116/116**. Tuzak: menü UI
+  doğrulamaydı: `test_game.js` **TEST15** 25 check → **116/116**. Tuzak: menü UI
   nesneleri `build_main_menu_scene()` sonrası `_objects_to_add`'te bekler —
   `scene.start()` çağrılmadan `scene.game_objects` içinde görünmezler (rozet
   testi bu yüzden önce boşaldı). İkinci tuzak: oyuncu uzun boşluktan düşerse

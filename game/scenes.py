@@ -113,6 +113,64 @@ def _attach_ground_tilemap(scene, data):
     scene._tilemap_segments = tm.to_segments()
 
 
+def export_scene_tilemap(scene):
+    """Runtime -> data: the scene's tilemap ground as JSON-safe level data.
+
+    The counterpart of `Tilemap.to_data()`, wired into the game layer so the
+    ground grid can be written to disk (console `tilemap_save`) and later fed
+    back through `import_scene_tilemap`. Returns None when the scene has no
+    tilemap (boss arenas / menu / UI scenes).
+    """
+    tm = getattr(scene, "_tilemap_ground", None)
+    return None if tm is None else tm.to_data()
+
+
+def import_scene_tilemap(scene, data):
+    """Data -> runtime: rebuilds the scene's tilemap ground from level data.
+
+    Accepts a `Tilemap.to_data()` dict. When the scene already has a tilemap
+    object its component is updated in place (no object churn); otherwise a new
+    "Tilemap" object is added. Keeps the `_tilemap_ground` /
+    `_tilemap_segments` geometry bridge in sync either way. False on bad input.
+    """
+    if not scene or not isinstance(data, dict) or not data.get("layers"):
+        return False
+    from deep_engine import Tilemap
+    fresh = Tilemap.from_data(data)
+    obj = scene.find_by_tag("Tilemap")
+    tm = obj.get_component(Tilemap) if obj is not None else None
+    if tm is not None:
+        # Update in place so the component's scene reference stays valid.
+        tm.tile_size = fresh.tile_size
+        tm.offset = list(fresh.offset)
+        tm.tile_set = dict(fresh.tile_set)
+        tm.layers = list(fresh.layers)
+    else:
+        grid = fresh.layers[0]["grid"] if fresh.layers else []
+        cols = len(grid[0]) if grid else 0
+        rows = len(grid)
+        obj = GameObject(name="TilemapGround", x=fresh.offset[0], y=fresh.offset[1],
+                         width=cols * fresh.tile_size, height=rows * fresh.tile_size,
+                         tag="Tilemap")
+        obj.add_component(fresh)
+        scene.add_object(obj)
+        tm = fresh
+    scene._tilemap_ground = tm
+    scene._tilemap_segments = tm.to_segments()
+    return True
+
+
+def _tilemap_summary(scene):
+    """One-line human summary of the scene's tilemap ground (console helper)."""
+    data = export_scene_tilemap(scene)
+    if not data:
+        return None
+    grid = data["layers"][0]["grid"]
+    return "%dx%d hucre, %d katman, %d kenar cizgisi" % (
+        len(grid[0]) if grid else 0, len(grid), len(data["layers"]),
+        len(getattr(scene, "_tilemap_segments", []) or []))
+
+
 def build_procedural_level(biome=None, seed=None, chunks=8, difficulty=0):
     """Builds a random biome/level scene from the procedural generator.
 

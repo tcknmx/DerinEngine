@@ -132,6 +132,69 @@ function _cmd_list(ctx, args) {
     return parts.join(", ") || "(bos sahne)";
 }
 
+// --- tilemap veri katmani (data <-> runtime, tarayicida localStorage) ---
+// Python game/commands.py eşi: tarayıcıda dosya yazılamadığı için tilemap
+// kayıtları kendi localStorage anahtarında tutulur (oyuncu profili kirletmez).
+// localStorage yoksa (Node/test) modul ici bellek deposuna düşer.
+const _TILEMAP_KEY = "tilemap_data.";
+const _TILEMAP_STORE = "derinengine_tilemaps_v1";
+const _TILEMAP_SAFE = /[^A-Za-z0-9_\-.]/g;
+let _tilemap_mem = null;
+
+function _safe_name(raw) {
+    const cleaned = String(raw).replace(_TILEMAP_SAFE, "_").slice(0, 48).replace(/^[._]+|[._]+$/g, "");
+    return cleaned || "level";
+}
+
+function _tilemap_all() {
+    try {
+        if (typeof window !== "undefined" && window.localStorage) {
+            const raw = window.localStorage.getItem(_TILEMAP_STORE);
+            return raw ? (JSON.parse(raw) || {}) : {};
+        }
+    } catch (e) { /* bozuk/engelli depoya sessizce düş */ }
+    return _tilemap_mem || (_tilemap_mem = {});
+}
+
+function _tilemap_put_all(obj) {
+    if (typeof window !== "undefined" && window.localStorage) {
+        try {
+            window.localStorage.setItem(_TILEMAP_STORE, JSON.stringify(obj));
+            return;
+        } catch (e) { /* kota dolu -> belleğe düş */ }
+    }
+    _tilemap_mem = obj;
+}
+
+function _tilemap_summary(scene) {
+    const data = DE_GAME.export_scene_tilemap(scene);
+    if (!data) return null;
+    const grid = data.layers[0].grid;
+    return (grid[0] ? grid[0].length : 0) + "x" + grid.length + " hucre, "
+        + data.layers.length + " katman, "
+        + ((scene._tilemap_segments || []).length) + " kenar cizgisi";
+}
+
+function _cmd_tilemap_save(ctx, args) {
+    if (!ctx) return "Sahne yok.";
+    const name = _safe_name(args.length ? args[0] : "level");
+    const data = DE_GAME.export_scene_tilemap(ctx);
+    if (!data) return "Bu sahnede tilemap yok (prosedurel/boss seviyesi gerekli).";
+    const all = _tilemap_all();
+    all[_TILEMAP_KEY + name] = data;
+    _tilemap_put_all(all);
+    return "tilemap kaydedildi: " + name + " (" + _tilemap_summary(ctx) + ")";
+}
+
+function _cmd_tilemap_load(ctx, args) {
+    if (!ctx) return "Sahne yok.";
+    const name = _safe_name(args.length ? args[0] : "level");
+    const data = _tilemap_all()[_TILEMAP_KEY + name];
+    if (!data) return "Okunamadi (" + name + "): kayit yok.";
+    if (!DE_GAME.import_scene_tilemap(ctx, data)) return "Veri gecersiz (tilemap katmani yok).";
+    return "tilemap yuklendi: " + name + " (" + _tilemap_summary(ctx) + ")";
+}
+
 DE.register_command("hp", "oyuncu canini ayarla (hp 5)", _cmd_hp);
 DE.register_command("heal", "can doldur", _cmd_heal);
 DE.register_command("god", "olumsuzluk ac/kapa", _cmd_god);
@@ -140,4 +203,6 @@ DE.register_command("speed", "oyuncu hizini ayarla (speed 300)", _cmd_speed);
 DE.register_command("jump", "ziplama gucunu ayarla (jump 600)", _cmd_jump);
 DE.register_command("tp", "isinla (tp x y)", _cmd_tp);
 DE.register_command("respawn", "spawn noktasina don", _cmd_respawn);
+DE.register_command("tilemap_save", "seviye tilemap'ini kaydet (tilemap_save seviye1)", _cmd_tilemap_save);
+DE.register_command("tilemap_load", "tilemap'i geri yukle (tilemap_load seviye1)", _cmd_tilemap_load);
 DE.register_command("list", "sahnedeki nesneleri say", _cmd_list);

@@ -303,12 +303,35 @@ Kaynaklar: `game/*.py`, `main.py` (pygbag dalı hariç).
   `_draw_enrage_aura` + `builders.js` slow-mo 0.9/0.28 + `zoom_punch`, 7 hız
   çizgileri `fall_streak_time`, 8 `ui.js` `BiomeProgress` + `scenes.js`
   `_campaign_sector_commit` + i18n `campaign_progress`/`biome_*`) — bu görev
-  **doğrulama** ile kapandı: `test_game.js` **TEST15** (30 check) eklendi: iz
+  **doğrulama** ile kapandı: `test_game.js` **TEST15** (25 check) eklendi: iz
   birikmesi/yaşlanması/aralık `0.03/dash_speed`/havuz ≤6 + hayalet çizimi
   (alpha 0 = çizilmez), düşüş süresi birikme-sönümleme-inişte sıfırlanma +
   yoğunluğa bağlı çizgi sayısı, enrage aurası çizim farkı + `_slow_dt` + zafer
   slow-mo değerleri, biyom kaydı/idempotency/menü rozetleri (5 yerelleştirilmiş
   ad, `_menu_ui` vs `_hud_ui`). **test_game 116/116**, diğer süitler yeşil.
+- **M5 sonrası kalan backlog KAPANDI (✅ 01.10.2026, "devam et, sıradaki tüm işi
+  bitir"):** HTML portu bitti; kalan iki kalem birlikte kapatıldı.
+  - **Araç (Modül 6 + 7, iki araçta birebir):** Modül 6 artık kanıtlanabilir sabit
+    küçük döngüleri (`range(4)`, `for (let i=0;i<4;i++)`, `for…of [1,2]`,
+    `for…in (-1,1)` — dış veya iç döngüden biri `<=32`) INFO "no O(n^2) risk" olarak
+    sınıflandırıyor (`perf_small_loop`), dinamik döngüde uyarı duruyor; 8 döngü yeniden
+    sınıflandı. Modül 7'nin JS eşi **ifade-bilincinde import** topluyor: `from X
+    import (a, b)` çok satırlı bloklar ve `import x as y` alias'ı artık yanlış
+    "unused" üretmiyordu (13 yanlış pozitif silindi) → **iki araç da 14 modülde
+    0 WARN/0 BUG/0 ERR**. Ayrıca `deep-tool.py find` Windows konsolunda (cp1254)
+    `UnicodeEncodeError` ile çöküyordu → stdout/stderr UTF-8'e alındı; Node
+    sarmalayıcılarındaki gerçekten kullanılmayan `os` import'u silindi.
+  - **Oyun (Tilemap veri katmanı):** `export_scene_tilemap()` / `import_scene_tilemap()`
+    (`game/scenes.py` ↔ `deep_engine_html/game/scenes.js`) `Tilemap.to_data()`'yı
+    oyun katmanına bağlıyor (JSON-uyumlu veri → aynı geometri, nesne yeniden
+    kullanılarak yerinde güncelleme). Konsola iki komut geldi: `tilemap_save` /
+    `tilemap_load` (Python: `<user_data>/<isim>.tilemap.json`; tarayıcı: ayrı
+    localStorage deposu `derinengine_tilemaps_v1`, oyuncu profilini kirletmez;
+    isimler dosya-adı güvenli sanitize edilir). TEST14 9→11 komut + 8 tilemap
+    check'i → **test_game 125/125**, tools **36/36**, browser 33/33, motor 365/365.
+  - Kapanan bayat kayıtlar: webpanel hide/lock + sürükle-bırak zaten `48163a5`
+    içinde vardı; Modül 7 oyun dosyalarında zaten temizdi; pygbag iframe adayı
+    standalone HTML build'i `main.js` ile karşılandığı için **iptal**.
 
 **[3] Sonsuz tırmanma oyunu (Icy Tower mekaniği):** kırılan platformlar, sürekli
 yukarı, yükseklik skoru. Bağımsız başlayabilir (1. maddedeki BreakablePlatform +

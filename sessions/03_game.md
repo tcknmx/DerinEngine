@@ -129,6 +129,22 @@
     `game/scenes.py`, `game/ui.py`, `main.py` — 8 dosyada 328 `#` yorumu + docstring
     gövdeleri akıcı İngilizce. Kod/i18n string literal'leri DEĞİŞMEDİ. Doğrulama:
     `python -m py_compile` OK (her dosyada `ÇĞİÖŞÜ` kalıntısı = 0).
+21. **Tilemap veri katmanı + konsol kaydet/yükle (01.10.2026):** prosedürel zemin
+    rasterize edildikten sonra artık **JSON'a dökülüp geri yüklenebiliyor** —
+    `game/scenes.py` → `export_scene_tilemap(scene)` (`Tilemap.to_data()`; tilemap
+    yoksa `None`) ve `import_scene_tilemap(scene, data)` (`Tilemap.from_data()`;
+    mevcut "Tilemap" nesnesinin bileşenini **yerinde** günceller, yoksa yeni nesne
+    ekler; `_tilemap_ground` + `_tilemap_segments` köprüsü senkron kalır,
+    bozuk/katmansız veri `False` döner). Konsola iki komut: `tilemap_save [isim]`
+    → `<user_data>/<isim>.tilemap.json`, `tilemap_load [isim]` → geri yükleme;
+    isimler dosya-adı güvenli sanitize edilir (`../../kötü ad*` → `k_t__ad`),
+    eksik dosya okunabilir hata mesajı verir. JS eşi birebir
+    (`deep_engine_html/game/{scenes,commands}.js`): tarayıcıda dosya yazılamadığı için
+    **ayrı** localStorage deposu `derinengine_tilemaps_v1` (oyuncu profilini
+    kirletmez; localStorage yoksa belleğe düşer). Doğrulama: Python headless probe
+    (2x2 ve 57x12 ızgara → 8/142 kenar, nesne yeniden kullanıldı, dosya temizlendi)
+    + `test_game.js` TEST14 9→11 komut ve 8 yeni check → **125/125**; iki araç
+    14 modülde 0 WARN/0 BUG/0 ERR; `test_engine_core.py` ALL OK.
 
 ---
 
@@ -156,6 +172,9 @@
   `ScrollContainer`) — menü/pause/options ekranlarını kurarken kullanılabilir.
   (İlk somut aday: menüdeki Sonsuz Mod kilit satırını veya pause katmanını kit ile
   yeniden kurmak; oyun oturumunda sıraya alınır.)
+  **TAMAMLANDI (01.10.2026):** UI kiti → menüdeki Sonsuz Mod düğmesi + pause katmanı
+  kit ile kuruldu (önceki oturum); **veri katmanı → aşağıdaki kayda bak.**
+  **> BU BLOK TAMAMLANDI (01.10.2026) — oyun tarafı kalmadı.**
 - **deneyim_iyilestirmeleri 5–8** (aşağıda, bu dosyaya taşındı — orijinal dosya silindi):
   1. (1–4 zaten uygulandı; 5 TAMAMLANDI, 6–7 uygulandı; 8 TAMAMLANDI — aşağıya bak.)
 
@@ -243,6 +262,10 @@
 3. **Modül 6 O(n²) incelemesi**: `game/entities.py` L143, L882 — düşman liste
    taramaları. Sabit küçük listeyse yanlış pozitif (kod değiştirme); her-frame büyüyen
    listeyse grid/bot taramaya çek.
+   **KAPANDI (01.10.2026):** incelenen döngüler sabit literal (`range(4)`,
+   `for side in (-1, 1)`) → yanlış pozitif; **kod değişmedi**. Bunun yerine araç
+   tarafında Modül 6'ya kanıtlanabilir küçük-sabit tanımı geldi (`perf_small_loop`,
+   ≤32) ve bu iki döngü INFO'ya indi; dinamik döngülerde uyarı duruyor.
 
 Doğrulama: `python tools\deep-tool.py --lang tr all` → Modül 3 WARN kalmaz; Modül
 1/7 oyun tarafı sessiz-except sıfır; playtest boot smoke hatasız.

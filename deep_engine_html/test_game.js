@@ -452,8 +452,8 @@ console.log("TEST14 konsol komutları:");
   const player = lvl.find_by_tag("Player");
   const pc = player.get_component(DE_GAME.PlayerController);
   const hp = player.get_component(DE.Health);
-  check("9 oyun komutu kayıtlı", ["hp", "heal", "god", "coins", "speed", "jump", "tp", "respawn", "list"]
-    .every(n => !!cmd(n)), "eksik: " + ["hp", "heal", "god", "coins", "speed", "jump", "tp", "respawn", "list"]
+  check("11 oyun komutu kayıtlı", ["hp", "heal", "god", "coins", "speed", "jump", "tp", "respawn", "tilemap_save", "tilemap_load", "list"]
+    .every(n => !!cmd(n)), "eksik: " + ["hp", "heal", "god", "coins", "speed", "jump", "tp", "respawn", "tilemap_save", "tilemap_load", "list"]
     .filter(n => !cmd(n)).join(","));
 
   check("hp: can güncellenir", cmd("hp")(lvl, ["5"]) === "can -> 5/3" && hp.current_hp === 5);
@@ -482,11 +482,32 @@ console.log("TEST14 konsol komutları:");
   check("respawn: spawn noktasına döner", cmd("respawn")(lvl, []) === "spawn noktasina donuldu."
     && (player.position.x !== beforeRespawn.x || player.position.y !== beforeRespawn.y));
 
-  const listed = cmd("list")(lvl, []);
+const listed = cmd("list")(lvl, []);
   check("list: sahne sayımı", typeof listed === "string" && listed.indexOf("Player x1") >= 0);
+
+  // tilemap veri katmani: export -> kaydet -> geri yukle -> ayni geometri
+  const saved = cmd("tilemap_save")(lvl, ["test_seviye"]);
+  check("tilemap_save: kaydeder", typeof saved === "string" && saved.indexOf("kaydedildi") > 0
+    && saved.indexOf("katman") > 0, saved);
+  const data0 = DE_GAME.export_scene_tilemap(lvl);
+  check("tilemap_save: veri JSON-uyumlu", !!data0 && Array.isArray(data0.layers)
+    && Array.isArray(data0.layers[0].grid) && typeof JSON.stringify(data0) === "string");
+  const segs0 = (lvl._tilemap_segments || []).length;
+  const loaded = cmd("tilemap_load")(lvl, ["test_seviye"]);
+  check("tilemap_load: geri yukler", typeof loaded === "string" && loaded.indexOf("yuklendi") > 0, loaded);
+  check("tilemap_load: geometri ayni", (lvl._tilemap_segments || []).length === segs0
+    && lvl._tilemap_ground.to_data().layers.length === data0.layers.length,
+    segs0 + " -> " + (lvl._tilemap_segments || []).length);
+  check("tilemap_load: tek Tilemap nesnesi", lvl.find_all_by_tag("Tilemap").length === 1);
+  check("tilemap_save: bozuk ad temizlenir", typeof cmd("tilemap_save")(lvl, ["../../kotu ad*"]) === "string");
+  check("tilemap_load: yoksa mesaj", cmd("tilemap_load")(lvl, ["olmayan_xyz"]).indexOf("Okunamadi") === 0);
+
   // _cmd_* yokken de güvenli: 'player yok' yolları
   const emptyScene = new DE.Scene("Empty", [0, 0, 0]);
   check("hp: oyuncu yokta güvenli mesaj", cmd("hp")(emptyScene, ["5"]) === "Oyuncu yok (o siste sahnesinde degilsin).");
+  check("tilemap_save: tilemap yoksa mesaj", cmd("tilemap_save")(emptyScene, ["x"]).indexOf("tilemap yok") > 0);
+  check("tilemap_load: bozuk veri reddi", DE_GAME.import_scene_tilemap(emptyScene, { "layers": [] }) === false
+    && DE_GAME.import_scene_tilemap(emptyScene, null) === false);
 }
 
 // TEST15: deneyim iyileştirmeleri 5–8 doğrulaması

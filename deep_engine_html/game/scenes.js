@@ -113,6 +113,44 @@ function _attach_ground_tilemap(scene, data) {
     scene._tilemap_segments = tm.to_segments();
 }
 
+/** Runtime -> data: sahnenin tilemap zeminini JSON-uyumlu veriye cevirir.
+ *  `Tilemap.to_data()` eşi; tilemap yoksa (boss/menü sahneleri) null. */
+function export_scene_tilemap(scene) {
+    const tm = scene && scene._tilemap_ground;
+    return tm ? tm.to_data() : null;
+}
+
+/** Data -> runtime: `to_data()` verisinden sahnenin tilemap zeminini kurar.
+ *  Tilemap nesnesi varsa yerinde güncellenir, yoksa "Tilemap" nesnesi eklenir.
+ *  `_tilemap_ground` / `_tilemap_segments` köprüsü senkron kalır. */
+function import_scene_tilemap(scene, data) {
+    if (!scene || !data || !Array.isArray(data.layers) || !data.layers.length) return false;
+    const fresh = DE.Tilemap.from_data(data);
+    const obj = scene.find_by_tag("Tilemap");
+    let tm = obj ? obj.get_component(DE.Tilemap) : null;
+    if (tm) {
+        tm.tile_size = fresh.tile_size;
+        tm.offset = [].concat(fresh.offset);
+        tm.tile_set = Object.assign({}, fresh.tile_set);
+        tm.layers = fresh.layers;
+    } else {
+        const grid = fresh.layers[0].grid || [];
+        const cols = grid.length ? grid[0].length : 0;
+        const rows = grid.length;
+        const newObj = new DE.GameObject({
+            "name": "TilemapGround", "x": fresh.offset[0], "y": fresh.offset[1],
+            "width": cols * fresh.tile_size, "height": rows * fresh.tile_size,
+            "tag": "Tilemap",
+        });
+        newObj.add_component(fresh);
+        scene.add_object(newObj);
+        tm = fresh;
+    }
+    scene._tilemap_ground = tm;
+    scene._tilemap_segments = tm.to_segments();
+    return true;
+}
+
 function build_procedural_level(biome = null, seed = null, chunks = 8, difficulty = 0) {
     const data = DE.procedural_generate(biome, seed, chunks, difficulty);
     const meta = {
@@ -385,3 +423,5 @@ DE_GAME._play_theme = _play_theme;
 DE_GAME._register_pause = _register_pause;
 DE_GAME._portal_campaign_boss = _portal_campaign_boss;
 DE_GAME._attach_ground_tilemap = _attach_ground_tilemap;
+DE_GAME.export_scene_tilemap = export_scene_tilemap;
+DE_GAME.import_scene_tilemap = import_scene_tilemap;
