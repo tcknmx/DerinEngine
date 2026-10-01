@@ -196,4 +196,94 @@ function done() {
     check("ozel komut cikti", dc.output[dc.output.length - 1].includes("hp verildi"));
 }
 
+// ================= S6 Engine._frame: konsol + T + F3 (Python core.py eşi) =================
+{
+    const fakeCtx = new Proxy({ canvas: { width: 900, height: 600 } }, {
+        get(o, p) {
+            if (p in o) return o[p];
+            if (p === "measureText") return () => ({ width: 80 });
+            return () => {};
+        },
+        set(o, p, v) { o[p] = v; return true; },
+    });
+    const fakeCanvas = { getContext: () => fakeCtx, width: 900, height: 600 };
+    const Input6 = {
+        _typed: [], _keys_down: {}, _keys: {},
+        get_typed_text() { const s = this._typed.join(""); this._typed = []; return s; },
+        clear_typed() { this._typed = []; },
+        get_key_down(k) { return !!this._keys_down[k]; },
+        get_key(k) { return !!this._keys[k]; },
+        begin_frame() {},
+        end_frame() { this._keys_down = {}; },
+    };
+    DE.Input = Input6;
+    DE.Input.instance = Input6;
+
+    const engine = new DE.Engine(fakeCanvas, "Test", 900, 600, 60);
+    check("motor konsolu kuruldu (DevConsole)", engine.console instanceof DE.DevConsole);
+    check("debug katmani kapali baslar", engine.show_debug_info === false);
+
+    const scene = new DE.Scene("Test", [0, 0, 0]);
+    let updates = 0;
+    const probe = new DE.GameObject("Probe", 0, 0);
+    probe.update = () => { updates++; };
+    scene.add_object(probe);
+    engine.set_scene(scene);
+
+    Input6._keys_down = { "BACKQUOTE": true };
+    engine._frame(1000);
+    check("backquote -> konsol acildi", engine.console.active === true);
+    check("konsol karesi sahneyi guncellemez (donar)", updates === 0);
+    Input6._keys_down = {};
+
+    engine._frame(1016);
+    Input6._keys_down = {};
+    check("konsol acikken update akmaz", updates === 0);
+
+    Input6._keys_down = { "QUOTEDBL": true };
+    engine._frame(1032);
+    check("QUOTEDBL -> konsol kapandi", engine.console.active === false);
+    Input6._keys_down = {};
+
+    engine._frame(1048); engine._frame(1064);
+    check("konsol kapaliyken update akiyor", updates === 3);
+    Input6._keys_down = {};
+
+    // T: dil degistirir + savegame'e yazar (Python core.py dil tercihi kalici).
+    // Not: S4 _local_storage'u kendi closure'yna sabitledi; buraya da kendi depomuz.
+    const langStore = {};
+    DE.SaveGame._local_storage = () => ({
+        getItem(k) { return Object.prototype.hasOwnProperty.call(langStore, k) ? langStore[k] : null; },
+        setItem(k, v) { langStore[k] = String(v); },
+        removeItem(k) { delete langStore[k]; },
+    });
+    const langBefore = DE.I18n.current_lang;
+    Input6._keys_down = { "T": true };
+    engine._frame(1080);
+    check("T -> dil degisti", DE.I18n.current_lang !== langBefore);
+    const savedRaw = langStore["derinengine_save_v1"] || "";
+    check("T -> dil tercihi savegame'e yazildi", savedRaw.indexOf('"lang"') >= 0 && savedRaw.indexOf(DE.I18n.current_lang) >= 0,
+        "raw=" + savedRaw + " lang=" + DE.I18n.current_lang);
+    Input6._keys_down = {};
+
+    // F3: debug katmani ac/kapa
+    Input6._keys_down = { "F3": true };
+    engine._frame(1096);
+    check("F3 -> debug katmani acildi", engine.show_debug_info === true);
+    Input6._keys_down = {};
+    engine._frame(1112);
+    Input6._keys_down = { "F3": true };
+    engine._frame(1128);
+    check("F3 tekrar -> kapatildi", engine.show_debug_info === false);
+    Input6._keys_down = {};
+
+    // Konsol acikken motor komutu calisir (help -> kayitli komutlar)
+    Input6._keys_down = { "BACKQUOTE": true };
+    engine._frame(1144);
+    Input6._keys_down = { "ENTER": true };
+    Input6._typed = ["h", "e", "l", "p"];
+    engine._frame(1160);
+    check("konsolda help calisti", engine.console.output.some(l => l.indexOf("help") >= 0));
+}
+
 done();

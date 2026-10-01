@@ -217,7 +217,7 @@ function bootGame() {
   ];
   const GAMES = [
     "game/state.js", "game/entities.js", "game/bosses.js", "game/ui.js",
-    "game/scenes.js", "game/builders.js", "game/main.js",
+    "game/scenes.js", "game/builders.js", "game/commands.js", "game/main.js",
   ];
   ENGS.concat(GAMES).forEach(f => {
     const src = fs.readFileSync(path.join(HTML, f), "utf8");
@@ -370,6 +370,13 @@ console.log("=== 4) oyun: gerçek açılış + çizim + P ile kampanya ===");
     const portal = menu.find_all_by_tag("Portal")[0];
     const gp = portal ? portal.get_component(DE_GAME.GoalPortal) : null;
     check("portal oyuna bağlı (next_factory)", !!gp && typeof gp.next_scene_factory === "function");
+    const gameCmds = ["hp", "heal", "god", "coins", "speed", "jump", "tp", "respawn", "list"];
+    check("oyun konsolu: 9 komut gerçek boot'ta kayıtlı",
+      gameCmds.every(n => !!DE._CONSOLE_COMMANDS[n]),
+      gameCmds.filter(n => !DE._CONSOLE_COMMANDS[n]).join(","));
+    const listed = DE._CONSOLE_COMMANDS["list"].fn(g.engine.active_scene, []);
+    check("oyun konsolu: list oyuncuyu sayar",
+      typeof listed === "string" && listed.indexOf("Player") >= 0, String(listed).slice(0, 60));
   }
 }
 

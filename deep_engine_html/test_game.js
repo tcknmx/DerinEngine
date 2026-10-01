@@ -32,7 +32,7 @@ function loadGame(name) {
   const code = fs.readFileSync(path.join(__dirname, "game", name), "utf8");
   new Function("DE", "window", "document", "DE_GAME", code)(global.DE, windowStub, documentStub, global.DE_GAME);
 }
-for (const f of ["state.js", "entities.js", "bosses.js", "ui.js", "scenes.js", "builders.js"]) loadGame(f);
+for (const f of ["state.js", "entities.js", "bosses.js", "ui.js", "scenes.js", "builders.js", "commands.js"]) loadGame(f);
 
 // --- Input stub: tarayıcı yok; get_key/get_key_down/get_horizontal_axis vb. statikleri. ---
 class FakeInput {
@@ -442,6 +442,51 @@ function drawSafe(scene) {
   fadeScene.add_object(fo);
   fadeScene.start();
   check("FadeOverlay katmanı çizilebilir", drawSafe(fadeScene));
+}
+
+// TEST14: oyun konsol komutları (game/commands.js — Python game/commands.py eşi)
+console.log("TEST14 konsol komutları:");
+{
+  const cmd = (name) => DE._CONSOLE_COMMANDS[name] && DE._CONSOLE_COMMANDS[name].fn;
+  const lvl = DE_GAME.build_procedural_level("lava", 7, 8, 2);
+  const player = lvl.find_by_tag("Player");
+  const pc = player.get_component(DE_GAME.PlayerController);
+  const hp = player.get_component(DE.Health);
+  check("9 oyun komutu kayıtlı", ["hp", "heal", "god", "coins", "speed", "jump", "tp", "respawn", "list"]
+    .every(n => !!cmd(n)), "eksik: " + ["hp", "heal", "god", "coins", "speed", "jump", "tp", "respawn", "list"]
+    .filter(n => !cmd(n)).join(","));
+
+  check("hp: can güncellenir", cmd("hp")(lvl, ["5"]) === "can -> 5/3" && hp.current_hp === 5);
+  check("hp: kullanım mesajı", cmd("hp")(lvl, []).indexOf("Kullanim: hp") === 0);
+
+  check("heal: can doldur + kısa koruma", cmd("heal")(lvl, []) === "sifa tamam."
+    && hp.current_hp === hp.max_hp && hp.invulnerable_timer >= 1.2);
+
+  hp.invulnerable_timer = 0;                        // god'un başlangıç durumu (heal artığı kalmasın)
+  check("god: aç/kapa", cmd("god")(lvl, []) === "god mode ACIK (olumsuz)." && hp.invulnerable_timer > 1e9);
+  check("god: kapat", cmd("god")(lvl, []) === "god mode KAPALI." && hp.invulnerable_timer === 0);
+
+  const before = pc.score;
+  check("coins: skora ekle", cmd("coins")(lvl, ["100"]) === "skor -> " + (before + 100) && pc.score === before + 100);
+
+  check("speed: hız ayarı + clamp", cmd("speed")(lvl, ["99999"]) === "hiz -> 2000" && pc.speed === 2000);
+  check("jump: zıplama ayarı", cmd("jump")(lvl, ["900"]) === "ziplama -> 900" && pc.jump_force === 900);
+
+  player.position.x = 42; player.position.y = 42;
+  check("tp: ışınla + hız sıfır", cmd("tp")(lvl, ["310", "120"]) === "isinlandi -> (310, 120)"
+    && player.position.x === 310 && player.position.y === 120);
+  const rb = player.get_component(DE.Rigidbody2D);
+  if (rb) rb.velocity.set(50, -80);
+
+  const beforeRespawn = { x: player.position.x, y: player.position.y };
+  check("respawn: spawn noktasına döner", cmd("respawn")(lvl, []) === "spawn noktasina donuldu."
+    && (player.position.x !== beforeRespawn.x || player.position.y !== beforeRespawn.y));
+
+  const listed = cmd("list")(lvl, []);
+  check("list: sahne sayımı", typeof listed === "string" && listed.indexOf("Player x1") >= 0);
+  // _cmd_* yokken de güvenli: 'player yok' yolları
+  const emptyScene = new DE.Scene("Empty", [0, 0, 0]);
+  check("hp: oyuncu yokta güvenli mesaj", cmd("hp")(emptyScene, ["5"]) === "Oyuncu yok (o siste sahnesinde degilsin).");
 }
 
 // Toplam

@@ -406,6 +406,10 @@ DE.Engine = class Engine {
         this.is_running = false;
         this._last = 0;
         this._frame_count = 0;
+        // Python Engine: geliştirici konsolu (backquote ` / " tuşu) + debug katmanı.
+        this.console = new DE.DevConsole(this.width, this.height);
+        this.show_debug_info = false;
+        this._fps = 0.0;
         // Python Engine: bekleyen sahne değişimi + time-slow katmanı (sadece
         // düşman dünyasını yavaşlatır; DE._slow_dt okuyucusu).
         this._next_scene = null;
@@ -432,9 +436,40 @@ DE.Engine = class Engine {
         // Python Engine._frame -> Input._update_events eşdeğeri: kumanda durumunu
         // kare başında tazele (analog eksen/hat/buton kenar algılama).
         if (DE.Input && DE.Input.instance) DE.Input.instance.begin_frame();
+        // Python Engine._frame: geliştirici konsolu (backquote ` / " tuşu aç/kapa).
+        const _gkd = (k) => (DE.Input && DE.Input.get_key_down) ? DE.Input.get_key_down(k) : false;
+        if (this.console && (_gkd("BACKQUOTE") || _gkd("QUOTEDBL"))) {
+            this.console.toggle();
+        }
+        // Konsol açıkken sahne donar: yalnız sahne + konsol üstte çizilip durulur.
+        if (this.console && this.console.active) {
+            this.console.update(dt);
+            if (this.active_scene) this.active_scene.draw(this.ctx);
+            this.console.draw(this.ctx);
+            if (DE.Input && DE.Input.instance) DE.Input.instance.end_frame();
+            return;
+        }
+        // Python Engine._frame: dil değiştirme (T) — tercih savegame'e yazılır.
+        if (_gkd("T")) {
+            DE.I18n.toggle_language();
+            try {
+                const prof = new DE.SaveGame();
+                prof.set("lang", DE.I18n.current_lang);
+                prof.save();
+            } catch (e) { /* yok say */ }
+            if (DE.SoundFX && DE.SoundFX.play) DE.SoundFX.play("coin");
+        }
+        // Python Engine._frame: debug bilgi katmanı (F3).
+        if (_gkd("F3")) {
+            this.show_debug_info = !this.show_debug_info;
+        }
         if (this.active_scene) {
             this.active_scene.update(dt);
             this.active_scene.draw(this.ctx);
+        }
+        // Python Engine._frame -> _draw_debug_overlay: FPS/nesne/kamera/oyuncu.
+        if (this.show_debug_info) {
+            this._draw_debug_overlay(dt);
         }
         // Python Engine._frame -> _handle_escape: ESC, aktif sahnenin on_escape
         // olayını tetikler (duraklatma overlay'i, menüde çıkış). on_escape yoksa
@@ -453,7 +488,59 @@ DE.Engine = class Engine {
         // sıfırlanır, böylece bir tuş basışı tam olarak bir kare görünür.
         if (DE.Input && DE.Input.instance) DE.Input.instance.end_frame();
     }
+    _draw_debug_overlay(dt) {
+        // Python Engine._draw_debug_overlay portu: FPS/nesne/kamera + oyuncu durumu.
+        const sc = this.active_scene;
+        this._fps = this._fps ? this._fps * 0.9 + (1 / Math.max(dt, 1e-6)) * 0.1 : 1 / Math.max(dt, 1e-6);
+        const obj_count = sc ? sc.game_objects.length : 0;
+        const cam_x = sc ? Math.trunc(sc.camera_position.x) : 0;
+        const cam_y = sc ? Math.trunc(sc.camera_position.y) : 0;
+        let p_dbg = "";
+        try {
+            const pl = sc ? sc.find_by_tag("Player") : null;
+            if (pl) {
+                const rb = pl.get_component(DE.Rigidbody2D);
+                let pc = null;
+                for (const c of pl.components) {
+                    if (c.coyote_timer !== undefined) { pc = c; break; }
+                }
+                if (rb && pc) {
+                    p_dbg = "P: grounded=" + rb.is_grounded
+                        + " coy=" + pc.coyote_timer.toFixed(2)
+                        + " buf=" + pc.jump_buffer_timer.toFixed(2)
+                        + " dbl=" + pc.can_double_jump
+                        + " wall=" + pc.wall_sliding
+                        + " vy=" + rb.velocity.y.toFixed(0)
+                        + " slow=" + this._time_slow_remaining.toFixed(2);
+                }
+            }
+        } catch (e) { /* yok say */ }
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.font = "13px monospace";
+        const lines = [
+            "[DerinEngine v" + (DE.__version__ || "0.0.0") + " Debug - F3 to Toggle]",
+            "FPS: " + Math.trunc(this._fps) + " (dt: " + (dt * 1000).toFixed(1) + "ms)",
+            "Aktif Nesne: " + obj_count,
+            "Kamera: (" + cam_x + ", " + cam_y + ")",
+            "Kontroller: A/D veya Sol/Sag = Hareket, SPACE/W = Ziplama, F3 = Debug",
+        ];
+        if (p_dbg) lines.push(p_dbg);
+        let y = 10;
+        for (const text of lines) {
+            const w = ctx.measureText ? ctx.measureText(text).width : text.length * 8;
+            ctx.fillStyle = "rgba(0,0,0,0.70)";
+            ctx.fillRect(8, y - 2, w + 4, 16);
+            ctx.fillStyle = "rgb(0,255,128)";
+            ctx.fillText(text, 10, y + 12);
+            y += 20;
+        }
+        ctx.restore();
+    }
     run() {
+        if (!this.active_scene) {
+            throw new Error("Hata: Motoru çalıştırmadan önce bir Sahne (Scene) belirlemelisiniz! engine.set_scene(...)");
+        }
         this.is_running = true;
         DE.Engine.instance = this;
         const step = (now) => {

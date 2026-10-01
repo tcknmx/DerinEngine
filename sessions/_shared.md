@@ -8,6 +8,21 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[OYUN-HTML] M4: konsol komutları + motor `_frame` davranışları port edildi
+  (28.09.2026, `01_strategy.md` [2] M4).** `game/commands.py` portu:
+  `deep_engine_html/game/commands.js` (yeni, `DE.register_command` ile 9 komut:
+  hp, heal, god, coins, speed, jump, tp, respawn, list; `tp` hız sıfırlar;
+  index.html'e builders.js sonrası eklendi). motor `deep_engine_html/engine/core.js`
+  eksik davranışlar Python `core.py` ile birebir: konsol aç/kapa
+  (`BACKQUOTE`/`QUOTEDBL`; açıkken sahne donar, konsol üstte çizilir), `T` dil
+  değiştirir + savegame'e "lang" yazar, `F3` debug katmanı (`_draw_debug_overlay`),
+  `run()` sahne yoksa throw. Testler: test_game **TEST14** → **91/91**,
+  test_browser BÖLÜM 4'e 2 boot konsol check'i → **33/33**, test_systems **S6**
+  (motor `_frame` için sahte canvas+Input) → motor **365/365**, tools 24/24.
+  Etkilenen: HTML portu bakımını yapan oturum (browser konsolu artık oyun
+  komutlarını da çalıştırır). Pygbag `main.py` dalına gerek yok — main.js rAF
+  döngüsü zaten doğal karşılık.
+
 - **[OYUN-HTML] M3.1 görsel kontrol + gerçek boot testi — gizli MenuFX bug'ı
   yakalandı (28.09.2026, `01_strategy.md` [2] M3 sonrası; M1 KALAN kapanışı).**
   M1 "tarayıcıda görsel kontrol" görevi **tamamlandı**: `test_game.js`'e **TEST13

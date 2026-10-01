@@ -286,9 +286,19 @@ Kaynaklar: `game/*.py`, `main.py` (pygbag dalı hariç).
   (`_hud_ui` yalnız `game_objects`) düzeltildi. **test_browser 31/31, test_game
   78/78, motor 353/353, tools 24/24.** M4 sıra: `game/commands.py` + pygbag
   onaylı `main.py` giriş dalı + son 1:1 davranış farkları düzeltmesi.
-- **M4+ Davranış:** `game/commands.py` (konsol komutları) + pygbag onaylı
-  `main.py` giriş dalı + son 1:1 davranış farkları düzeltmesi.
-- **M5 İnce ayar:** menüde kampanya ilerleme rozetleri (yazıldı), deneyim
+- **M4+ Davranış (✅ 28.09):** `game/commands.py`'ın JS portu yapıldı —
+  `deep_engine_html/game/commands.js` (yeni): 9 komut `DE.register_command` ile
+  kayıtlı (hp, heal, god, coins, speed, jump, tp, respawn, list) + `tp`
+  hız sıfırlar. motor `_frame` eksik davranışları Python `core.py` ile birebir
+  port edildi: konsol aç/kapa (`BACKQUOTE`/`QUOTEDBL`, açıkken sahne donar +
+  konsol sahne üstüne çizilir), `T` dil değiştirir + savegame'e "lang" yazar,
+  `F3` debug katmanı (`_draw_debug_overlay`: FPS, nesne sayısı, kamera, oyuncu
+  bilgisi, yeşil metin), `run()` aktif sahne yoksa throw. test_game **TEST14**
+  konsol komutları (12 check) → 91/91; test_browser BÖLÜM 4'e 2 boot konsol
+  check'i → **33/33**; test_systems **S6** motor `_frame` testi (12 check) →
+  motor **365/365**, tools 24/24. Pygbag `main.py` giriş dalı HTML'de karşılık
+  olarak zaten rAF döngüsü (main.js) — ayrı dal gerekmedi, kapatıldı.
+- **M5 İnce ayar (sırada):** menüde kampanya ilerleme rozetleri (yazıldı), deneyim
   iyileştirmeleri 5–8 portları (`03_game.md`), doğrulama: tüm JS süitleri.
 
 **[3] Sonsuz tırmanma oyunu (Icy Tower mekaniği):** kırılan platformlar, sürekli
