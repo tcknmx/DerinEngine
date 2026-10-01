@@ -298,8 +298,17 @@ Kaynaklar: `game/*.py`, `main.py` (pygbag dalı hariç).
   check'i → **33/33**; test_systems **S6** motor `_frame` testi (12 check) →
   motor **365/365**, tools 24/24. Pygbag `main.py` giriş dalı HTML'de karşılık
   olarak zaten rAF döngüsü (main.js) — ayrı dal gerekmedi, kapatıldı.
-- **M5 İnce ayar (sırada):** menüde kampanya ilerleme rozetleri (yazıldı), deneyim
-  iyileştirmeleri 5–8 portları (`03_game.md`), doğrulama: tüm JS süitleri.
+- **M5 İnce ayar (✅ 28.09):** deneyim iyileştirmeleri 5–8'in HTML portu **zaten
+  birebir yapılmışmış** (5 `entities.js` after-image, 6 `bosses.js`
+  `_draw_enrage_aura` + `builders.js` slow-mo 0.9/0.28 + `zoom_punch`, 7 hız
+  çizgileri `fall_streak_time`, 8 `ui.js` `BiomeProgress` + `scenes.js`
+  `_campaign_sector_commit` + i18n `campaign_progress`/`biome_*`) — bu görev
+  **doğrulama** ile kapandı: `test_game.js` **TEST15** (30 check) eklendi: iz
+  birikmesi/yaşlanması/aralık `0.03/dash_speed`/havuz ≤6 + hayalet çizimi
+  (alpha 0 = çizilmez), düşüş süresi birikme-sönümleme-inişte sıfırlanma +
+  yoğunluğa bağlı çizgi sayısı, enrage aurası çizim farkı + `_slow_dt` + zafer
+  slow-mo değerleri, biyom kaydı/idempotency/menü rozetleri (5 yerelleştirilmiş
+  ad, `_menu_ui` vs `_hud_ui`). **test_game 116/116**, diğer süitler yeşil.
 
 **[3] Sonsuz tırmanma oyunu (Icy Tower mekaniği):** kırılan platformlar, sürekli
 yukarı, yükseklik skoru. Bağımsız başlayabilir (1. maddedeki BreakablePlatform +

@@ -489,6 +489,157 @@ console.log("TEST14 konsol komutları:");
   check("hp: oyuncu yokta güvenli mesaj", cmd("hp")(emptyScene, ["5"]) === "Oyuncu yok (o siste sahnesinde degilsin).");
 }
 
+// TEST15: deneyim iyileştirmeleri 5–8 doğrulaması
+// (5 dash after-image, 6 boss enrage/zafer slow-mo, 7 hız çizgileri,
+//  8 menü kampanya ilerleme rozetleri) — Python game/ eşi birebir port.
+console.log("TEST15 deneyim 5-8:");
+function countCtx() {
+  const t = { canvas: { width: 900, height: 600 }, fills: 0, strokes: 0, texts: [],
+    fillStyle: "", strokeStyle: "", lineWidth: 1, font: "", globalAlpha: 1, textAlign: "left" };
+  return new Proxy(t, {
+    get(o, p) {
+      if (p in o) return o[p];
+      if (p === "createRadialGradient" || p === "createLinearGradient") return () => ({ addColorStop() {} });
+      if (p === "measureText") return () => ({ width: 90 });
+      if (p === "fill") return () => { o.fills++; };
+      if (p === "stroke") return () => { o.strokes++; };
+      if (p === "fillText") return (s) => { o.texts.push(String(s)); };
+      return () => {};
+    },
+    set(o, p, v) { o[p] = v; return true; },
+  });
+}
+{
+  // ---- 5. Dash after-image ----
+  const { lvl, player, ctrl } = freshLevel("forest", 42, 8, 0);
+  press("LSHIFT");
+  step(lvl, 1);
+  step(lvl, 7);                        // dash 0.16 sn (~10 kare)
+  check("5: dash sırasında iz doğdu", ctrl._afterimages.length >= 2, "n=" + ctrl._afterimages.length);
+  check("5: izler yaşlanıyor", ctrl._afterimages.some(g => g[4] > 0));
+  const iv = 0.03 / Math.max(1.0, ctrl.dash_speed);
+  check("5: iz aralığı 0.03/dash_speed", ctrl._afterimage_timer > 0 && ctrl._afterimage_timer <= iv + 1e-9,
+    "t=" + ctrl._afterimage_timer.toFixed(4) + " iv=" + iv.toFixed(4));
+  check("5: iz havuzu sınırlı (<=6)", ctrl._afterimages.length <= 6);
+  // Çizim: hayalet oyuncunun arkasında ek fill üretir.
+  ctrl._afterimages = [];
+  const cNo = countCtx(); ctrl.draw(cNo, [0, 0]);
+  ctrl._afterimages = [[player.position.x, player.position.y, 1.0, 1.0, 0.0]];
+  const cGhost = countCtx(); ctrl.draw(cGhost, [0, 0]);
+  check("5: hayalet çizilir", cGhost.fills > cNo.fills, "fills " + cNo.fills + " -> " + cGhost.fills);
+  // Solmuş hayalet (alpha<=0) çizilmez
+  ctrl._afterimages = [[player.position.x, player.position.y, 1.0, 1.0, 0.5]];
+  const cFade = countCtx(); ctrl.draw(cFade, [0, 0]);
+  check("5: solmuş hayalet çizilmez", cFade.fills === cNo.fills);
+
+  // ---- 7. Uzun düşüş hız çizgileri ----
+  const lv7 = DE_GAME.build_procedural_level("forest", 11, 8, 0);
+  use(lv7); step(lv7, 30);
+  const p7 = lv7.find_by_tag("Player");
+  const c7 = p7.get_component(DE_GAME.PlayerController);
+  const rb7 = p7.get_component(DE.Rigidbody2D);
+  // Zemine yakın yerden bırak: uzun boşluk düşüşü "dünya dışı" kurtarmasını tetiklemesin.
+  let groundTop = 0;
+  for (const obj of lv7.game_objects) {
+    if (obj.tag !== "Ground") continue;
+    const col = obj.get_component(DE.BoxCollider);
+    if (!col) continue;
+    const a = col.get_aabb();
+    if (a.x <= p7.position.x && a.x + a.w >= p7.position.x) groundTop = Math.max(groundTop, a.y);
+  }
+  p7.position.y = groundTop - p7.size.y - 240;
+  rb7.velocity.y = 1000;                 // eşik (900) üstü hızlı düşüş
+  step(lv7, 2);
+  check("7: hızlı düşüşte süre birikiyor", c7.fall_streak_time > 0, "t=" + c7.fall_streak_time.toFixed(3));
+  c7.fall_streak_time = 0.5;
+  rb7.velocity.y = 120;                  // yavaş düşüş -> sönümlenir
+  step(lv7, 1);
+  check("7: yavaş düşüşte sönümlenir", c7.fall_streak_time < 0.5 && c7.fall_streak_time > 0.45,
+    "t=" + c7.fall_streak_time.toFixed(4));
+  // Yere inince sıfırlanır
+  c7.fall_streak_time = 0.5;
+  rb7.velocity.y = 400;
+  let guard = 0, sawGround = false;
+  while (guard < 200) { step(lv7, 1); guard++; if (rb7.is_grounded) { sawGround = true; break; } }
+  step(lv7, 1);                            // iniş karesi: süre sıfırlanır
+  check("7: yere inince sıfırlanır", sawGround && c7.fall_streak_time === 0,
+    "iniş=" + sawGround + " t=" + c7.fall_streak_time + " kare=" + guard);
+  // Çizim: yoğunluk arttıkça çizgi sayısı artar (üst + alt kenar)
+  rb7.velocity.y = 1000; c7.fall_streak_time = 0.4;
+  const cWeak = countCtx(); c7.draw(cWeak, [0, 0]);
+  c7.fall_streak_time = 0.9;
+  const cStrong = countCtx(); c7.draw(cStrong, [0, 0]);
+  check("7: yoğun düşüşte daha çok çizgi", cStrong.strokes > cWeak.strokes,
+    "strokes " + cWeak.strokes + " -> " + cStrong.strokes);
+  c7.fall_streak_time = 0; rb7.velocity.y = 0;
+
+  // ---- 6. Boss enrage aurası + zafer slow-mo ----
+  DE_GAME.start_campaign();
+  const chain6 = DE_GAME.state.campaign_state["chain"];
+  const arena = DE_GAME.build_campaign_boss(chain6[0], 1, 0);
+  use(arena);
+  const boss = arena.find_by_tag("Boss");
+  const bhp = boss.get_component(DE.Health);
+  check("6: _draw_boss_bar dışa açık", typeof DE_GAME._draw_boss_bar === "function");
+  bhp.current_hp = bhp.max_hp;
+  const cFull = countCtx(); DE_GAME._draw_boss_bar(cFull, boss, bhp, boss.boss_key, [0, 0]);
+  bhp.current_hp = Math.max(1, Math.floor(bhp.max_hp * 0.4));
+  const cRage = countCtx(); DE_GAME._draw_boss_bar(cRage, boss, bhp, boss.boss_key, [0, 0]);
+  check("6: HP<%50 enrage aurası çizilir", cRage.strokes > cFull.strokes,
+    "can=" + cFull.strokes + " enrage=" + cRage.strokes);
+  engine._time_slow_remaining = 0.9; engine._time_slow_factor = 0.28;
+  check("6: _slow_dt düşmanı yavaşlatır", Math.abs(DE._slow_dt(1) - 0.28) < 1e-9, "-> " + DE._slow_dt(1));
+  engine._time_slow_remaining = 0.0;
+  check("6: süre bitince normale döner", Math.abs(DE._slow_dt(1) - 1) < 1e-9);
+  engine._time_slow_remaining = 0.0; engine._time_slow_factor = 0.4;
+  bhp.take_damage(999999);
+  check("6: boss ölümü zafer slow-mo'yu kurar (0.9 / 0.28)",
+    engine._time_slow_remaining > 0 && Math.abs(engine._time_slow_factor - 0.28) < 1e-9,
+    "rem=" + engine._time_slow_remaining + " factor=" + engine._time_slow_factor);
+
+  // ---- 8. Menü kampanya ilerleme rozetleri ----
+  const prof = DE_GAME.savegame();
+  const savedDone = [].concat(prof.get("completed_biomes", []) || []);
+  const cs8 = DE_GAME.state.campaign_state;
+  prof.set("completed_biomes", []);
+  cs8["sector_score"] = 500;
+  const baseBefore = cs8["score"];
+  DE_GAME._campaign_sector_commit("forest");
+  check("8: sektör skoru tabana eklendi", cs8["score"] === baseBefore + 500 && cs8["sector_score"] === 0,
+    "score=" + cs8["score"]);
+  const done8 = [].concat(prof.get("completed_biomes", []) || []);
+  check("8: tamamlanan biyom savegame'e yazıldı", done8.length === 1 && done8[0] === "forest", done8.join(","));
+  DE_GAME._campaign_sector_commit("forest");
+  check("8: çift kayıt olmaz (idempotent)", [].concat(prof.get("completed_biomes", [])).length === 1);
+  DE_GAME._campaign_sector_commit("cave");
+  check("8: ikinci biyom eklendi", [].concat(prof.get("completed_biomes", [])).length === 2);
+
+  const menu8 = DE_GAME.build_main_menu_scene();
+  use(menu8);
+  menu8.start();                           // menü UI nesneleri sahneye boşalır
+  const progObj = menu8.game_objects.filter(o => o.get_component(DE_GAME.BiomeProgress))[0] || null;
+  const prog = progObj ? progObj.get_component(DE_GAME.BiomeProgress) : null;
+  check("8: menüde BiomeProgress var", prog !== null);
+  check("8: rozetler savegame'den beslendi", prog !== null
+    && prog.completed.has("forest") && prog.completed.has("cave") && !prog.completed.has("astro"));
+  check("8: rozet is_ui (menü zoom'undan etkilenmez)", prog !== null && prog.is_ui === true);
+  check("8: rozet menüde görünür (_menu_ui'da, _hud_ui'da değil)", progObj !== null
+    && menu8._menu_ui.indexOf(progObj) >= 0 && menu8._hud_ui.indexOf(progObj) === -1);
+  if (prog) {
+    progObj.active = true;
+    const c8 = countCtx();
+    prog.draw(c8, [0, 0]);
+    const NAMES = ["Orman", "Mağara", "Buz", "Çöl", "Uzay", "Forest", "Cave", "Ice", "Desert", "Space"];
+    const labels = c8.texts.filter(s => NAMES.indexOf(s) >= 0);
+    check("8: 5 rozet + yerelleştirilmiş ad çizilir", labels.length === 5, "adlar=" + labels.join(","));
+    const filled = c8.fills;
+    prog.completed = new Set(["forest", "cave", "ice", "desert", "astro"]);
+    const c8All = countCtx(); prog.draw(c8All, [0, 0]);
+    check("8: tamamlanan biyom dolu yıldız, kilitli soluk", c8All.fills > filled, "fills " + filled + " -> " + c8All.fills);
+  }
+  prof.set("completed_biomes", savedDone);   // temizlik
+}
+
 // Toplam
 console.log("----------------------------------------");
 console.log("SONUÇ: " + pass + " geçti, " + fail + " kaldı");

@@ -8,6 +8,17 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[OYUN-HTML] M5: deneyim iyileştirmeleri 5–8 doğrulandı (28.09.2026,
+  `01_strategy.md` [2] M5).** Kod tarafı (after-image, boss enrage aurası +
+  zafer slow-mo 0.9/0.28 + zoom_punch, düşüş hız çizgileri, menü kampanya
+  rozetleri + `completed_biomes`) **zaten birebir port edilmişti**; iş
+  doğrulamaydı: `test_game.js` **TEST15** 30 check → **116/116**. Tuzak: menü UI
+  nesneleri `build_main_menu_scene()` sonrası `_objects_to_add`'te bekler —
+  `scene.start()` çağrılmadan `scene.game_objects` içinde görünmezler (rozet
+  testi bu yüzden önce boşaldı). İkinci tuzak: oyuncu uzun boşluktan düşerse
+  `position.y > 900` kurtarması devreye girip `respawn` yapıyor; iniş testi
+  zemine yakın bırakılmalı.
+
 - **[OYUN-HTML] M4: konsol komutları + motor `_frame` davranışları port edildi
   (28.09.2026, `01_strategy.md` [2] M4).** `game/commands.py` portu:
   `deep_engine_html/game/commands.js` (yeni, `DE.register_command` ile 9 komut:
