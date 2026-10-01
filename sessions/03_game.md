@@ -224,6 +224,15 @@
   **> BU BLOK TAMAMLANDI (01.10.2026) — oyun tarafı kalmadı.**
 - **deneyim_iyilestirmeleri 5–8** (aşağıda, bu dosyaya taşındı — orijinal dosya silindi):
   1. (1–4 zaten uygulandı; 5 TAMAMLANDI, 6–7 uygulandı; 8 TAMAMLANDI — aşağıya bak.)
+- **JS motoru ↔ Python parite denetimi (03.10.2026 eklendi, kullanıcı isteği):**
+  Kullanıcı netleştirdi: istenen şey "oyun katmanını JS'e taşımak" değil, **JS
+  motorunun Python ile aynı denklikte yazılması** — tarayıcı sürümü oynanabilir
+  ve davranış olarak birebir aynı olmalı. Bulunan ilk gerçek parite boşluğu
+  düzeltildi: `DE.Engine.set_scene()` sahneye `screen_width/height` atamıyordu
+  (bkz. AÇIK RAPOR 4, yan bulgu). **Kalan:** modül modül API/karşılaştırması
+  (`core/scene/game_object/components/input/render/physics` ↔ Python eşleri) ve
+  bunu kilitleyen otomatik test. Not: aynı seed'te `random.Random` ile
+  `mulberry32` **aynı kule düzenini üretmez** — denklik oynanış/API düzeyindedir.
 
 ### Deneyim iyileştirmeleri 5–8
 - **5. Dash after-image**: dash süresince arkada yarı-saydam oyuncu kopyası izi
@@ -362,6 +371,59 @@ kampanya giriş/boss 60–90 kare `_frame` hatasız); savegame test sonrası tem
 ---
 
 ### AÇIK RAPORLAR
+
+**4. Tarayıcıda "C" çalışmıyor, oyuna giremiyorum — ÇÖZÜLDÜ (03.10.2026, iki ayrı hata).**
+Kullanıcı tarayıcı sürümünü oynuyor ve menüden hiçbir şeye giremiyordu.
+*Teşhis yöntemi:* Node içinde gerçek DOM olay zinciri kuruldu
+(`tools_html/test_browser.js` bölüm 4b kalıcı test) — `keydown` → `Input` →
+`main.js` → `_start_climber()` → karartma → `Engine.switch_scene`.
+
+- **Hata A (asıl blocker): karartma hiç başlamıyordu.** `MainMenu._start_climber()`
+  `_pending_factory`'ı ve `game_mode`'u ayarlıyor ama `_fade_dir` `__init__`'te
+  **0** olduğu için `update()` şartı (`_fade_dir == 1`) hiç sağlanmıyor, `_fade`
+  0'da kalıyor ve sahne **asla değişmiyordu**. `C` tuşu ve fare tıklaması
+  sessizce hiçbir şey yapıyordu. Çözüm: `_start_climber()` içinde
+  `_fade = 0` + `_fade_dir = 1` + `_fading_out = True` atanıyor
+  (`game/ui.py` + `deep_engine_html/game/ui.js`).
+- **Hata B (kafa karışıklığı): yatay tuşlar sanıldı.** A/D ve ← → çalışıyordu;
+  oyuncu yalnızca sahneye hiç girilemediği için "tuşlar çalışmıyor" izlenimi
+  doğuyordu. Doğrulama: sahneye girildikten sonra D 1 sn'de x 435→765,
+  ArrowRight/ArrowLeft de oyuncuyu taşıyor.
+- **Yarım kalan iş (aynı oturumda kapandı):** ESC tırmanış sahnesinde motoru
+  kapatıyordu. `scene.on_escape` kancası eklendi (Python + JS) → ana menüye döner,
+  oyun kapanmaz.
+- **Yan bulgu (motor paritesi):** `DE.Engine.set_scene()` sahneye
+  `screen_width/height` **atamıyordu** (Python `Engine.set_scene` atıyor). 900x600
+  özel sahne kurulduğunda UI/kamera yanlış boyut kullanırdı. Düzeltildi.
+
+**5. Tırmanışta oyuncu ekran dışına çıkıyordu — ÇÖZÜLDÜ (03.10.2026).**
+Kullanıcı "oyun ekrana sığmıyor" dedi. Ölçüm (30 sn, girişsiz, 3 seed):
+**1800 karenin 133'ünde (%7) oyuncu ekran üstünden çıkıyordu**, en kötü −46 px.
+Kök neden: kamera yalnız yeni katmana inildiğinde `anchor − 600*0.62 = anchor − 372`
+hedefine gidiyordu; ama sekiş tepesi (~390 px) bu çizgiyi **aşıyor**, yani
+oyuncu 60 px'lik yüksekliğin tepesinde kamera hâlâ 372 px'deyken ekran dışında
+kalıyordu. Çözüm (`FLOOR_LINE = 0.72` + `PLAYER_TOP_MARGIN = 96`):
+`want = min(anchor − 600*0.72, player.y − 96)` → kamera hem katmanı aşağıda
+tutar hem oyuncunun başını ekranda tutar. Doğrulama: Python 1800 kare **0 dışarıda**,
+JS 1200 kare **0 dışarıda** (kalıcı test: "oyuncu hiç ekran dışına çıkmıyor").
+
+**6. Platformlar "kaba" görünüyordu — ÇÖZÜLDÜ (03.10.2026).** Düz renkli tek kutu
+yerine `ClimbPlatform.draw()` (Python + JS): alt gölge şeridi, sol/sağ pah, parlak
+üst yüzey (basılan yer) + ikincil şerit, isabetle birlikte koyulaşan çatlaklar,
+kontrol noktalarında bant + flama direği/flama. Ayrıca `ClimbBackdrop` (bina
+cephesi): yan duvarlar, iç kenarlar, kat ayraçları (derinlik hissi). Piksel
+sayımıyla doğrulandı: bir platformda **20 farklı renk** (eskisi düz kutuydü).
+
+**7. Tarayıcıda oyun pencereye sığmıyordu — ÇÖZÜLDÜ (03.10.2026).** Canvas
+sabit `900x600` piksel idi; küçük pencerede taşyordu. `index.html` CSS'ine
+`max-width/max-height: 100vh; aspect-ratio: 900/600` eklendi — **dahili çizim
+koordinatları değişmedi** (900x600 çizilir, sadece görüntü ölçeklenir).
+`object-fit: contain` + `height: 100vh` gerekiyor, yoksa küçük pencerede dikey
+taşma olur.
+
+**8. Elle zıplama — BEKLEMEDE (kullanıcı cevabı yok).** Kullanıcı soruldu: tırmanışta
+elle zıplama eklensin mi? Cevap gelene kadar mevcut otomatik sekiş korundu;
+`climber_hint` ipucu ("A/D veya ← → yatay hareket") alt satırda gösteriliyor.
 
 **1. Spike etkisi yetersiz — ÇÖZÜLDÜ (oyun 23.09.2026).** Kök nedenler incelendi:
 - *bounce/knockback yok* → doğruydu: temasta sadece teleport-respawn vardı. Artık

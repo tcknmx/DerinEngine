@@ -84,9 +84,9 @@ Testler (pencere açmaz, hepsi yeşil olmalı):
 ```powershell
 python tests\test_engine_core.py     # motor (Event/Tween/kamera) -> ALL OK
 python tests\test_climber.py         # Star Climber mekanik + headless oynanış -> ALL OK
-node deep_engine_html\test_game.js   # oyun (TEST17 dahil) -> SONUÇ: 174 geçti
+node deep_engine_html\test_game.js   # oyun (TEST17 dahil) -> SONUÇ: 182 geçti
 node tools_html\test_tools.js        # deep-tool -> 36/36
-node tools_html\test_browser.js      # tarayıcı testi -> 33/33
+node tools_html\test_browser.js      # tarayıcı testi (gerçek tuş yolu) -> 44/44
 ```
 
 Kontroller: A/D hareket, SPACE/W/↑ zıplama (+çift), LSHIFT dash, F/sol-tık ateş,

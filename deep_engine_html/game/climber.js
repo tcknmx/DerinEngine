@@ -32,6 +32,16 @@ const SIDE_MARGIN = 24.0;
 // Oyuncu yerinde kalsa bile bir üst kata geçebilsin diye zorunlu.
 const REACH_OVERLAP = 70.0;
 const FREE_CLIMB = 8;      // bu kata kadar katmanlar oyuncunun sütununda kalır
+const FLOOR_LINE = 0.72;   // ulaşılan katman ekranın %72'sine çizilir
+const PLAYER_TOP_MARGIN = 96.0;   // oyuncunun başı bu satırın üstüne çıkmaz
+
+function shade(rgb, k) {
+    return [
+        Math.max(0, Math.min(255, Math.round(rgb[0] * k))),
+        Math.max(0, Math.min(255, Math.round(rgb[1] * k))),
+        Math.max(0, Math.min(255, Math.round(rgb[2] * k))),
+    ];
+}
 
 const COL_SOLID = [110, 190, 255];
 const COL_CHECKPOINT = [120, 255, 180];
@@ -128,6 +138,73 @@ DE_GAME.ClimbPlatform = class ClimbPlatform extends DE.Component {
             this.game_object.active = false;
             if (DE.SoundFX && DE.SoundFX.play) DE.SoundFX.play("break");
         }
+    }
+    /* --- Çizim: düz kutu yerine "kiriş" görünümlü katman (Python draw eşi) --- */
+    draw(ctx, camera_offset) {
+        if (!this.game_object.active) return;
+        const obj = this.game_object;
+        const x = Math.round(obj.position.x - (camera_offset ? camera_offset.x : 0));
+        const y = Math.round(obj.position.y - (camera_offset ? camera_offset.y : 0));
+        const w = Math.round(obj.size.x), h = Math.round(obj.size.y);
+        if (w <= 0 || h <= 0 || !ctx) return;
+        const base = this._base_color || COL_SOLID;
+        const top = this.checkpoint ? COL_CHECKPOINT : base;
+        const prev = ctx.fillStyle;
+        const r = (px, py, pw, ph, rgb) => {
+            if (pw <= 0 || ph <= 0) return;
+            ctx.fillStyle = "rgb(" + rgb[0] + "," + rgb[1] + "," + rgb[2] + ")";
+            ctx.fillRect(px, py, pw, ph);
+        };
+        r(x, y + h - 3, w, 3, shade(base, 0.35));          // alt gölge
+        r(x, y, 2, h, shade(top, 1.18));                    // sol pah
+        r(x + w - 2, y, 2, h, shade(top, 0.62));            // sağ pah
+        r(x, y, w, 4, shade(top, 1.30));                    // üst yüzey (basılan yer)
+        r(x, y + 4, w, 2, shade(top, 0.92));
+        if (this.checkpoint) {
+            r(x, y + 6, w, 3, COL_CHECKPOINT);
+            r(x + w - 26, y - 16, 2, 16, [200, 220, 230]);   // flama direği
+            r(x + w - 24, y - 16, 22, 10, COL_CHECKPOINT);  // flama
+        }
+        if (this.hits_to_break > 0) {
+            const k = Math.min(1.0, this.hits / this.hits_to_break);
+            const n = 1 + Math.round(k * 3);
+            ctx.fillStyle = "rgb(" + COL_CRACK.join(",") + ")";
+            for (let i = 0; i < n; i++) {
+                const cx = x + Math.round(w * (0.25 + 0.5 * (i / 3.0)));
+                ctx.fillRect(cx, y + 2, 2, h - 5);
+            }
+        }
+        ctx.fillStyle = prev;
+    }
+};
+
+/* --- Bina cephesi: yan duvarlar + kat ayraçları (derinlik) --- */
+DE_GAME.ClimbBackdrop = class ClimbBackdrop extends DE.Component {
+    draw(ctx, camera_offset) {
+        if (!ctx) return;
+        const w = (ctx.canvas ? ctx.canvas.width : SCREEN_W);
+        const h = (ctx.canvas ? ctx.canvas.height : SCREEN_H);
+        const camY = camera_offset ? camera_offset.y : 0;
+        const m = SIDE_MARGIN;
+        const prev = ctx.fillStyle;
+        const r = (px, py, pw, ph, rgb) => {
+            ctx.fillStyle = "rgb(" + rgb.join(",") + ")";
+            ctx.fillRect(px, py, pw, ph);
+        };
+        r(0, -camY, m, h, [22, 26, 48]);                    // sol duvar
+        r(w - m, -camY, m, h, [22, 26, 48]);                // sağ duvar
+        r(m - 2, -camY, 2, h, [46, 56, 92]);                // iç kenar
+        r(w - m, -camY, 2, h, [46, 56, 92]);
+        // kat ayraçları
+        const STOREY = 78;
+        let yy = Math.floor((camY - h) / STOREY) * STOREY;
+        const limit = camY + h * 2;
+        while (yy < limit) {
+            const sy = Math.round(yy - camY);
+            if (sy >= -2 && sy <= h + 2) r(m, sy, w - 2 * m, 1, [24, 28, 54]);
+            yy += STOREY;
+        }
+        ctx.fillStyle = prev;
     }
 };
 
@@ -368,7 +445,12 @@ _place_floor_x(index, w, checkpoint) {
         // Zıplama tepesine takılırsa oyuncu kendi katmanının ekran dışına düşer ve
         // her sekişte aynı yerde ölür; Icy Tower'da da kamera yeni katmana
         // inince kayar.
-        const want = this._camera_anchor_y() - SCREEN_H * 0.62;
+        let want = this._camera_anchor_y() - SCREEN_H * FLOOR_LINE;
+        // Oyuncu BAŞI ekranın üstüne çıkmasın (sekiş tepesi ≈390px > 372px).
+        if (this.player) {
+            const keep = this.player.position.y - PLAYER_TOP_MARGIN;
+            if (keep < want) want = keep;
+        }
         if (want < this._cam_y) {
             this._cam_y += (want - this._cam_y) * Math.min(dt * 9.0, 1.0);
         }
@@ -450,6 +532,15 @@ DE_GAME.build_climber_scene = function (seed = null) {
     // Python build_climber_scene eşi: oyun kamerası elle sürülür (yalnızca yukarı).
     const scene = new DE.Scene("Star Climber", COL_BG);
     scene.camera_manual = true;
+    // ESC -> ana menü (motor ESC'yi sahne alırsa oyun kapanmaz)
+    scene.on_escape = function () {
+        try { DE_GAME.state.game_mode = "menu"; } catch (e) { /* yok say */ }
+        DE.Engine.switch_scene(DE_GAME.build_main_menu_scene());
+        return true;
+    };
+    const bg = new DE.GameObject("ClimbBackdrop", 0, 0, 0, 0, "ClimbBackdrop");
+    bg.add_component(new DE_GAME.ClimbBackdrop());
+    scene.add_object(bg);
     _climber_make_player(scene);
     const hud = new DE.GameObject("ClimbHUD", SCREEN_W / 2, 22, 0, 0, "ClimbHUD");
     hud.add_component(new DE.TextRenderer(
@@ -461,6 +552,11 @@ DE_GAME.build_climber_scene = function (seed = null) {
         DE.I18n.localize("climber_speed", { mult: "1.00" }), 18,
         [140, 220, 255], true, [0, 0, 0], true));
     scene.add_object(speed);
+    const hint = new DE.GameObject("ClimbHint", SCREEN_W / 2, SCREEN_H - 16, 0, 0, "ClimbHint");
+    hint.add_component(new DE.TextRenderer(
+        DE.I18n.localize("climber_hint", {}), 15,
+        [120, 140, 180], true, [0, 0, 0], true));
+    scene.add_object(hint);
     const game = new DE.GameObject("ClimbGame", 0, 0, 0, 0, "ClimbGame");
     game.add_component(new DE_GAME.ClimbGame(scene, seed));
     scene.add_object(game);

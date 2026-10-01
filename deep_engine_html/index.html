@@ -5,14 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DerinEngine HTML — Star Collector Hero</title>
 <style>
-  body { margin: 0; background: #0e1220; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: monospace; }
-  canvas { image-rendering: pixelated; border: 2px solid #2a3350; border-radius: 6px; }
-  #info { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; color: #7c8db0; font-size: 13px; }
+  body { margin: 0; background: #0e1220; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: monospace; overflow: hidden; }
+  /* Oyun 900x600 çizilir ama pencere/kaydırma çubuğu küçükse KIRPILMASIN:
+     canvas en-boy oranını koruyarak pencereye sığacak şekilde küçülür. */
+  canvas {
+    image-rendering: pixelated; border: 2px solid #2a3350; border-radius: 6px;
+    max-width: 100vw; max-height: 100vh; width: auto; height: auto;
+    aspect-ratio: 900 / 600; object-fit: contain;
+  }
+  #info { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; color: #7c8db0; font-size: 13px; pointer-events: none; }
 </style>
 </head>
 <body>
 <canvas id="game" width="900" height="600"></canvas>
-<div id="info">Star Collector Hero · A/D hareket · SPACE zıpla · F ateş · P kampanya · 4 Sonsuz Mod</div>
+<div id="info">Star Collector Hero · A/D hareket · SPACE zıpla · F ateş · P kampanya · C Star Climber · 4 Sonsuz Mod</div>
 
 <!-- DerinEngine HTML çekirdeği (sıra önemli) -->
 <script src="engine/core.js"></script>

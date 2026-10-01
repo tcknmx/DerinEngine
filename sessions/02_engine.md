@@ -237,6 +237,15 @@ dokunan kısımlar için `03_game.md`'ye bak.
 Doğrulama alışkanlığı (bu oturumda): headless dummy SDL + gerçek Engine kullanılır,
 bozuk dosyalar için `py_compile`, her değişiklikte "oyun X sn çökmeden boot" kontrolü.
 
+**JS/Python motor paritesi — `Engine.set_scene` boyut ataması (03.10.2026).**
+Kullanıcı tarayıcı sürümünü oynarken "motor JS ile Python ile aynı denklikte
+yazılmalı" diye netleştirdi. İlk denetimde bulunan gerçek fark: Python
+`Engine.set_scene()` yeni sahneye `screen_width`/`screen_height` **atıyor**,
+`DE.Engine.set_scene()` ise atamıyordu → 900x600 dışında boyutlu bir sahne
+kurulduğunda UI/parallax/kamera yanlış boyutu kullanırdı. JS'e aynı iki atama eklendi
+(`engine/core.js`). **Kalan:** modül modül API/karşılaştırması + otomatik parite
+testi (bkz. `03_game.md` OYUN KALAN, "JS motoru ↔ Python parite denetimi").
+
 ---
 
 ## MOTOR KALAN (bekleyen motor işleri, sıra kullanıcıyla)

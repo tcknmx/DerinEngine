@@ -31,6 +31,9 @@ from deep_engine import (
     Input,
     I18n,
 )
+import pygame
+
+from . import state
 
 # --- Sabitler (JS eşiyle birebir aynı olmalı) ---
 SCREEN_W = 900
@@ -59,6 +62,8 @@ SIDE_MARGIN = 24.0
 REACH_OVERLAP = 70.0       # ardışık katmanlar arası en az yatay örtüşme (px)
 FREE_CLIMB = 8             # bu kata kadar katmanlar oyuncunun sütununda kalır
                           # -> oyuncu yatay giriş vermeden de tırmanabilir
+FLOOR_LINE = 0.72          # ulaşılan katman ekranın %72'sine çizilir
+PLAYER_TOP_MARGIN = 96.0  # oyuncunun başı bu satırın üstüne çıkmaz (sekiş tepesi)
 
 COL_SOLID = (110, 190, 255)
 COL_CHECKPOINT = (120, 255, 180)
@@ -89,6 +94,23 @@ def reset_floor_cache():
     """Testler için katman yüksekliği önbelleğini sıfırlar."""
     _FLOOR_Y.clear()
     _FLOOR_Y.append(START_Y)
+
+
+def _shade(rgb, k: float):
+    """Rengi katsayıyla açar/koyulaştırır (0..255 clamp)."""
+    return tuple(max(0, min(255, int(c * k))) for c in rgb[:3])
+
+
+def _rect(surface, x, y, w, h, rgb):
+    """Düz renkli dikdörtgen (çizim yardımcısı). Ekran dışı parça sorun çıkarmaz."""
+    if w <= 0 or h <= 0:
+        return
+    surface.fill(rgb, (int(x), int(y), int(w), int(h)))
+
+
+def _line(surface, x1, y1, x2, y2, rgb):
+    """Tek piksellik çizgi (çatlaklar için)."""
+    pygame.draw.line(surface, rgb, (int(x1), int(y1)), (int(x2), int(y2)), 2)
 
 
 class ClimbPlatform(Component):
@@ -162,6 +184,81 @@ class ClimbPlatform(Component):
         else:
             self.game_object.active = False
             SoundFX.play("break")
+
+    # ------------------------------------------------------------------ çizim
+    def draw(self, surface, camera_offset):
+        """Düz renkli dikdörtgen yerine "kiriş" görünümlü katman çizer.
+
+        Üst yüzey (basılan yer) açık, gövde koyu, altta gölge, yanlarda pah —
+        böylece katman "kaba bir kutu" gibi görünmez. Kırılabilir katmanlarda
+        çatlaklar isabet sayısına göre belirir, kontrol noktasında yeşil bant
+        + flama vardır. SpriteRenderer taban rengi çizer, burada üstüne detay
+        eklenir.
+        """
+        if not self.game_object.active:
+            return
+        obj = self.game_object
+        x = int(obj.position.x - camera_offset.x)
+        y = int(obj.position.y - camera_offset.y)
+        w = int(obj.size.x)
+        h = int(obj.size.y)
+        if w <= 0 or h <= 0:
+            return
+        base = self._base_color or (110, 190, 255)
+        top = COL_CHECKPOINT if self.checkpoint else base
+
+        # --- alt gölge (yapıyı zemine oturtur) ---
+        _rect(surface, x, y + h - 3, w, 3, _shade(base, 0.35))
+        # --- yan pahlar ---
+        _rect(surface, x, y, 2, h, _shade(top, 1.18))
+        _rect(surface, x + w - 2, y, 2, h, _shade(top, 0.62))
+        # --- üst yüzey: basılan yer parlak, ince bir şerit ---
+        _rect(surface, x, y, w, 4, _shade(top, 1.30))
+        _rect(surface, x, y + 4, w, 2, _shade(top, 0.92))
+
+        if self.checkpoint:
+            # kontrol noktası: gövdede yeşil bant + flama direği
+            _rect(surface, x, y + 6, w, 3, COL_CHECKPOINT)
+            _rect(surface, x + w - 26, y - 16, 2, 16, (200, 220, 230))
+            _rect(surface, x + w - 24, y - 16, 22, 10, COL_CHECKPOINT)
+
+        if self.hits_to_break > 0:
+            # çatlaklar: isabet sayısına göre sağdan sola
+            k = min(1.0, self.hits / float(self.hits_to_break))
+            n = 1 + int(round(k * 3))
+            for i in range(n):
+                cx = x + int(w * (0.25 + 0.5 * (i / 3.0)))
+                _line(surface, cx, y + 2, cx - 4, y + h - 3, COL_CRACK)
+
+
+class ClimbBackdrop(Component):
+    """Bina cephesi: yan duvarlar + kat ayraçları (derinlik hissi).
+
+    Sahne arka planı düz renk olduğu için kule "boşlukta yükselen kutular"
+    gibi duruyordu. Bu bileşen ekranı bir bina içi gibi çerçeveler: sol/sağ
+    duvar şeritleri ve düşük kontrastlı kat çizgileri.
+    """
+
+    STOREY = 78.0
+
+    def draw(self, surface, camera_offset):
+        w, h = surface.get_size()
+        top = -int(camera_offset.y)
+        # sol/sağ duvar (SIDE_MARGIN kadar içeride)
+        m = int(SIDE_MARGIN)
+        _rect(surface, 0, top, m, h, (22, 26, 48))
+        _rect(surface, w - m, top, m, h, (22, 26, 48))
+        _rect(surface, m - 2, top, 2, h, (46, 56, 92))
+        _rect(surface, w - m, top, 2, h, (46, 56, 92))
+        # kat ayraçları (yumuşak, derinlik için)
+        y0 = int(camera_offset.y) - h
+        y1 = int(camera_offset.y) + h * 2
+        yy = (y0 // int(self.STOREY)) * int(self.STOREY)
+        while yy < y1:
+            sy = yy - int(camera_offset.y)
+            if -2 <= sy <= h + 2:
+                _rect(surface, m, sy, w - 2 * m, 1, (24, 28, 54))
+            yy += int(self.STOREY)
 
 
 class ClimberPlayer(Component):
@@ -440,8 +537,16 @@ class ClimbGame(Component):
         Neden oyuncunun tepesine değil: zıplama tepesi kamerayı yukarı çekerse,
         oyuncu kendi üstünde durduğu katmanın ekran dışına düşer ve her sekişte
         aynı yerde ölür. Icy Tower'da da kamera yalnız yeni katmana inince kayar.
+
+        EK: oyuncu BAŞI ekranın üstüne çıkmasın (PLAYER_TOP_MARGIN). Yoksa
+        sekiş tepesi (≈390px) katman çizgisini (372px) aştığı için oyuncu her
+        sekişte ekranın dışına taşıyordu.
         """
-        want = self._camera_anchor_y() - SCREEN_H * 0.62
+        want = self._camera_anchor_y() - SCREEN_H * FLOOR_LINE
+        if self.player is not None:
+            keep = self.player.position.y - PLAYER_TOP_MARGIN
+            if keep < want:
+                want = keep
         if want < self._cam_y:
             self._cam_y += (want - self._cam_y) * min(dt * 9.0, 1.0)
         self.scene.camera_position.x = 0.0
@@ -535,6 +640,19 @@ def build_climber_scene(seed=None) -> Scene:
     scene = Scene(name="Star Climber", background_color=COL_BG)
     # Kamera oyun tarafından sürülür (yalnızca yukarı) → motor takibi kapalı
     scene.camera_manual = True
+
+    def _on_escape() -> bool:
+        """ESC -> ana menü (motor ESC'yi sahne alırsa oyun kapanmaz)."""
+        from .ui import build_main_menu_scene
+        state.game_mode = "menu"
+        Engine.switch_scene(build_main_menu_scene())
+        return True
+
+    scene.on_escape = _on_escape
+
+    bg = GameObject(name="ClimbBackdrop", x=0, y=0, width=0, height=0, tag="ClimbBackdrop")
+    bg.add_component(ClimbBackdrop())
+    scene.add_object(bg)
     _make_player(scene)
     hud = GameObject(name="ClimbHUD", x=SCREEN_W / 2, y=22, width=0, height=0, tag="ClimbHUD")
     hud.add_component(TextRenderer(text=I18n.localize("climber_hud", floor=0, score=0),
@@ -546,6 +664,12 @@ def build_climber_scene(seed=None) -> Scene:
                                      font_size=18, color=(140, 220, 255), is_ui=True,
                                      shadow=(0, 0, 0), center_x=True))
     scene.add_object(speed)
+    hint = GameObject(name="ClimbHint", x=SCREEN_W / 2, y=SCREEN_H - 16, width=0, height=0,
+                      tag="ClimbHint")
+    hint.add_component(TextRenderer(text=I18n.localize("climber_hint"),
+                                    font_size=15, color=(120, 140, 180), is_ui=True,
+                                    shadow=(0, 0, 0), center_x=True))
+    scene.add_object(hint)
     game = GameObject(name="ClimbGame", x=0, y=0, width=0, height=0, tag="ClimbGame")
     game.add_component(ClimbGame(scene=scene, seed=seed))
     scene.add_object(game)

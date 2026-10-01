@@ -471,6 +471,10 @@ DE.Engine = class Engine {
     }
     set_scene(scene) {
         this.active_scene = scene;
+        // Python Engine.set_scene eşi: sahne ekran boyutunu ALIR
+        // (UI/parallax/kamera bu değerlere göre konumlanır).
+        this.active_scene.screen_width = this.width;
+        this.active_scene.screen_height = this.height;
         scene.start();
     }
     _frame(now) {

@@ -8,6 +8,33 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[OYUN] Tarayıcı sürümü oynanamıyordu: "C" çalışmıyor, oyun ekrana sığmıyor,
+  platformlar kaba (03.10.2026, kullanıcı playtesti).** Kullanıcı tarayıcıda
+  (`index.html`) oynuyor ve menüden hiçbir şeye giremiyordu. Node'da **gerçek DOM
+  olay zinciri** kuruldu; asıl kök neden bulundu: `MainMenu._start_climber()`
+  `_fade_dir`'ı ayarlamıyordu (0'da kalıyordu) → karartma hiç başlamıyor →
+  `update()`'in `_fade_dir == 1` şartı hiç sağlanmıyor → **sahne asla
+  değişmiyordu** (C ve fare sessizce ölü). Düzeltme: `_fade=0` + `_fade_dir=1` +
+  `_fading_out=True` (Py `ui.py` + JS `ui.js`). Yatay tuşlar zaten çalışıyordu
+  (D 1 sn'de x 435→765) — oyuncu yalnız sahneye giremiyordu.
+  **Kamera:** tırmanışta 1800 karenin 133'ünde (%7) oyuncu ekran dışındaydı
+  (en kötü −46px); sebep sekiş tepesinin (~390px) katman çizgisini (372px) aşması.
+  `FLOOR_LINE=0.72` + `PLAYER_TOP_MARGIN=96` ile `want = min(anchor−600*0.72,
+  player.y−96)` → **0 dışarıda** (Py ve JS). **ESC** tırmanışta motoru kapatıyordu →
+  `scene.on_escape` kancası (Py+JS) menüye döndürüyor. **Platform çizimi:**
+  `ClimbPlatform.draw()` (gölge + sol/sağ pah + parlak üst yüzey + çatlaklar +
+  kontrol noktası flama) + `ClimbBackdrop` (yan duvar + kat ayraçları) — piksel
+  sayımıyla 20 farklı renk doğrulandı. **Canvas:** CSS `aspect-ratio: 900/600` +
+  `max-width/max-height: 100vh` (dahili 900x600 çizimi **aynen korunur**, sadece
+  görüntü ölçeklenir). **Motor paritesi:** `DE.Engine.set_scene()` sahneye
+  `screen_width/height` atamıyordu (Python atıyor) → düzeltildi. Regresyon:
+  **JS motor+oyun 561 kontrol / 0 hata** (`test_game.js` 174→**182**/182), Python
+  `tests/test_climber.py` 9/9, `test_engine_core.py` ALL OK, tools 36/36,
+  **browser 33→44**/44 (yeni **bölüm 4b**: gerçek `keydown` ile C → sahne → D/ok
+  hareketi → 20 sn ekran dışı yok → ESC menü), üç araç 14 modülde 0/0/0.
+  Ayrıntılı kök nedenler: `03_game.md` AÇIK RAPOR 4–8.
+  → Yeni çapraz tuzak **#11** aşağıya eklendi (karartma/`_fade_dir` tuzağı).
+
 - **[MOTOR+OYUN] Kamera/shake refactoru + SpawnIn koruması + STAR CLIMBER
   (03.10.2026, "yap hepsini").** (1) **MOTOR kamera:** `Scene.set_camera_target()` ilk
   karede hedefe **snap** eder (`camera_follow_point()`, `snap_camera_to_target()` —
@@ -697,6 +724,19 @@ import `game/*` içinde ÇALIŞMAZ — paket dışındadırlar).
    Python'da `tests/test_climber.py`, JS'de `test_game.js` TEST17 — ikisi de
    aynı kural setini kontrol eder. Geçici probe betikleri **kalıcı teste
    çevrilmeli** (commit'ten silinir, sonra o hataya geri dönüş olur).
+11. **YENİ Menü geçişi = karartmayı test et (03.10.2026).** Sahne değiştiren her
+    menü aksiyonu (`_pending_factory` kullananlar: P, 4, C, çıkış) önce karartmayı
+    **başlatmak** zorundadır: `_fade = 0` **+ `_fade_dir = 1`** +
+    `_fading_out = True`. `_fade_dir` `0` iken `update()`'teki
+    `if _fade_dir == 1` şartı hiç sağlanmaz, `_fade` 0'da kalır ve sahne **asla**
+   değişmez — kullanıcı tuşa basar, hiçbir şey olmaz, tuşlar "bozuk" sanılır.
+   Gerçek tuş yolu ancak DOM-benzeri bir testte yakalanır: geçici probe
+   `window.addEventListener("keydown")` zinciri kurup `keydown` → `Input` →
+   menü → `_start_climber` → `Engine.switch_scene` yolunu sürdü; bu artık
+   `tools_html/test_browser.js` **bölüm 4b**'de kalıcı. Kural: `test_browser.js`
+   `bootGame()` liste listesinde **her `index.html` `<script>` sırasını birebir
+   yansıt** (Climber `test_browser.js`'te 03.10.2026'ya kadar hiç yoktu —
+   yüklenmemiş kod test edilemez).
 
 ---
 

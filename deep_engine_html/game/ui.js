@@ -260,6 +260,11 @@ DE_GAME.MenuController = class MenuController extends DE.Component {
         DE.SoundFX.play("win");
         DE_GAME.state.game_mode = "climber";
         this._pending_factory = DE_GAME.build_climber_scene;
+        // KRİTİK: karartmayı BAŞLAT. _fade_dir init'te 0'dır ve update()
+        // yalnız _fade_dir=1 iken koyulaştırır — bu satır olmadan sahne hiç
+        // değişmez (C tuşu / tıklama sessizce hiçbir şey yapmaz).
+        this._fade = 0;
+        this._fade_dir = 1;
         this._fading_out = true;
     }
     _dispatch_action(action) {

@@ -811,9 +811,17 @@ console.log("TEST17 Star Climber:");
   check("17: düşünce yükseklik ilerlemesi sıfırlandı (rekor korunur)",
     game.max_floor === 20 && game.best_floor === 25,
     "maxf=" + game.max_floor + " best=" + game.best_floor);
+  // Kamera yumuşak takip (dt*9) — hedefe oturması için birkaç kare gerekir.
+  for (let i = 0; i < 40; i++) step(cl, 1);
+  // Kamera sözleşmesi: min(katman çizgisi, oyuncunun başı + üst pay).
+  // Oyuncu zıplarken ikinci terkin belirleyici olabilir (kamera oyuncuyu
+  // ekranda tutar) — bu yüzden ikisinin minimumu beklenir.
+  const anchorWant = game._camera_anchor_y() - 600 * 0.72;
+  const wantCam = Math.min(anchorWant, player.position.y - 96);
   check("17: düşünce kamera kontrol noktasına döndü",
-    Math.abs(cl.camera_position.y - (game._camera_anchor_y() - 600 * 0.62)) < 1,
-    "cam=" + cl.camera_position.y);
+    cl.camera_position.y <= anchorWant + 1 && Math.abs(cl.camera_position.y - wantCam) < 40,
+    "cam=" + cl.camera_position.y.toFixed(2) + " want=" + wantCam.toFixed(2) +
+    " fark=" + Math.abs(cl.camera_position.y - wantCam).toFixed(2));
 
   // 9b) ZEMİNDE duran oyuncu ölmez (yoksa aynı ölüm sonsuz tekrarlanır)
   cl.camera_position.y = game.floors[0].position.y + 900;
@@ -950,13 +958,20 @@ console.log("TEST17 Star Climber:");
     // 17) GİRİŞSİZ oynanış smoke — bu test, 5 gerçek oynanış hatasının
     //     (0. katman yok / sekiş yok / kamera ölüm döngüsü / zeminde ölüm /
     //     respawn max_floor) hepsini birden yakalar. 3 seed x 30 sn.
+    //     Aynı zamanda oyuncunun EKRAN DIŞINA ÇIKMADIĞINI doğrular (03.10.2026
+    //     düzeltmesi: sekiş tepesi katman çizgisini aşıyordu, %7 kare dışarıda).
     {
-      let climbed = [], fell = [];
+      let climbed = [], fell = [], offFrames = 0, worst = 0;
       for (const seed of [7, 99, 2024]) {
         const ss = DE_GAME.build_climber_scene(seed);
         use(ss); ss.start();
         const sg = ss.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame);
-        for (let i = 0; i < 1800; i++) step(ss, 1);   // 30 sn, hiç tuş basılmıyor
+        const sp = ss.find_by_tag("Player");
+        for (let i = 0; i < 1800; i++) {           // 30 sn, hiç tuş basılmıyor
+          step(ss, 1);
+          const sy = sp.position.y - ss.camera_position.y;
+          if (sy < -1) { offFrames++; worst = Math.min(worst, sy); }
+        }
         climbed.push(sg.best_floor);
         fell.push(sg.falls);
       }
@@ -964,6 +979,51 @@ console.log("TEST17 Star Climber:");
         "katman=" + climbed.join(","));
       check("17: girişsiz oynanışta ölüm döngüsü yok", fell.every(f => f <= 3),
         "düşme=" + fell.join(","));
+      check("17: oyuncu hiç ekran dışına çıkmıyor", offFrames === 0,
+        "dışarıda=" + offFrames + (worst < 0 ? " ençok=" + Math.round(worst) + "px" : ""));
+    }
+
+    // 18) ESC -> menü (sahne ESC'yi alırsa motor oyunu KAPATMAZ)
+    {
+      const es = DE_GAME.build_climber_scene(3);
+      use(es); es.start();
+      check("17: tırmanış sahnesi ESC kancası tanımlı", typeof es.on_escape === "function");
+      let handled = false;
+      if (typeof es.on_escape === "function") handled = es.on_escape() === true;
+      check("17: ESC menüye dönüyor (oyun kapanmaz)", handled === true);
+      step(es, 2);
+      check("17: ESC sonrası ana menü sahnesi",
+        es.name === "Main Menu" || (DE_GAME.state && DE_GAME.state.game_mode === "menu"),
+        "sahne=" + (es.name) + " mod=" + (DE_GAME.state && DE_GAME.state.game_mode));
+    }
+
+    // 19) Çizim: katman "kiriş" gibi çiziliyor (kaba düz kutu değil)
+    {
+      const ds = DE_GAME.build_climber_scene(11);
+      use(ds); ds.start();
+      const dg = ds.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame);
+      const p0 = dg.floors[1].get_component(DE_GAME.ClimbPlatform);
+      const cp = dg.floors[10].get_component(DE_GAME.ClimbPlatform);
+      const ops = [];
+      const fake = {
+        canvas: { width: 900, height: 600 }, fillStyle: "",
+        fillRect(x, y, w, h) { ops.push([x, y, w, h]); },
+      };
+      let ok = false;
+      try { p0.draw(fake, { x: 0, y: 0 }); ok = true; } catch (e) { ok = false; }
+      // 6 dikdörtgen bekleniyor: alt gölge, sol/sağ pah, üst yüzey (2 şerit)
+      check("17: katman özel çizimi çalışıyor", ok && ops.length >= 5, "dikdörtgen=" + ops.length);
+      const topBand = ops.filter(o => o[1] === Math.round(dg.floors[1].position.y));
+      check("17: katmanda parlak üst yüzey şeridi var", topBand.length >= 2,
+        "üst şerit=" + topBand.length);
+      const cops = [];
+      try { cp.draw({ canvas: { width: 900, height: 600 }, fillStyle: "",
+        fillRect(x, y, w, h) { cops.push([x, y, w, h]); } }, { x: 0, y: 0 }); } catch (e) { }
+      check("17: kontrol noktası flama/bant çiziyor", cops.length >= 8, "dikdörtgen=" + cops.length);
+      // arka plan bileşeni
+      const bg = ds.find_by_tag("ClimbBackdrop");
+      check("17: bina cephesi (arka plan) var", bg !== null &&
+        bg.get_component(DE_GAME.ClimbBackdrop) !== null);
     }
   }
 }

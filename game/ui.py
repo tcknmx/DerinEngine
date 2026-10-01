@@ -354,6 +354,11 @@ class MenuController(Component):
         SoundFX.play("win")
         state.game_mode = "climber"
         self._pending_factory = build_climber_scene
+        # KRİTİK: karartmayı BAŞLAT. _fade_dir değeri 0'dır ve update()
+        # yalnızca _fade_dir == 1 iken koyulaştırır — bu satır olmadan sahne hiç
+        # değişmez (C tuşu / fare tıklaması sessizce hiçbir şey yapmazdı).
+        self._fade = 0.0
+        self._fade_dir = 1
         self._fading_out = True
 
     def _dispatch_action(self, action: str):
