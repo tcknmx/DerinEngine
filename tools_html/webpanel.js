@@ -15,7 +15,6 @@
 
 const http = require("http");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
 

@@ -65,6 +65,27 @@ async function main() {
   const leak = r8.modules[0].findings.filter(f => f.lvl === "ERR");
   check("modul 8: engine leak yok", leak.length === 0, JSON.stringify(leak.slice(0, 2)));
 
+  console.log("=== 2b) modul 6 sabit-kucuk dongu siniflandirmasi ===");
+  const cls = dt.const_loop_size;
+  check("export const_loop_size", typeof cls === "function");
+  check("py range(4) -> 4", cls("for i in range(4):") === 4, String(cls("for i in range(4):")));
+  check("py range(0, 40, 8) -> 5", cls("for i in range(0, 40, 8):") === 5, String(cls("for i in range(0, 40, 8):")));
+  check("py tuple literal -> 2", cls("for side in (-1, 1):") === 2, String(cls("for side in (-1, 1):")));
+  check("py liste literal -> 3", cls('for t in ["a", "b", "c"]:') === 3);
+  check("py dinamik range -> null", cls("for i in range(n):") === null, String(cls("for i in range(n):")));
+  check("py buyuk literal (>32) -> null", cls("for i in range(64):") === null, String(cls("for i in range(64):")));
+  check("js for(i<4) -> 4", cls("for (let i = 0; i < 4; i++) {") === 4, String(cls("for (let i = 0; i < 4; i++) {")));
+  check("js of literal -> 2", cls("for (const x of [1, 2]) {") === 2, String(cls("for (const x of [1, 2]) {")));
+  check("js dinamik -> null", cls("for (const x of items) {") === null);
+  // modul 6 ciktisi: kucuk-sabit etiketi gercekten kullaniliyor, WARN/BUG/ERR artmamis
+  const r6 = dt.api_dispatch("scan", ["6"]);
+  const f6 = r6.modules[0].findings;
+  const smallTagged = f6.filter(f => /kucuk|<=32/i.test(f.msg)).length;
+  check("modul 6: sabit-kucuk etiketi uretildi", smallTagged > 0, "adet=" + smallTagged);
+  check("modul 6: WARN/BUG/ERR yok",
+    f6.every(f => f.lvl === "INFO"),
+    JSON.stringify(f6.filter(f => f.lvl !== "INFO").slice(0, 2)));
+
   console.log("=== 3) api_find + api_modules ===");
   const fm = dt.api_dispatch("modules", []);
   check("modules 13 maddeli", fm.ok && fm.modules.length === 13);

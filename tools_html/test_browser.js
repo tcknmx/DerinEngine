@@ -14,7 +14,6 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 const http = require("http");
-const os = require("os");
 
 const ROOT = path.join(__dirname, "..");
 const HTML = path.join(ROOT, "deep_engine_html");

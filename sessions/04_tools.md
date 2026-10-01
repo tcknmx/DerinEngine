@@ -231,6 +231,40 @@ new üret+koruma), `--lang en all` 0/0/0. Eski 8765 süreçleri kapatılıp sunu
     `input.js` zaten end_frame tanıyordu) ve `webpanel.html/js` değişti. Py motor
     DEĞİŞMEDİ (zaten doğru sıra + `_update_events`).
     ⏳ **Bu madde için COMMIT sırada (kullanıcı onayıyla push).**
+18. **deep-tool iki araçta Modül 6 + Modül 7 denkliği + konsol çökmesi düzeltmesi
+    (01.10.2026, "devam et, sıradaki tüm işi bitir" kapsamında):**
+    - **Modül 6 — sabit küçük döngü yanlış pozitifleri:** 6.x iç içe döngüde
+      O(n²) riskini kanıtlanabilir sabit küçük iterasyonda üretiyordu (oyun kodu
+      doğruydu). İki araca da `_const_loop_size` / `const_loop_size` eklendi:
+      Python `range(a,b[,s])` tek argümanlı literal, `for … in (tüp/liste/set)`
+      literal'i, satır içi string; JS `for (let i=0;i<N;i++)`, `for…of/in` literal
+      dizi/nesle/string. **Dış veya iç döngülerden biri `<=32`** ise bulgu
+      INFO'ya iner: "nested loop with a small constant side (<=32) - no O(n^2)
+      risk" (`perf_small_loop` iki dilde); dinamik döngüde uyarı aynen durur.
+      Sonuç: **8 döngü** yeniden sınıflandı (py `parallax.py:118`,
+      `game/entities.py:159/996`; JS `parallax.js:105`, `tilemap.js:116`,
+      `levelfile.js:112`, `game/entities.js:136/923`) ve iki araç **aynı Python
+      dosyalarında birebir aynı sınıflandırmayı** üretiyor.
+    - **Modül 7 — JS eşi yanlış "unused import" üretiyordu (13 yanlış pozitif):**
+      `_IMPORT_RE` yalnız `from … import` satırının **modül adını** yakalıyordu,
+      bind edilen isimleri değil → `from deep_engine import (\n …\n)` gibi çok
+      satırlı bloklarda ve `import traceback as _tb` alias'ında isim "kullanılmıyor"
+      sanılıyordu (Python tarafı `ast` ile doğruydu). Yeni ifade-bilincinde toplama:
+      `py_import_names()` / `js_import_names()` / `strip_import_stmts()` — çok
+      satırlı parantezli import, `as` alias'ı, `import {a,b} from "m"`,
+      `const X = require("m")` (JS'te yalnız **bind adı** yoksa) destekleniyor.
+      Kalan 2 uyarı **gerçekti**: `tools_html/webpanel.js` ve
+      `tools_html/test_browser.js` içinde hiç kullanılmayan `const os = require("os")`
+      satırları silindi.
+    - **`deep-tool.py find` Windows'ta çöküyordu:** eşleşen satır `→` gibi Unicode
+      karakter içerince cp1254 konsolunda `UnicodeEncodeError` ile traceback
+      basıyor, çıkış kodu 1. `main()`'de stdout/stderr `utf-8` +
+      `errors="replace"`'a alındı → `find` artık 0 ile çıkıyor.
+    - **Doğrulama:** `python tools\deep-tool.py --lang en all` **14 × 0 WARN / 0 BUG /
+      0 ERR**; `node tools_html\deep-tool.js --lang en all` **14 × 0/0/0** (önceden
+      Modül 7'de 15 WARN). `test_tools.js` Modül 6 sınıflandırma testlerini de
+      kapsıyor → **36/36** (11 yeni check: 8 helper + 3 entegrasyon);
+      `test_browser.js` **33/33**; `node --check` tüm değişen JS dosyalarında OK.
 
 ---
 
@@ -387,14 +421,22 @@ tamamlanınca araçlar da JS'e taşınıyor: **`tools_html/`** klasörü.
   tilemap+levelfile, UI kit, SceneManager+console+log+i18n+audio+savegame+procedural.
   Sonra: SCH tam portu + tırmanma oyunu (Icy Tower mekaniği).
   Doğrulama komutu: `node deep_engine_html\test_core.js` → `ALL OK`.
-- **Modül 7 kullanılmayan import WARN temizliği** (`game/*.py`) — manuel, kullanıcı.
-- **tarayıcı interaktif playtest** (kullanıcıya bırakıldı).
-- **web paneli: katıştırılmış oyun sekmesi** (pygbag iframe) — aday, ertelendi.
-- **editör: gizle/kilit + sürükle-bırak sıralama** — madde 14 sonrası KALAN.
-- **Modül 6 (Performans) yanlış-pozitif yumuşatması** (27.09, MOTOR devri — `02_engine.md`):
-  O(n²) satırlarının tamamı incelendi; hepsi ya sabit-küçük liste ya cull'lanmış çizim
-  ya da zaten uzaysal grid. Tarayıcı, küçük-sabit iç döngüleri (ör. `< 32` eleman/tampon)
-  yanlış-pozitif olarak işaretlemeyebilir → temiz tarama.
+- **Modül 7 kullanılmayan import WARN temizliği** (`game/*.py`) — ~~KALAN~~ **KAPANDI
+  (01.10.2026):** tarama zaten temiz; araçtaki uyarı mekanizması geçici
+  `game/zz_probe_unused.py` ile kanıtlandı (`[WARN] … unused import 'os'`), dosya
+  silindi. Ayrıca **JS eşindeki 13 yanlış pozitif** düzeltildi (madde 18).
+- **tarayıcı interaktif playtest** (kullanıcıya bırakıldı — `test_browser.js` 33/33
+  boot/rAF/klavye smoke yeşil; gerçek kullanıcı etkileşimi gerekiyor).
+- **web paneli: katıştırılmış oyun sekmesi (pygbag iframe)** — ~~aday, ertelendi~~
+  **İPTAL (01.10.2026):** ana paket artık standalone `deep_engine_html/index.html`
+  (`main.js` rAF döngüsü), Python/pyscript iframe'ine gerek kalmadı.
+- **editör: gizle/kilit + sürükle-bırak sıralama** — ~~KALAN~~ **KAPANDI:** özellikler
+  zaten `tools/webpanel.py:790+` içinde ve `48163a5` commit'inde var (gizle, kilit,
+  `ondrop` ile sıra değiştirme); kayıt bayattı, düzeltildi.
+- **Modül 6 (Performans) yanlış-pozitif yumuşatması** (27.09, MOTOR devri —
+  `02_engine.md`) — ~~KALAN~~ **KAPANDI (01.10.2026, madde 18):** kanıtlanabilir
+  sabit küçük döngü tanımı (≤32) iki araca da girdi, 8 döngü INFO'ya indi,
+  dinamik döngü uyarısı duruyor, iki araç 0 WARN.
 
 ## GÖREV HEDEFİ — editörü gerçek motor UI'ye çevir (26.09.2026)
 
@@ -404,8 +446,10 @@ hierarchy (Sahne ağacı) + toolbar (Kaydet/Farklı/geri al/yinele/çoğalt/sil/
 Inspector (hızlı butonlar) + durum çubuğu + klavye kısayolları (Ctrl+Z/Y/D/S,
 Delete, Esc) + **undo/redo (60 snapshot)** + kaydet (açık dosyaya, default korunur) +
 çoğalt/↑↓ çizim sırası. ✔ **KOD YAZILDI + DOĞRULANDI** (madde 14; sig-HEDEF-14;
-sunucu canlı, sayfa F5 ile görülür). ⏳ commit için kullanıcı onayı bekleniyor.
-KALAN: gizle/kilit, sürükle-bırak sıralama.
+sunucu canlı, sayfa F5 ile görülür). ✔ **COMMIT `48163a5` içinde (bayat "onay
+bekleniyor" notu kapatıldı — 01.10.2026).**
+KALAN: ~~gizle/kilit, sürükle-bırak sıralama~~ → **YOK, ikisi de mevcut**
+(`webpanel.py:790+`).
 
 ---
 

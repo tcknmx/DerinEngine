@@ -77,6 +77,7 @@ const EN = {
   asset_missing: "referenced file NOT on disk",
   asset_checked: "Asset references checked: {n}",
   perf_nested_loop: "nested double loop (O(n^2) risk)",
+  perf_small_loop: "nested loop with a small constant side (<=32) - no O(n^2) risk",
   perf_file_loop: "file/resource open inside loop",
   perf_perf_loop: "asset/resource load inside loop",
   main_menu_title: "Select a tool:",
@@ -181,6 +182,7 @@ const TR = {
   asset_missing: "basvurulan dosya diskte YOK",
   asset_checked: "Kontrol edilen asset referansi: {n}",
   perf_nested_loop: "ic ice cift dongu (O(n^2) riski)",
+  perf_small_loop: "tarafi sabit-kucuk (<=32) ic ice dongu - O(n^2) riski yok",
   perf_file_loop: "dongu icinde dosya/kaynak acma",
   perf_perf_loop: "dongu icinde asset/kaynak yukleme",
   main_menu_title: "Bir alt-arac secin:",
@@ -610,6 +612,57 @@ function run_asset(collect) {
 }
 
 /* ======================= MODÜL 6 : PERFORMANS ======================= */
+/* Sabit-küçük döngü tespiti (Python deep-tool.py _const_loop_size ile aynı mantık;
+ * bu araç .py VE .js dosyalarını taradığı için iki sözdizimini de tanır).
+ * Döngünün yineleme sayısı kanıtlanabilir <= SMALL_LOOP_MAX ise döner, aksi hâlde null. */
+const SMALL_LOOP_MAX = 32;
+function const_loop_size(code) {
+  const c = String(code).trim();
+  let it = null;
+  // JS: for (let i = 0; i < N; i++)   -> sinir deger sayisal sabit mi?
+  let m = /^for\s*\(\s*(?:const|let|var)\s+\w+\s*=\s*\w+\s*;\s*\w+\s*<\s*([^;]+);\s*\w+\+\+\s*\)\s*\{?\s*$/.exec(c);
+  if (m) {
+    const bound = m[1].trim();
+    if (!/^\d+$/.test(bound)) return null;
+    const n = parseInt(bound, 10);
+    return n > 0 && n <= SMALL_LOOP_MAX ? n : null;
+  }
+  // JS: for (const x of EXPR) / for (const x in EXPR)
+  m = /^for\s*\(\s*(?:const|let|var)\s+[^;]*?\s+(?:in|of)\s+([\s\S]+?)\s*\)\s*\{?\s*$/.exec(c);
+  if (m) it = m[1].trim();
+  // Python: for x in EXPR:   (tuple unpacking "for a, b in ..." dahil)
+  if (it === null) {
+    m = /^for\s+(?:\w+\s*,\s*)?\w+\s+in\s+(.+?):\s*$/.exec(c);
+    if (m) it = m[1].trim();
+  }
+  if (it === null) return null;
+  // Python: range(...) sabit adim -> adim matematiği
+  const rm = /^range\(([^()]*)\)$/.exec(it);
+  if (rm) {
+    const args = rm[1].split(",").map((s) => s.trim()).filter((s) => s !== "");
+    if (!args.every((a) => /^\d+$/.test(a))) return null;
+    const nums = args.map(Number);
+    let n = null;
+    if (nums.length === 1) n = nums[0];
+    else if (nums.length === 2) n = nums[1] - nums[0];
+    else if (nums.length === 3) n = nums[2] === 0 ? null : Math.ceil((nums[1] - nums[0]) / nums[2]);
+    return n !== null && n > 0 && n <= SMALL_LOOP_MAX ? n : null;
+  }
+  // literal dizi / nesle / string / (Python tuple)
+  const open = it[0];
+  const CLOSERS = { "[": "]", "{": "}", "(": ")", "\"": "\"" };
+  if (Object.prototype.hasOwnProperty.call(CLOSERS, open)) {
+    const close = CLOSERS[open];
+    if (it.length < 2 || it[it.length - 1] !== close) return null;
+    if (open === "\"") return it.length - 2 > 0 && it.length - 2 <= SMALL_LOOP_MAX ? it.length - 2 : null;
+    const body = it.slice(1, -1).trim();
+    if (!body) return null;   // bare "()" -> yineleme kaynagi belirsiz
+    const n = body.split(",").filter((s) => s.trim() !== "").length;
+    return n > 0 && n <= SMALL_LOOP_MAX ? n : null;
+  }
+  return null;
+}
+
 function run_perf(collect) {
   for (const p of project_files()) {
     const src = read(p);
@@ -626,7 +679,10 @@ function run_perf(collect) {
         const L2 = lines[j];
         if (isLoop(L2.code)) {
           if (L2.ind > L.ind) {
-            collect("INFO", rel(p) + " :: L" + L.n + ": " + t("perf_nested_loop"));
+            // Yanlış-pozitif yumuşatma: dış ya da iç döngüden biri sabit-küçük ise
+            // toplam iş sabit çarpanlıdır (O(n^2) riski yok).
+            const small = const_loop_size(L.code) || const_loop_size(L2.code);
+            collect("INFO", rel(p) + " :: L" + L.n + ": " + (small ? t("perf_small_loop") : t("perf_nested_loop")));
             break;
           }
         } else if (L2.ind <= L.ind && L2.code && !/^[#)]/.test(L2.code)) {
@@ -701,6 +757,65 @@ const FALSEY = new Set(["self", "cls", "key", "value", "item", "obj", "colour",
   "font", "mixer", "pygame", "np", "sk", "time", "os", "sys", "random", "math",
   "json", "io", "path", "g", "A", "i", "j", "e", "ev", "el", "w", "h", "x", "y", "v"]);
 
+// Modul 7 (AST) icin ifade-bilincinde import toplama. _IMPORT_RE yalnizca
+// modulun adini yakalayip 'from X import (a, b)' ve 'import x as y' durumlarini
+// kaçirir; burada asıl bind edilen isimler toplanir (Python AST ile ayni sonuc).
+const _PY_IMPORT_STMT =
+  /^[ \t]*import\s+([^\n(]+)|^[ \t]*from\s+([.\w]+)\s+import\s+(\([\s\S]*?\)|[^\n]+)/gm;
+const _JS_IMPORT_STMT =
+  /^[ \t]*(?:import\s+(\{[^}]*\}|\w+)[^\n]*from\s*['"][^'"]+['"]|(?:const|let|var)\s+(\{[^}]*\}|\w+)\s*=\s*require\s*\(\s*['"][^'"]+['"]\s*\))/gm;
+
+function _alias_name(item) {
+  const parts = String(item).trim().split(/\s+as\s+/);
+  const nm = parts.length > 1 ? parts[1] : parts[0];
+  return nm.split(".")[0].trim();
+}
+
+function _names_from_list(list) {
+  const out = [];
+  for (let item of String(list).replace(/^\(|\)$/g, "").split(",")) {
+    item = item.trim().replace(/,+$/, "");
+    if (!item || item === "*" || item.startsWith("#")) continue;
+    const nm = _alias_name(item);
+    if (nm && /^[A-Za-z_]\w*$/.test(nm)) out.push(nm);
+  }
+  return out;
+}
+
+function py_import_names(src) {
+  const map = new Map();
+  let m;
+  _PY_IMPORT_STMT.lastIndex = 0;
+  while ((m = _PY_IMPORT_STMT.exec(src)) !== null) {
+    const ln = lineNo(src, m.index);
+    for (const nm of _names_from_list(m[1] !== undefined ? m[1] : m[3] || "")) {
+      if (!map.has(nm)) map.set(nm, ln);
+    }
+  }
+  return map;
+}
+
+function js_import_names(src) {
+  const map = new Map();
+  let m;
+  _JS_IMPORT_STMT.lastIndex = 0;
+  while ((m = _JS_IMPORT_STMT.exec(src)) !== null) {
+    const ln = lineNo(src, m.index);
+    const list = m[1] !== undefined ? m[1] : m[2] || "";
+    const names = /^\{/.test(list.trim())
+      ? _names_from_list(list)
+      : [_alias_name(list)].filter(n => /^[A-Za-z_$][\w$]*$/.test(n));
+    for (const nm of names) {
+      if (!map.has(nm)) map.set(nm, ln);
+    }
+  }
+  return map;
+}
+
+function strip_import_stmts(src) {
+  return src.replace(_PY_IMPORT_STMT, "").replace(_JS_IMPORT_STMT, "");
+}
+
 function run_ast(collect) {
   let imported_total = 0, unreachable_total = 0, empty_total = 0, undef_total = 0;
   for (const p of project_files()) {
@@ -710,23 +825,15 @@ function run_ast(collect) {
     const isInit = path.basename(p) === "__init__.py";
 
     if (!isInit) {
-      // 1) kullanılmamış import (basit: import ismi kodda hiç geçmiyor)
+      // 1) kullanılmamış import (import ifadesi bind ettiği isim kodda hiç geçmiyor)
       const imported = new Map();
-      let m;
-      _IMPORT_RE.lastIndex = 0;
-      while ((m = _IMPORT_RE.exec(src)) !== null) {
-        const nm = (m[1] || m[2]).split(".")[0];
-        if (!imported.has(nm)) imported.set(nm, lineNo(src, m.index));
+      for (const [nm, ln] of py_import_names(src)) imported.set(nm, ln);
+      for (const [nm, ln] of js_import_names(src)) {
+        if (!imported.has(nm)) imported.set(nm, ln);
       }
-      _JS_IMPORT_RE.lastIndex = 0;
-      while ((m = _JS_IMPORT_RE.exec(src)) !== null) {
-        const nm = (m[1] || m[2] || m[3] || m[4] || "").split("/")[0].replace(/^\.+/, "");
-        if (!imported.has(nm)) imported.set(nm, lineNo(src, m.index));
-      }
+      const body = strip_import_stmts(src);
       for (const [nm, ln] of imported) {
         const re = new RegExp("\\b" + nm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b");
-        // import satırları hariç vücudu say
-        const body = src.split("\n").filter((l, i) => i !== ln - 1).join("\n").replace(_IMPORT_RE, "").replace(_JS_IMPORT_RE, "");
         if (!re.test(body) && !_BUILTINS.has(nm)) {
           collect("WARN", relp + " :: L" + ln + ": " + t("ast_unused_import") + " '" + nm + "'");
           imported_total++;
@@ -1387,4 +1494,5 @@ if (__main) {
 module.exports = {
   ROOT, LANG, t, set_lang, project_files, rel, read,
   run_module, MODULES, api_dispatch, perform_new, collect_find, search_files,
+  const_loop_size, SMALL_LOOP_MAX,
 };

@@ -124,6 +124,7 @@ EN = {
     "asset_checked": "Asset references checked: {n}",
     # 6 - performance
     "perf_nested_loop": "nested double loop (O(n^2) risk)",
+    "perf_small_loop": "nested loop with a small constant side (<=32) - no O(n^2) risk",
     "perf_file_loop": "file/resource open inside loop",
     "perf_perf_loop": "asset/resource load inside loop",
     # main (alt-tool) menu
@@ -242,6 +243,7 @@ _TR_DATA = {
     "asset_checked": "Kontrol edilen asset referansi: {n}",
     # 6 - performance
     "perf_nested_loop": "ic ice cift dongu (O(n^2) riski)",
+    "perf_small_loop": "tarafi sabit-kucuk (<=32) ic ice dongu - O(n^2) riski yok",
     "perf_file_loop": "dongu icinde dosya/kaynak acma",
     "perf_perf_loop": "dongu icinde asset/kaynak yukleme",
     # main (alt-tool) menu
@@ -816,6 +818,54 @@ def _iter_code_lines(src):
         yield ln, indent, st.strip(), raw
 
 
+def _const_loop_size(code):
+    """Returns the iteration count of a loop that is provably small and constant.
+
+    Recognized (and only these): a literal ``range(<int>)`` / ``range(a, b, step)``
+    whose step math yields <= _SMALL_LOOP_MAX items, a literal list/tuple/set of
+    <= _SMALL_LOOP_MAX elements, and a literal string of that length. Anything
+    dynamic (``range(n)``, ``for x in items``) returns None -> unknown.
+    """
+    m = re.match(r"^for\b.*?\bin\s+(.+?):\s*$", code)
+    if not m:
+        return None
+    it = m.group(1).strip()
+    r = re.match(r"^range\(([^()]*)\)$", it)
+    if r:
+        args = [a.strip() for a in r.group(1).split(",") if a.strip()]
+        try:
+            nums = [int(a) for a in args]
+        except ValueError:
+            return None
+        if len(nums) == 1:
+            n = max(0, nums[0])
+        elif len(nums) == 2:
+            n = max(0, nums[1] - nums[0])
+        elif len(nums) == 3:
+            if nums[2] == 0:
+                return None
+            n = max(0, -(-(nums[1] - nums[0]) // nums[2]))  # ceil
+        else:
+            return None
+        return n if 0 < n <= _SMALL_LOOP_MAX else None
+    for op, cl in (("[", "]"), ("(", ")"), ("{", "}")):
+        if it.startswith(op) and it.endswith(cl):
+            body = it[1:-1].strip()
+            if op == "(" and not body:      # bare tuple -> iteration source is unknown
+                return None
+            parts = [c for c in re.split(r",(?![^\[\]{}()]*[\]\}\)])", body) if c.strip()]
+            n = len(parts)
+            return n if 0 < n <= _SMALL_LOOP_MAX else None
+    s = re.match(r"^(['\"]).*\1$", it)
+    if s:
+        n = len(it) - 2
+        return n if 0 < n <= _SMALL_LOOP_MAX else None
+    return None
+
+
+_SMALL_LOOP_MAX = 32  # <= this many iterations is a fixed cost, not an O(n^2) risk
+
+
 def run_perf(collect):
     files = _py_project_files()
     for p in files:
@@ -831,8 +881,13 @@ def run_perf(collect):
                 ln2, ind2, code2, _ = lines[j]
                 if code2.startswith("for ") or code2.startswith("for("):
                     if ind2 > ind:  # deeper indent = nested loop
+                        # Yanlış-pozitif yumuşatma: dış ya da iç döngüden biri
+                        # sabit-küçük (<=32) ise toplam iş sabit çarpanlıdır.
+                        n_small = _const_loop_size(code) or _const_loop_size(code2)
                         collect("INFO", "%s :: L%s: %s"
-                                % (_rel(p), _ln, t("perf_nested_loop")))
+                                % (_rel(p), _ln,
+                                   t("perf_small_loop") if n_small
+                                   else t("perf_nested_loop")))
                         break
                 elif ind2 <= ind and code2 and not code2.startswith(("#", ")")):
                     break  # end of outer block
@@ -1733,6 +1788,13 @@ def _api_dispatch(mode, args):
 
 def main(argv):
     global LANG
+    # Windows konsol (cp1254 gibi) Unicode satirlari yazamaz -> asagi degistirilemez
+    # karakterler '?' olur. Boylece find/cikti komutlari encoding hatasi vermez.
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     args = list(argv)
     # --lang tr|en  (from the command line)
     if "--lang" in args:
