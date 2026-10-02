@@ -52,8 +52,13 @@ DE.ParallaxLayer = class ParallaxLayer {
 }
 
 DE.ParallaxBackground = class ParallaxBackground {
+    /* Python `ParallaxBackground(theme="forest")` tek metin alir.
+     * JS tarafinda cagri yerleri bir noktada `{theme: "ice"}` NESNESI gecirdi
+     * (Python'da `theme=` anahtar sozcugu) -> tema hicbir kati ile eslesmedi ve
+     * arka plan HIC cizilmedi (0 katman). Burada ikisini de kabul ediyoruz. */
     constructor(theme = "forest") {
-        this.theme = theme;
+        if (theme && typeof theme === "object") theme = theme.theme || theme[0] || "forest";
+        this.theme = typeof theme === "string" ? theme : "forest";
         this.layers = [];
         this._stars = [];
         this._next_star = null;   // ms cinsinden (Python time based)

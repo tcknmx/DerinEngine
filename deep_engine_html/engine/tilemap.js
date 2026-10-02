@@ -12,6 +12,10 @@ DE.Tilemap = class Tilemap extends DE.Component {
         this.offset = offset ? [offset[0], offset[1]] : [0, 0];
         this.tile_set = {};      // tile id -> [r,g,b] veya None=boş
         this.layers = [];        // { grid: 2D dizi, z: sayı } — z sıralı
+        // Gorsel zenginlik (duz blok gorsun diye): yuzey isigi, derinlik
+        // gradyani ve karonun icine karo bazli doku. Kapali -> Python gibi
+        // tamamen duz kare (eski davranis, testler bunu bekliyor olabilir).
+        this.textured = true;
     }
 
     add_layer(grid, z_index = 0) {
@@ -143,6 +147,7 @@ DE.Tilemap = class Tilemap extends DE.Component {
         const row0 = Math.max(0, Math.trunc((cam_y - oy) / ts));
         const col1 = Math.trunc((cam_x + w - ox) / ts) + 1;
         const row1 = Math.trunc((cam_y + h - oy) / ts) + 1;
+        const tex = this.textured;
         for (const layer of this.layers) {
             const grid = layer.grid;
             for (let row = row0; row < Math.min(row1, grid.length); row++) {
@@ -152,9 +157,43 @@ DE.Tilemap = class Tilemap extends DE.Component {
                     if (tid === null || tid === undefined) continue;
                     const color = this.tile_set[tid];
                     if (color === null || color === undefined) continue;
-                    ctx.fillStyle = "rgb(" + color[0] + "," + color[1] + "," + color[2] + ")";
-                    ctx.fillRect(Math.trunc(ox + col * ts - cam_x),
-                                 Math.trunc(oy + row * ts - cam_y), ts, ts);
+                    const dx = Math.trunc(ox + col * ts - cam_x);
+                    const dy = Math.trunc(oy + row * ts - cam_y);
+                    if (!tex) {
+                        ctx.fillStyle = "rgb(" + color[0] + "," + color[1] + "," + color[2] + ")";
+                        ctx.fillRect(dx, dy, ts, ts);
+                        continue;
+                    }
+                    const open_top = row === 0 || grid[row - 1][col] === null || grid[row - 1][col] === undefined;
+                    const open_left = col === 0 || cells[col - 1] === null || cells[col - 1] === undefined;
+                    const open_right = col >= cells.length - 1 || cells[col + 1] === null || cells[col + 1] === undefined;
+
+                    // Derinlik: yuzeyden uzaklasan karo koyulasir (blok hissi olmaz).
+                    const depth = open_top ? 1.0 : Math.max(0.62, 1.0 - (4 - (row % 8)) * 0.06);
+                    // Karonun icine kucuk doku (deterministik, her karo ayni desen).
+                    const jitter = ((col * 7 + row * 13) % 5) - 2;   // -2..2
+                    const r = Math.max(0, Math.min(255, Math.trunc(color[0] * depth + jitter)));
+                    const g = Math.max(0, Math.min(255, Math.trunc(color[1] * depth + jitter)));
+                    const b = Math.max(0, Math.min(255, Math.trunc(color[2] * depth + jitter)));
+                    ctx.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
+                    ctx.fillRect(dx, dy, ts, ts);
+
+                    if (open_top) {
+                        // Yuzey seridi: ustte 2px acik, hemen altinda 3px koyu cizgi
+                        // -> platform "uzerinde durulabilir" bir zemin gibi okunur.
+                        ctx.fillStyle = "rgb(" + Math.min(255, r + 46) + "," + Math.min(255, g + 46) + "," + Math.min(255, b + 40) + ")";
+                        ctx.fillRect(dx, dy, ts, 2);
+                        ctx.fillStyle = "rgb(" + Math.max(0, r - 38) + "," + Math.max(0, g - 34) + "," + Math.max(0, b - 28) + ")";
+                        ctx.fillRect(dx, dy + 2, ts, 3);
+                    }
+                    if (open_left) {
+                        ctx.fillStyle = "rgb(" + Math.max(0, r - 26) + "," + Math.max(0, g - 24) + "," + Math.max(0, b - 20) + ")";
+                        ctx.fillRect(dx, dy, 2, ts);
+                    }
+                    if (open_right) {
+                        ctx.fillStyle = "rgb(" + Math.max(0, r - 26) + "," + Math.max(0, g - 24) + "," + Math.max(0, b - 20) + ")";
+                        ctx.fillRect(dx + ts - 2, dy, 2, ts);
+                    }
                 }
             }
         }

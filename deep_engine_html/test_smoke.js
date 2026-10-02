@@ -506,11 +506,64 @@ tour("ortam/ses-yok", function () {
   if (ERRORS.length === before) console.log("       (ses'siz ortamda 270 kare sorunsuz)");
 });
 
+/* ---------------- GORSEL KAPILAR ----------------
+ * Hata yoksa oyun "aciliyor" demektir; ama gorsel olarak BOZUK olabilir.
+ * Asagidaki kapilar bir son donemde kullaniciya gorulen 3 hatayi kalici
+ * lastige baglar:
+ *   1) paralaks katmani 0 -> arka plan hic cizilmiyor
+ *   2) zemin nesnesi her seyin ustunde ciziliyor -> coin/oyuncu kapatiliyor
+ *   3) coin gorsel bileseni yok / zeminde gomulu kalmiyor
+ */
+const GATES = [];
+function gate(name, cond, extra) {
+  GATES.push({ name: name, ok: !!cond, extra: extra || "" });
+  if (!cond) fail("gorsel-kapi", name + (extra ? " (" + extra + ")" : ""));
+}
+const onScreen = function (o, cam) {
+  const sx = o.position.x - cam.x, sy = o.position.y - cam.y;
+  return sx > -40 && sx < 940 && sy > -40 && sy < 640;
+};
+BIOMES.forEach(function (b) {
+  tour("kapi/" + b, function () {
+    DE.Engine.switch_scene(DG.build_campaign_entrance(b, 2, 0));
+    h.frames(120);
+    const sc = DE.Engine.instance.active_scene;
+    const cam = sc.render_camera;
+
+    // 1) paralaks gercekten ciziliyor mu?
+    const px = sc.parallax_background;
+    gate(b + ": paralaks temasi metin", px && typeof px.theme === "string", px ? "tip=" + typeof px.theme : "yok");
+    gate(b + ": paralaks katmani > 0", px && px.layers.length > 0, px ? "katman=" + px.layers.length : "yok");
+
+    // 2) zemin arkada mi?
+    const tm = sc.game_objects.filter(function (o) { return o.name === "TilemapGround"; })[0];
+    if (tm) {
+      gate(b + ": zemin en arkada", tm.z_index < 0, "z_index=" + tm.z_index);
+      const tmc = tm.get_component(DE.Tilemap);
+      gate(b + ": zemin dokusu acik", tmc && tmc.textured === true);
+      let filled = 0;
+      tmc.layers.forEach(function (L) {
+        L.grid.forEach(function (r) { r.forEach(function (c) { if (c !== null && c !== undefined) filled++; }); });
+      });
+      gate(b + ": zeminde karo var", filled > 0, "karo=" + filled);
+    }
+
+    // 3) coinler gorunur mu?
+    const coins = sc.game_objects.filter(function (o) { return o.tag === "Coin"; });
+    gate(b + ": coin uretildi", coins.length > 0, "adet=" + coins.length);
+    const vis = coins.filter(function (c) { return !!c.get_component(DG.CoinVisual); });
+    gate(b + ": coin gorsel bileseni", vis.length === coins.length, vis.length + "/" + coins.length);
+    const screen = coins.filter(function (c) { return onScreen(c, cam); });
+    gate(b + ": ekranda coin var", screen.length > 0, "ekranda=" + screen.length);
+  });
+});
+
 /* ---------------- RAPOR ---------------- */
 const FRAMES = TOTAL_FRAMES;
 console.log("");
 console.log("==============================================");
-console.log("Oynanan kare: " + FRAMES + " | tur: 29 | canvas cizim cagrisi: " + (h.canvas._stats.calls));
+console.log("Oynanan kare: " + FRAMES + " | tur: " + (29 + BIOMES.length) + " | canvas cizim cagrisi: " + (h.canvas._stats.calls));
+console.log("Gorsel kapilar: " + GATES.filter(function (g) { return g.ok; }).length + "/" + GATES.length + " gecti");
 if (ERRORS.length === 0) {
   console.log("SONUC: 0 HATA - tum demolar hatasiz acildi ve oynadi.");
   console.log("==============================================");

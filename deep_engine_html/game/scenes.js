@@ -94,6 +94,9 @@ function _attach_ground_tilemap(scene, data) {
     }
 
     const tm_obj = new DE.GameObject("TilemapGround", min_x, min_y, cols * ts, rows * ts, "Tilemap");
+    // Zemin EN SON ekleniyordu -> normal ekleme sirasinda EN USTTE ciziliyor ve
+    // zemine batan oyuncu/coin/dusmanin USTUNU kapatiyordu. Arkaya alinir.
+    tm_obj.z_index = -100;
     const tm = tm_obj.add_component(new DE.Tilemap(ts, [min_x, min_y]));
     tm.set_tile_set({ 1: top, 2: soil });
     tm.add_layer(grid);
@@ -162,7 +165,7 @@ function build_procedural_level(biome = null, seed = null, chunks = 8, difficult
     const scene = new DE.Scene(meta["name"], meta["background_color"]);
     if (meta["parallax_theme"]) {
         try {
-            scene.parallax_background = new DE.ParallaxBackground({ theme: meta["parallax_theme"] });
+            scene.parallax_background = new DE.ParallaxBackground(meta["parallax_theme"]);
         } catch (e) { /* yok say */ }
     }
 
@@ -307,7 +310,7 @@ function build_campaign_boss(biome, difficulty, index) {
     const scene = new DE.Scene(meta["name"], meta["background_color"]);
     if (meta["parallax_theme"]) {
         try {
-            scene.parallax_background = new DE.ParallaxBackground({ theme: meta["parallax_theme"] });
+            scene.parallax_background = new DE.ParallaxBackground(meta["parallax_theme"]);
         } catch (e) { /* yok say */ }
     }
 

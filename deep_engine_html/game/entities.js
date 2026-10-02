@@ -1311,6 +1311,34 @@ DE_GAME.SniperEnemy = class SniperEnemy extends DE.Component {
     }
 };
 
+/* Coin gorsellestirme: koyu altin kontur + ust-sol parlamasi.
+ * Siradan ONCE eklenir (SpriteRenderer'dan once cizilir) -> altin daire
+ * konturun ustune biner, her zeminde okunur olur. */
+DE_GAME.CoinVisual = class CoinVisual extends DE.Component {
+    constructor() {
+        super();
+        this.time = 0.0;
+    }
+
+    update(dt) { this.time += dt; }
+
+    draw(ctx, camera_offset) {
+        const o = this.game_object;
+        if (!o) return;
+        const sx = o.position.x - camera_offset.x;
+        const sy = o.position.y - camera_offset.y;
+        const r = o.size.x / 2;
+        ctx.fillStyle = "rgb(86,54,0)";
+        ctx.beginPath(); ctx.arc(sx + r, sy + r, r + 2, 0, 6.283185307); ctx.fill();
+        // Nabiz gibi parlamasi (coin yerinde durmasin, canli dursun).
+        const pulse = 0.22 + 0.10 * Math.sin(this.time * 4.0);
+        ctx.fillStyle = "rgba(255,255,235," + pulse.toFixed(2) + ")";
+        ctx.beginPath();
+        ctx.arc(sx + r - r * 0.3, sy + r - r * 0.34, Math.max(1.5, r * 0.30), 0, 6.283185307);
+        ctx.fill();
+    }
+};
+
 DE_GAME.BobbingAnimation = class BobbingAnimation extends DE.Component {
     constructor(amplitude = 6.0, speed = 4.0) {
         super();

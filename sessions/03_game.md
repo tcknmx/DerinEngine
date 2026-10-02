@@ -338,6 +338,38 @@ Doğrulama: `python tools\deep-tool.py --lang tr all` → Modül 3 WARN kalmaz; 
 Aşağıdakilar kullanıcı bildirimiyle teşhis edilip çözüldü; tekrar benzer sorun
 görülürse önce buraya bak:
 
+- **HTML'de paralaks hiç çizilmiyordu (03.10.2026, kullanıcı bildirimi
+  "paralaks/coin yok, platformlar keskin")** — KÖK: `game/scenes.js` iki yerde
+  `new DE.ParallaxBackground({ theme: meta["parallax_theme"] })` yazıyordu, oysa
+  constructor **tek metin** alıyor (`ParallaxBackground(theme="forest")`). Tema bir
+  nesneyle eşleşmediği için `layers.length === 0` kalıyor, arka plan hiç çizilmiyordu.
+  DÜZELTME (çift savunma): (1) çağrı yerleri Python ile aynı biçime getirildi
+  (`new DE.ParallaxBackground(meta["parallax_theme"])`), (2) constructor artık
+  `"ice"` ve `{theme:"ice"}` ikisini de kabul ediyor.
+  *Ölçüm:* Edge headless ekran görüntüsünde dağ/orman katmanı renkleri
+  `rgb(25,32,50)` %6.5 + `rgb(30,48,70)` %5.5; gökyüzü çeşitliliği 33 → 285 renk.
+- **Zemin (TilemapGround) en son ekleniyordu → en üstte çiziliyordu (03.10.2026)**:
+  `_attach_ground_tilemap` nesneyi sahne sonuna ekliyor, sıralama ekleme sırasına
+  göre olduğu için zemin zemine batan **oyuncu/coin/düşmanın üstünü kapatıyordu**
+  (ölçüm: 80 nesnenin 64'ünde, zeminden sonra 16 nesne çiziliyordu).
+  DÜZELTME: `tm_obj.z_index = -100` (tüm nesnelerin arkasında).
+- **Coinler görünmüyordu (03.10.2026)**: kök neden zemin kapatmasına karışıyordu;
+  ayrıca 18px altın daire her zeminde kontrast vermiyordu. DÜZELTME:
+  `DE_GAME.CoinVisual` (koyu altın kontur + nabızlı üst-sol parlaması),
+  `SpriteRenderer`'dan **önce** eklenir. *Ölçüm:* sarı piksel 232 → 942.
+- **Platformlar "çok büyük ve keskin" blok gibi (03.10.2026)**: tek düz `fillRect`
+  yüzeyi. DÜZELTME (`engine/tilemap.js`, `tilemap.textured=true`): yüzey karonun
+  üstüne 2px açık şerit + 3px koyu kontur ("durulabilir zemin" okuması), açık
+  sol/sağ kenarlarda 2px koyu şerit, derinlik gradyanı (yüzeyden aşağı koyulaşır,
+  en derin %62) ve karo başına deterministik ±2 doku. `textured=false` eski düz
+  davranışı verir (Python parity'si bozulmaz).
+- **Bu 3 hata artık kalıcı kapıda (03.10.2026)**: `test_smoke.js` içine
+  **40 görsel kapı** eklendi (her biyom için paralaks teması metin + katman > 0,
+  zemin `z_index < 0` + doku + karo dolu, coin üretimi + `CoinVisual` + ekranda
+  coin). *Mutasyon kanıtı:* paralaks çözümü bozulunca 35/40, `CoinVisual` ve
+  `z_index` satırları silinince 30/40 — kapılar boş değil, gerçekten yakalıyor.
+  Smoke artık **34 tur / 9382 kare / ~5.1M canvas çağrısı, 0 hata**.
+
 - **Spawn spring süzülme + sonsuz jump**: spring player doğum noktası (x=60) →
   güvenlik bölgesine spring konmaz artık; ayrıca oyunun yavaş hissi yerinden.
 - **"Dünya yavaş" 2. tur**: yerçekimi 1400, jump 620, fall boost 550, wall_slide 160,

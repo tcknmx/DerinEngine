@@ -8,6 +8,28 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[MOTOR+OYUN] 3 GÖRSEL HATA DÜZELTİLDİ + 40 KALICI GÖRSEL KAPI (03.10.2026,
+  kullanıcı bildirimi: "paralaks yok, coin görünmüyor, platformlar keskin ve
+  büyük").** Hepsi **gerçek tarayıcı** (Edge headless) ekran görüntüsü +
+  piksel ölçümüyle doğrulandı, tahminle değil:
+  - **Paralaks hiç çizilmiyordu:** `scenes.js` çağrı yerleri `{theme: "ice"}` **nesnesi**
+    geçiriyordu, constructor tek metin alıyor → `layers.length = 0`. Çağrı yerleri
+    düzeltildi + constructor iki biçimi de kabul ediyor. Ölçüm: gökyüzü renk
+    çeşitliliği 33 → 285, dağ/orman katman renkleri görünür.
+  - **Zemin her şeyin üstünde çiziliyordu** (`TilemapGround` son ekleniyordu) →
+    zemine batan coin/oyuncuyu kapatıyordu. `z_index = -100` ile arkaya alındı.
+  - **Coin görünmüyordu:** `DE_GAME.CoinVisual` (koyu altın kontur + nabızlı
+    parlaması) eklendi. Sarı piksel 232 → 942.
+  - **Platformlar büyük keskin bloktu:** `Tilemap.textured` (varsayılan açık) →
+    yüzey şeridi + kontur, kenar şeritleri, derinlik gradyanı, karo dokusu.
+    `textured=false` eski düz çizimi verir → Python parity'si bozulmaz.
+  - **Kapı:** `test_smoke.js` artık yalnız hata değil **40 görsel kapı** da
+    kontrol ediyor (her biyom: paralaks teması/katman, zemin z_index/doku/karo,
+    coin üretimi/görsel bileşen/ekranda). Mutasyonla kanıtlandı (35/40 ve 30/40).
+    Smoke: **34 tur, 9382 kare, ~5.1M canvas çağrısı, 0 hata**.
+  - *Etkilenen oturumlar: 2 (motor — `engine/parallax.js`, `engine/tilemap.js`),
+    3 (oyun — `game/scenes.js`, `game/builders.js`, `game/entities.js`).*
+
 - **[MOTOR+OYUN+ARAÇ] PYTHON MOTORU DONDURULDU — JS BİRİNCİL (03.10.2026,
   kullanıcı kararı: "tüm py motoru tamamen js motora transfer et, artık html
   motordan devam edecez").** Artık yeni motor/oyun yeteneği **yalnız JS'e**

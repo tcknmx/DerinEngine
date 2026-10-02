@@ -81,6 +81,7 @@ function _build_ramp(scene, data) {
 function _build_coin(scene, data) {
     const x = _g(data, "x", 0), y = _g(data, "y", 0);
     const coin = new DE.GameObject("Coin", x, y, 18, 18, "Coin");
+    coin.add_component(new DE_GAME.CoinVisual());
     coin.add_component(new DE.SpriteRenderer([255, 215, 0], "circle", 0));
     const anim = coin.add_component(new DE.Animator(8));
     anim.add_state("glow", [[255, 215, 0], [255, 235, 90], [255, 255, 170], [255, 235, 90]]);
