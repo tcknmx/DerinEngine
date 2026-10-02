@@ -264,3 +264,14 @@ DE.Input.get_mouse_button = function (b) {
 DE.Input.get_mouse_button_down = function (b) {
     const i = DE.Input.instance; return i ? i.get_mouse_button_down(b) : false;
 };
+/* Python'da @classmethod; JS'te statik sarmalayici olmazsa konsol
+ * (DevConsole.update) her kare TypeError atip oyun dongusunu dusuruyordu. */
+DE.Input.get_typed_text = function () {
+    const i = DE.Input.instance; return i ? i.get_typed_text() : "";
+};
+DE.Input.clear_typed = function () {
+    const i = DE.Input.instance; if (i) i.clear_typed();
+};
+DE.Input.is_controller_active = function () {
+    const i = DE.Input.instance; return i ? i.is_controller_active() : false;
+};
