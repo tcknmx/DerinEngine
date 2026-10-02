@@ -153,6 +153,17 @@ barındırılsın.
 
 ## KARAR LOGU (kullanıcı kararları, kronolojik özet)
 
+### 03.10.2026 — **MOTOR YOLU DEĞİŞTİ: JS birincil, Python donduruldu**
+Kullanıcı kararı: *"tüm py motoru tamamen js motora transfer et, artık html motordan
+devam edecez, py motor back geliştirme kalcsk"*.
+- **Gerekçe:** tarayıcı motoru oyuncuya en yakın ve taşınabilir hedef; tek motor
+  bakımı yapılacak. Python sürümü artık **referans** (API kataloğu + regresyon).
+- **Sonuç:** `deep_engine_html/` birincil; `deep_engine/`, `game/*.py`, `main.py`
+  donmuş. Yeni testler JS'e yazılır; Python testleri donmuş motoru korur.
+- **Denetim:** deep-tool Modül 14 (Python/JS parite) kalıcı kalite kapısı oldu.
+- **Bugün:** API paritesi TAM (115 motor + 59 oyun sembolu). Sırada **oynanış
+  paritesi** (modül/modül davranış + oynanış ölçümü) var → `02_engine.md` KALAN.
+
 1. Önce 2D tam v1, sonra 2.5D → voxel → `.map` (üstteki çizelge).
 2. Kampanya akışı: giriş → boss → sonraki biyom → zafer; **astro = final**.
 3. "Simdilik standart zorluk eğrisi" — güvenli başlangıç + zorlukla artan tehdit korunur.

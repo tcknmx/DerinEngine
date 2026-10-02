@@ -8,6 +8,30 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[MOTOR+OYUN+ARAÇ] PYTHON MOTORU DONDURULDU — JS BİRİNCİL (03.10.2026,
+  kullanıcı kararı: "tüm py motoru tamamen js motora transfer et, artık html
+  motordan devam edecez").** Artık yeni motor/oyun yeteneği **yalnız JS'e**
+  (`deep_engine_html/engine/`, `deep_engine_html/game/`) yazılır. `deep_engine/` ve
+  `game/*.py` donmuş **referans**tır (API kataloğu + regresyon testi).
+  *Etkilenen oturumlar: 2 (motor), 3 (oyun), 4 (araç).*
+  - **Kapı:** deep-tool **Modül 14 — Python/JS parite**. Python'da olup JS'te
+    olmayan her sınıf/metot/fonksiyon `BUG` verir.
+    `python tools\deep-tool.py --lang tr 14` (veya `python tools\parity_check.py`).
+    Arac iki tarafı da **gerçekten yükleyip çıkarır** (Node introspection), metin
+    tahmini yapmaz.
+  - **Durum: PARITE TAM** (115 motor + 59 oyun sembolu), 0 WARN/0 BUG/0 ERR.
+  - Kapatılan JS boşlukları: `Component` event sistemi (`on/once/off/emit`),
+    `GameObject` sahne ağacı (`add_child/remove_child/find_child/world_position`),
+    `Engine.run_async()/stop()`, `TextRenderer.start()`, `Particle.draw()`,
+    `log.set_file/close_file/file_buffer`, `procedural.generate/pick_biome/
+    generate_boss_arena` + `BIOMES/BIOME_NAMES/BOSSES/BOSS_TYPES`,
+    `DE_GAME.floor_gap/floor_y/reset_floor_cache`, `DE_GAME.cmd_*`.
+  - Testler: JS 12 dosya **584 kontrol** (402 motor + 182 oyun) yesil,
+    `test_tools.js` 36/36, `test_browser.js` 44/44, Python iki test ALL OK.
+  - **Tuzak:** JS `new DE.Engine(canvas, title, w, h, fps)` — ilk argüman canvas
+    (`title` değil); yapıcı `canvas.getContext("2d")` ve `DE.DevConsole` gerektirir,
+    headless testte sahte canvas + `console.js` yüklemesi şart.
+
 - **[OYUN] Tarayıcı sürümü oynanamıyordu: "C" çalışmıyor, oyun ekrana sığmıyor,
   platformlar kaba (03.10.2026, kullanıcı playtesti).** Kullanıcı tarayıcıda
   (`index.html`) oynuyor ve menüden hiçbir şeye giremiyordu. Node'da **gerçek DOM

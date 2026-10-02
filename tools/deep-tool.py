@@ -94,6 +94,12 @@ EN = {
     "header_files": "Files scanned: {n}",
     "summary": "Summary: {w} WARN, {b} BUG, {e} ERR",
     "goodbye": "Goodbye.",
+    # 14 - Python <-> JS parity
+    "parity_gap": "PARITY {kind}: {file} :: {sym} -> {detail}",
+    "parity_bug": "JS engine does NOT match Python ({n} gap(s)). "
+                  "Finish the JS side first.",
+    "parity_fail": "parity check could not run: {err}",
+    "parity_missing": "parity_check.py not found: {path}",
     # 1 - motor console
     "mc_py": ".py files found: {n}",
     "mc_syntax": "Syntax: {ok}/{total} OK",
@@ -157,6 +163,7 @@ EN = {
     "menu_11": "[11] Dead code (defined but never called)",
     "menu_12": "[12] Complexity snapshot (biggest files / functions)",
     "menu_13": "[13] Crash trend (motor.log)",
+    "menu_14": "[14] Python/JS parity (JS engine must match Python API)",
     "menu_20": "[20] Scan ALL",
     "menu_b": "[b] Back to main menu",
     "menu_prompt": "Your choice (comma-separated, e.g. 1,4 / 10 / b / q): ",
@@ -213,6 +220,11 @@ _TR_DATA = {
     "header_files": "Taranan dosya: {n}",
     "summary": "OZET: {w} WARN, {b} BUG, {e} ERR",
     "goodbye": "Gorusuruz, iyi oyunlar!",
+    # 14 - Python <-> JS parite
+    "parity_gap": "PARITE {kind}: {file} :: {sym} -> {detail}",
+    "parity_bug": "JS motoru Python ile denk degil ({n} bosluk). Once JS tarafini tamamla.",
+    "parity_fail": "parite denetimi calistirilamadi: {err}",
+    "parity_missing": "parity_check.py bulunamadi: {path}",
     # 1 - motor console
     "mc_py": "Bulunan .py dosyasi: {n}",
     "mc_syntax": "Sozdizimi: {ok}/{total} OK",
@@ -1463,6 +1475,45 @@ def run_module(num, collect):
         run_complexity(collect)
     elif num == 13:
         run_crashtrend(collect)
+    elif num == 14:
+        run_parity(collect)
+
+
+def run_parity(collect):
+    """Modul 14: Python <-> JS motor/oyun PARITE denetimi.
+
+    Kural (03.10.2026 karari): JS motoru birincil gelistirme hedefidir; Python
+    motoru donduruldu. Bu yuzden Python API'sinin TAMAMI JS tarafinda olmak
+    zorundadir. Denetim iki tarafi da GERCEKTEN yukleyip cikarir (tools/
+    parity_check.py): sinif yok / metot yok / modul fonksiyonu yok.
+    Bilinen-kasten farklar (dosya sistemi gibi) arac icin istisnadir, WARN
+    uretmez.
+    """
+    tool = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "parity_check.py")
+    if not os.path.exists(tool):
+        collect("BUG", t("parity_missing", path=tool))
+        return
+    try:
+        proc = subprocess.run([sys.executable, tool, "--json"],
+                              capture_output=True, text=True, encoding="utf-8",
+                              timeout=300)
+    except Exception as exc:
+        collect("ERR", t("parity_fail", err=str(exc)))
+        return
+    if proc.returncode == 2:
+        collect("ERR", t("parity_fail", err=(proc.stderr or "").strip()[:200]))
+        return
+    try:
+        data = json.loads(proc.stdout)
+    except Exception as exc:
+        collect("ERR", t("parity_fail", err=str(exc)))
+        return
+    for gap in data.get("gaps", []):
+        collect("WARN", t("parity_gap", kind=gap["kind"], file=gap["file"],
+                          sym=gap["symbol"], detail=gap["detail"]))
+    if not data.get("ok"):
+        collect("BUG", t("parity_bug", n=len(data.get("gaps", []))))
 
 
 MODULES = {
@@ -1479,6 +1530,7 @@ MODULES = {
     11: "Dead code",
     12: "Complexity snapshot",
     13: "Crash trend",
+    14: "Python/JS parite",
 }
 
 

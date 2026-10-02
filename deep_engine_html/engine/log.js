@@ -13,6 +13,27 @@ DE.MotorLogger = class MotorLogger {
         this.handlers = [];
         this.handlers.push((level, label, msg) => this._default_console(level, label, msg));
         this._last_notified = {};
+        this.file_name = null;   // web'de dosya yok; yalnizca ad + tampon tutulur
+        this._buffer = [];
+    }
+    /* Python log.py set_file'in WEB karsiligi: tarayicida dosya sistemi yok.
+     * Bunun yerine kayitlar bellekte tamponlanir; close_file() tamponu dondurur
+     * (kaydetme/indirme bir UI/derleme katmani isligiyle yapilabilir). Boylece
+     * API denk kalir ve "motor.log'a yaz" istegi sessizce yitmez. */
+    set_file(name) {
+        this.file_name = name || null;
+        this._buffer = [];
+        return this.file_name;
+    }
+    close_file() {
+        const text = this._buffer.join("\n") + (this._buffer.length ? "\n" : "");
+        this._buffer = [];
+        this.file_name = null;
+        return text;
+    }
+    /* Tampona yazilan son kayitlari dondurur (web'de set_file kullanilirsa). */
+    file_buffer() {
+        return this._buffer.slice();
     }
     set_level(level) {
         this.level = level;
@@ -30,6 +51,9 @@ DE.MotorLogger = class MotorLogger {
     _emit(level, msg) {
         if (level < this.level) return;
         const label = DE._LOG_LEVEL_NAMES[level] || "?";
+        if (this.file_name) {
+            this._buffer.push("[" + label + "] " + String(msg));
+        }
         for (const h of [...this.handlers]) {
             try {
                 h(level, label, String(msg));

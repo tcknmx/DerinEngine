@@ -413,6 +413,18 @@ tamamlanınca araçlar da JS'e taşınıyor: **`tools_html/`** klasörü.
 
 ## ARAÇ KALAN (bekleyen araç işleri)
 
+### TAMAMLANDI — Python/JS parite denetimi (03.10.2026)
+- **`tools/parity_check.py` (yeni, kalıcı):** Python↔JS API envanter karşılaştırması.
+  Python tarafı `ast`; JS tarafı **gerçek Node yüklemesi** + `DE.*` / `DE_GAME.*`
+  introspection (metin tahmini değil). Çıktı: insan-okunur rapor ve `--json`.
+  `game/commands.py::ensure_dir()` bilinen istisna (Python disk yardımcısı).
+- **deep-tool Modül 14 `[14] Python/JS parity`:** boşluk → `BUG`, denetim
+  çalıştırılamazsa `ERR` (sessiz geçiş yok). TR/EN i18n metinleri eklendi.
+  `python tools\deep-tool.py --lang tr 14` → `0 WARN, 0 BUG, 0 ERR`.
+- Doğrulama: mutasyonla boşluk yakalandı (`world_position` → `METOT_YOK`,
+  `cmd_hp` → `FONKSIYON_YOK`); araç 3 uyarıyı düzelttikten sonra tam tarama
+  **0 WARN / 0 BUG / 0 ERR** (TR ve EN).
+
 - **HTML MOTOR SIRADAKİ (DerinEngine HTML) — bakınız `01_strategy.md` MASTER SIRADAKİ
   (28.09.2026).** ~~SIRADA G2–G9~~ **KAPANDI (28.09.2026):** G2–G9 motor eşitliği
   bitti (G1–G9 tamam; ardından G10 INPUT denkliği + Modül 7 JS eşi de kapandı).

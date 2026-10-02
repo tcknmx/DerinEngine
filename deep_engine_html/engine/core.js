@@ -49,12 +49,42 @@ DE.Component = class Component {
     constructor() {
         this.game_object = null;
         this.active = true;
+        this._events = {};
     }
     start() {}
     update(dt) {}
     draw(ctx, camera_offset) {}
     on_collision(other) {}
-}
+    /* --- Event System (Python components.py birebir) ---------------------
+     * Bileşenler birbirine doğrudan bağlanmadan adlandırılmış sinyallerle
+     * konuşabilir (Godot signals'ın hafif sürümü). */
+    on(event, callback) {
+        if (!this._events[event]) this._events[event] = [];
+        this._events[event].push(callback);
+        return callback;
+    }
+    once(event, callback) {
+        const self = this;
+        const wrapper = function () {
+            self.off(event, wrapper);
+            callback.apply(null, arguments);
+        };
+        return this.on(event, wrapper);
+    }
+    off(event, callback) {
+        const listeners = this._events[event];
+        if (!listeners) return;
+        if (callback === undefined || callback === null) {
+            this._events[event] = [];
+        } else {
+            this._events[event] = listeners.filter(c => c !== callback);
+        }
+    }
+    emit(event, ...args) {
+        const listeners = (this._events[event] || []).slice();
+        for (const cb of listeners) cb.apply(null, args);
+    }
+};
 
 DE._slow_dt = function (dt) {
     // Python components.py _slow_dt birebir: yalnızca motorun time-slow katmanı
@@ -78,7 +108,65 @@ DE.GameObject = class GameObject {
         this.active = true;
         this.components = [];
         this._started = false;
-        this.z_index = 0;
+        this._events = {};
+        // --- Scene tree (hierarchy) — Python game_object.py birebir ---
+        this.parent = null;     // bağlandığı GameObject
+        this.children = [];     // bu nesneye bağlı alt nesneler
+        this.z_index = 0;       // kardeşler arası elle sıralama (yüksek = üstte)
+    }
+    /* --- Hierarchy -------------------------------------------------------- */
+    add_child(child, local_offset) {
+        // Cocuk KONUMUNU yerel (parente goreli) tutar; ebeveyni tasininca
+        // alt agac da tasinir. local_offset = cocugun ebeveynin sol-ustune gore
+        // konumu (varsayilan 0,0).
+        const off = local_offset || { x: 0, y: 0 };
+        if (child.parent !== null && child.parent !== undefined) {
+            child.parent.remove_child(child);
+        }
+        child.parent = this;
+        child.position = new DE.Vector2(off.x, off.y);
+        this.children.push(child);
+        return child;
+    }
+    remove_child(child) {
+        // Cocugu ayirir ve konumunu TEKRAR DUNYA koordinatina cevirir.
+        const i = this.children.indexOf(child);
+        if (i >= 0) {
+            this.children.splice(i, 1);
+            child.position = this.world_position(child);
+            child.parent = null;
+        }
+        return child;
+    }
+    find_child(name) {
+        // Adla cocuk (veya altindaki torun) bulur.
+        for (const c of this.children) {
+            if (c.name === name) return c;
+            const found = c.find_child(name);
+            if (found) return found;
+        }
+        return null;
+    }
+    world_position(obj) {
+        // Her dugum konumunu ebeveynine gore tutar; zincir boyunca toplam
+        // = mutlak (dunya) konumu.
+        const target = (obj !== undefined && obj !== null) ? obj : this;
+        let total = new DE.Vector2(target.position.x, target.position.y);
+        let node = target.parent;
+        while (node !== null && node !== undefined) {
+            total = new DE.Vector2(total.x + node.position.x, total.y + node.position.y);
+            node = node.parent;
+        }
+        return total;
+    }
+    _subtree_active() {
+        // Kendisi ve TUM ebeveynleri aktif mi?
+        let node = this;
+        while (node !== null && node !== undefined) {
+            if (!node.active) return false;
+            node = node.parent;
+        }
+        return true;
     }
     add_component(component) {
         component.game_object = this;
@@ -100,12 +188,35 @@ DE.GameObject = class GameObject {
         }
     }
     update(dt) {
-        if (!this.active) return;
+        if (!this._subtree_active()) return;
         for (const c of this.components) c.update(dt);
+        for (const child of this.children) child.update(dt);
     }
-    draw(ctx, camera_offset) {
-        if (!this.active) return;
-        for (const c of this.components) c.draw(ctx, camera_offset);
+    draw(ctx, camera_offset, origin) {
+        // Bu nesneyi ve cocuklarini cizer.
+        // origin = ust ebeveyn zincirinden gelen toplam ofset: cocuk KONUMUNU
+        // yerel tutar, bu yuzden cizerken ebeveyn origin'ini kamera ofsetinden
+        // dusulur (cocuk gercek dunya konumuna oturur). Varsayilan (0,0) tum
+        // kok nesneleri (ve mevcut oyun kodunu) tamamen ayni sekilde tutar.
+        if (!this._subtree_active()) return;
+        const org = origin || { x: 0, y: 0 };
+        const cam = camera_offset || new DE.Vector2(0, 0);
+        const eff_cam = new DE.Vector2(cam.x - org.x, cam.y - org.y);
+        for (const c of this.components) c.draw(ctx, eff_cam);
+        // Cocuk cizim sirasi: varsayilan = eklenme sirasi; z_index elle
+        // bir kardesi ustte gostermek icin kullanilir.
+        let child_list = this.children;
+        if (this.children.some(c => c.z_index)) {
+            child_list = this.children.slice()
+                .sort((a, b) => (a.z_index || 0) - (b.z_index || 0));
+        }
+        for (const child of child_list) {
+            child.draw(ctx, cam, { x: org.x + this.position.x, y: org.y + this.position.y });
+        }
+    }
+    toString() {
+        return "GameObject(" + this.name + ", Tag=" + this.tag +
+            ", Pos=" + this.position.x + "," + this.position.y + ")";
     }
 }
 
@@ -606,6 +717,41 @@ DE.Engine = class Engine {
             requestAnimationFrame(step);
         };
         requestAnimationFrame(step);
+    }
+    /* Python Engine.run_async'in JS karsiligi: await edilebilir, olay dongusune
+     * surekli BIRAKAN dongu (tarayiciya nefes alan birakir — Python'daki
+     * `await asyncio.sleep(0)` satirinin birebir karsiligi) + 60 karede bir
+     * tanilama kaydi (tarayici konsolunda gorunur). Dondugunde bir Promise cozulur. */
+    run_async() {
+        if (!this.active_scene) {
+            throw new Error("Hata: Motoru çalıştırmadan önce bir Sahne (Scene) belirlemelisiniz! engine.set_scene(...)");
+        }
+        this.is_running = true;
+        DE.Engine.instance = this;
+        const self = this;
+        return new Promise(function (resolve) {
+            let frame_count = 0;
+            const step = function (now) {
+                if (!self.is_running) { resolve(frame_count); return; }
+                self._frame(now);
+                frame_count += 1;
+                if (frame_count <= 5 || frame_count % 60 === 0) {
+                    const sc = self.active_scene;
+                    console.log("[ENGINE] frame=" + frame_count + " scene=" +
+                        (sc ? sc.name : "None") + " objs=" +
+                        (sc ? sc.game_objects.length : 0));
+                }
+                // Tarayiciya nefes alani birak (pythondaki asyncio.sleep(0))
+                if (typeof requestAnimationFrame === "function") requestAnimationFrame(step);
+                else setTimeout(function () { step(Date.now()); }, 16);
+            };
+            if (typeof requestAnimationFrame === "function") requestAnimationFrame(step);
+            else step(Date.now());
+        });
+    }
+    /* Dondurur: dongu biter ve run_async() Promise'i cozulur. */
+    stop() {
+        this.is_running = false;
     }
 }
 

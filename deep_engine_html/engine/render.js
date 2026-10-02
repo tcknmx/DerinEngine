@@ -94,6 +94,13 @@ DE.TextRenderer = class TextRenderer extends DE.Component {
         this.shadow = shadow;
         this.center_x = center_x;
         this.center_y = center_y;
+        this._font_css = "";       // start() hazirlar (Python'da _font)
+    }
+    start() {
+        // Python TextRenderer.start: font nesnesini burada hazırlar.
+        // JS'te canvas.font dizesi yeterlidir ama yasam dongusu pariteliği
+        // icin start() yine de font dizesini bir kez hesaplar.
+        this._font_css = `bold ${this.font_size}px Arial`;
     }
     draw(ctx, camera_offset) {
         if (!this.game_object.active) return;
@@ -103,7 +110,7 @@ DE.TextRenderer = class TextRenderer extends DE.Component {
             x -= camera_offset.x;
             y -= camera_offset.y;
         }
-        ctx.font = `bold ${this.font_size}px Arial`;
+        ctx.font = this._font_css || `bold ${this.font_size}px Arial`;
         const metrics = ctx.measureText(this.text);
         let tx = x, ty = y;
         if (this.center_x) tx = x - metrics.width / 2;

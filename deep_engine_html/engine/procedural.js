@@ -367,3 +367,15 @@ DE.procedural_generate_boss_arena = function (biome = null, seed = null, difficu
         "objects": objects,
     };
 }
+/* --- Python procedural.py modul adiyla birebir ayni API (parite) ---------
+ * Python: procedural.generate / pick_biome / generate_boss_arena,
+ *         BIOMES / BIOME_NAMES / BOSSES / BOSS_TYPES
+ * JS bunlari `procedural_` onekiyle disa veriyor; oyun kodu bunlari kullaniyor.
+ * Bu takma adlar Python'daki kisa adlari da erisilebilir kilar (denklik). */
+DE.generate = DE.procedural_generate;
+DE.pick_biome = DE.procedural_pick_biome;
+DE.generate_boss_arena = DE.procedural_generate_boss_arena;
+DE.BIOMES = DE.PR_BIOMES;
+DE.BIOME_NAMES = DE.PR_BIOME_NAMES;
+DE.BOSSES = DE.PR_BOSSES;
+DE.BOSS_TYPES = DE.PR_BOSS_TYPES;

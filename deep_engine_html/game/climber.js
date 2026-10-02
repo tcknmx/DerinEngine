@@ -67,6 +67,11 @@ function reset_floor_cache() {
     _FLOOR_Y.length = 1;
     _FLOOR_Y[0] = START_Y;
 }
+/* Python climber.py modul fonksiyonlarinin DE_GAME uzerinden disa acilmis
+ * halleri (parite: testler/konsol modul seviyesinde cagirabilmeli). */
+DE_GAME.floor_gap = floor_gap;
+DE_GAME.floor_y = floor_y;
+DE_GAME.reset_floor_cache = reset_floor_cache;
 
 /* --- 0..1 deterministik rastgelelik (Python random.Random yerine) --- */
 function mulberry32(seed) {

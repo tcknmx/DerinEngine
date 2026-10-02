@@ -206,3 +206,18 @@ DE.register_command("respawn", "spawn noktasina don", _cmd_respawn);
 DE.register_command("tilemap_save", "seviye tilemap'ini kaydet (tilemap_save seviye1)", _cmd_tilemap_save);
 DE.register_command("tilemap_load", "tilemap'i geri yukle (tilemap_load seviye1)", _cmd_tilemap_load);
 DE.register_command("list", "sahnedeki nesneleri say", _cmd_list);
+/* --- Python game/commands.py ile ayni adlarla disa ac (parite) ---------
+ * Python'da komutlar `def cmd_hp(...)` + dekoratör; burada `_cmd_hp` (yerel
+ * kural: alt cizgili = dosya ici) idi. Takma adlar hem Python adini hem de
+ * konsolun cagirdigi davranisi erisilebilir kilar. */
+DE_GAME.cmd_hp = _cmd_hp;
+DE_GAME.cmd_heal = _cmd_heal;
+DE_GAME.cmd_god = _cmd_god;
+DE_GAME.cmd_coins = _cmd_coins;
+DE_GAME.cmd_speed = _cmd_speed;
+DE_GAME.cmd_jump = _cmd_jump;
+DE_GAME.cmd_tp = _cmd_tp;
+DE_GAME.cmd_respawn = _cmd_respawn;
+DE_GAME.cmd_tilemap_save = _cmd_tilemap_save;
+DE_GAME.cmd_tilemap_load = _cmd_tilemap_load;
+DE_GAME.cmd_list = _cmd_list;

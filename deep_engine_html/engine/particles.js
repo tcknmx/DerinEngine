@@ -27,6 +27,17 @@ DE.Particle = class Particle {
         const progress = this.lifespan / this.max_lifespan;
         this.size = Math.max(0.5, this.initial_size * progress);
     }
+    /* Python Particle.draw: parçacığı TEK BAŞINA çizer (emitter'dan bağımsız
+     * çağrılabilir — test ve özel efektler için). */
+    draw(ctx, camera_offset) {
+        if (!this.is_alive || this.size <= 0 || !ctx) return;
+        const sx = this.x - (camera_offset ? camera_offset.x : 0);
+        const sy = this.y - (camera_offset ? camera_offset.y : 0);
+        ctx.fillStyle = `rgb(${this.color[0]},${this.color[1]},${this.color[2]})`;
+        ctx.beginPath();
+        ctx.arc(sx, sy, Math.max(0.5, this.size), 0, Math.PI * 2);
+        ctx.fill();
+    }
 }
 
 DE.ParticleEmitter = class ParticleEmitter extends DE.Component {
@@ -55,7 +66,7 @@ DE.ParticleEmitter = class ParticleEmitter extends DE.Component {
         for (const p of this.particles) p.update(dt);
         this.particles = this.particles.filter(p => p.is_alive);
     }
-    draw(ctx, camera_offset) {
+draw(ctx, camera_offset) {
         for (const p of this.particles) {
             if (!p.is_alive || p.size <= 0) continue;
             const sx = p.x - (camera_offset ? camera_offset.x : 0);

@@ -380,3 +380,61 @@ Awake sistemi (16), Game Feel oyuncu tarafı (17–19), boss tipleri (22), canl�
 (23), kampanya/skor (14/29/30), UX (40), emoji HUD (41), dash koruması (42) — bu
 işlerin motor tarafına dokunan bileşenleri yukarıda kayıtlı; asıl oynanış kayıtları
 `03_game.md`'de.
+---
+
+## JS MOTORUNE AKTARIM (03.10.2026) — Python/JS PARITE KAPISI
+
+**Karar:** Motor gelistirme yolu artik **deep_engine_html/engine/ (JS)**.
+deep_engine/*.py **donduruldu**; yalnizca API katalogu + regresyon testi olarak yasar.
+
+### Yapilanlar
+1. **API envanteri cikarildi ve bosluklar kapatildi:**
+   - core.js — Component.on/once/off/emit (Python Component._events API'si),
+     GameObject.parent/children, dd_child/remove_child/find_child/world_position,
+     alt agac update/draw (cocuklar kapaliysa cizilmez), Engine.run_async(),
+     Engine.stop().
+   - ender.js — TextRenderer.start() + _font_css (font onbellegi).
+   - particles.js — Particle.draw() (bagimsiz cizim).
+   - log.js — set_file()/close_file()/file_buffer() (web'de dosya yazma yok,
+     bellek tamponu; Python ile ayni arayuz).
+   - procedural.js — Python isimli API: DE.generate, DE.pick_biome,
+     DE.generate_boss_arena, DE.BIOMES/BIOME_NAMES/BOSSES/BOSS_TYPES.
+   - game/climber.js — DE_GAME.floor_gap/floor_y/reset_floor_cache.
+   - game/commands.js — DE_GAME.cmd_* takma adlari.
+2. **	ools/parity_check.py yazildi (yeni kalici arac).**
+   - Python tarafi st ile sinif/metot/fonksiyon envanteri.
+   - JS motor tarafi **gercek Node yuklemesi** + DE.* introspection.
+   - JS oyun tarafi DE_GAME.* atamalari + sinif/fonksiyon exportlari.
+   - Cikti: --json (deep-tool Modul 14 icin) ve insan-okunur rapor.
+   - game/commands.py::ensure_dir() yalnizca Python disk yardimcisi -> KNOWN_EXCEPTIONS
+     (JS'te karsiligi yok; oyun davranisi degil).
+3. **deep-tool Modul 14 eklendi:** [14] Python/JS parity.
+   Bosluk = BUG; denetim calistirilamazsa acik ERR (sessiz gecis yok).
+   python tools\deep-tool.py --lang tr 14 ->   WARN, 0 BUG, 0 ERR.
+4. **Parite araci mutasyonla dogrulandi:** GameObject.world_position yeniden
+   adlandirildi -> METOT_YOK; DE_GAME.cmd_hp kaldirildi -> FONKSIYON_YOK.
+   Denetim gercekten bosluk yakaliyor.
+5. **Yeni testler (	est_core.js):** Component event sistemi (8 kontrol),
+   GameObject sahne agaci (3), un_async/stop (4). Sonuc: **35 kontrol, ALL OK**.
+   > Tuzak: JS Engine yapicisi canvas.getContext("2d") ister ve DE.DevConsole
+   > kurar -> headless testte sahte canvas + console.js yuklemesi sart
+   > (ui.js, log.js, i18n.js, savegame.js bagimlilik zinciri).
+   > Ayrica Engine imzasi (canvas, title, w, h, fps) — ilk arguman **canvas**.
+
+### Durum
+- Parite: **TAM** (SONUC: PARITE TAM — 115 motor + 59 oyun sembolu).
+- Regresyon: JS 12 dosya **584 kontrol** (402 motor + 182 oyun) yesil;
+  Python 	est_engine_core.py + 	est_climber.py ALL OK;
+  	est_tools.js 36/36; 	est_browser.js 44/44; deep-tool TR/EN **0/0/0**.
+
+### Motor KALAN (JS tarafi, sirayla)
+1. **Oynanis paritesi** (API denk, ama modul/modul davranis farki olabilir):
+   core/scene/components/physics/render/tween/input/particles/audio/lighting/
+   parallax/i18n/levelfile/savegame/log/procedural/console — her modul icin
+   "Python ne yapiyor, JS ne yapiyor" karsilastirmali test + oynanisi olcum.
+2. Engine.run_async() tarayicida smoke testi (Promise + requestAnimationFrame
+   yasam dongusu, 	ools_html/test_browser.js icine eklenmeli).
+3. Oyun tarafi: state/entities/bosses/ui/scenes/builders icin public API +
+   oynanis testleri genisletme (182 kontrol su an yalnizca oyun regresyonu).
+4. Python'da kalan **ozel durumlar** (or. pygame'e ozel kisitlar) icin
+   "JS kariligi nedir" notlari.
