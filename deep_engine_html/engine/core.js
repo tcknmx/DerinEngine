@@ -588,10 +588,56 @@ DE.Engine = class Engine {
         this.active_scene.screen_height = this.height;
         scene.start();
     }
+    /* Python Engine._frame'in birebir JS karsiligi — ama Python'daki
+     * `clock.tick(60)` SEMANTIGI ile: fizik SABIT 1/60 adimda ilerler.
+     *
+     * Neden onemli: Python `dt = clock.tick(60)/1000` ile 60 Hz'de birer
+     * adim atar ve 0.05 ile kirpar. JS ise ekranin tazeleme hizina gore
+     * koşardi (144Hz -> dt=7ms, 240Hz -> dt=4ms). Yercekimi entegrasyonu,
+     * carpisma cozumu ve "dokunma" (jump cut) kare SAYISINA bagli oldugu
+     * icin 240Hz'de zıplama yüksekligi, duvar kaymasi ve iniş fiziği
+     * Python'dan FARKLI olurdu ("fizik daha kotu"). Sabit adim + birikici
+     * bunu monitordan bagimsiz hale getirir: 60/144/240Hz'de ayni sonuc.
+     *
+     * Takilma (hic) korumasi: Python gibi dt 0.05 ile kirpilir ve kare
+     * basina en fazla 5 adim atilir (spiral of death olmaz). */
     _frame(now) {
-        const dt = Math.min(1 / 30, (now - (this._last || now)) / 1000);
+        if (typeof now !== "number") now = (this._last || 0) + 1000 / (this.target_fps || 60);
+        const fixed = 1 / (this.target_fps || 60);
+        let elapsed;
+        if (this._last === undefined) {
+            // Python'da ilk `clock.tick(60)` sifir DEGILDIR (saat basindan beri
+            // gecen sureyi dondurur) -> ilk karede de bir adim atilir.
+            elapsed = fixed;
+        } else {
+            elapsed = (now - this._last) / 1000;
+            if (!(elapsed >= 0)) elapsed = 0;
+            if (elapsed > 0.05) elapsed = 0.05;      // Python: `if dt > 0.05: dt = 0.05`
+        }
         this._last = now;
         this._frame_count += 1;
+
+        this._accum = (this._accum || 0) + elapsed;
+        let steps = 0;
+        // EPS: rAF zaman damgalari 1/60'in tam kati degildir (16.6/16.7 ms) ve
+        // kayan nokta birikimi ~1e-18 sapma birakir; bu eps o sapmayi yutar,
+        // boylece "60 Hz'de kare basina tam 1 fizik adimi" garantisi bozulmaz.
+        const EPS = 1e-9;
+        while (this._accum >= fixed - EPS && steps < 5) {
+            this._accum -= fixed;
+            if (this._accum < EPS) this._accum = 0;
+            this._step(fixed);
+            steps += 1;
+            // Sahne degistirme karari bir sonraki adima birakilir (Python ile ayni).
+            if (this._next_scene) break;
+        }
+        if (steps >= 5) this._accum = 0;
+        this._render_frame();
+    }
+
+    /* Bir fizik/adim karesi (sabit dt) — Python Engine._frame'in update kismi. */
+    _step(dt) {
+        this._last_dt = dt;
         // Python Engine._frame: sahne değişimi bekleyen switch_scene varsa uygula.
         if (this._next_scene) {
             this.set_scene(this._next_scene);
@@ -612,8 +658,6 @@ DE.Engine = class Engine {
         // Konsol açıkken sahne donar: yalnız sahne + konsol üstte çizilip durulur.
         if (this.console && this.console.active) {
             this.console.update(dt);
-            if (this.active_scene) this.active_scene.draw(this.ctx);
-            this.console.draw(this.ctx);
             if (DE.Input && DE.Input.instance) DE.Input.instance.end_frame();
             return;
         }
@@ -633,17 +677,15 @@ DE.Engine = class Engine {
         }
         if (this.active_scene) {
             this.active_scene.update(dt);
-            this.active_scene.draw(this.ctx);
-        }
-        // Python Engine._frame -> _draw_debug_overlay: FPS/nesne/kamera/oyuncu.
-        if (this.show_debug_info) {
-            this._draw_debug_overlay(dt);
         }
         // Python Engine._frame -> _handle_escape: ESC, aktif sahnenin on_escape
         // olayını tetikler (duraklatma overlay'i, menüde çıkış). on_escape yoksa
         // veya false dönerse oyun kapanır.
-        const esc = (DE.Input && DE.Input.get_key_down) ? DE.Input.get_key_down("ESCAPE") : false;
-        if (esc) {
+        // DİKKAT: bu kontrol `end_frame()` ÖNCESİ yapılmalı — get_key_down bir
+        // "kenar" (edge) sorgusudur ve end_frame() hepsini sıfırlar. (Eski kodda
+        // bu blok _render_frame() içindeydi; sabit adıma geçince kenar çoktan
+        // temizlenmiş olduğu için ESC hiç çalışmıyordu.)
+        if (_gkd("ESCAPE")) {
             const sc = this.active_scene;
             if (sc && sc.on_escape) {
                 if (sc.on_escape() === false) this.is_running = false;
@@ -655,6 +697,20 @@ DE.Engine = class Engine {
         // (get_key_down / get_mouse_button_down / get_mouse_scroll) her kare sonunda
         // sıfırlanır, böylece bir tuş basışı tam olarak bir kare görünür.
         if (DE.Input && DE.Input.instance) DE.Input.instance.end_frame();
+    }
+
+    /* Cizim: fizik adimindan SONRA bir kez (60Hz mantigi degismedi). */
+    _render_frame() {
+        if (this.console && this.console.active) {
+            if (this.active_scene) this.active_scene.draw(this.ctx);
+            this.console.draw(this.ctx);
+            return;
+        }
+        if (this.active_scene) this.active_scene.draw(this.ctx);
+        // Python Engine._frame -> _draw_debug_overlay: FPS/nesne/kamera/oyuncu.
+        if (this.show_debug_info) {
+            this._draw_debug_overlay(this._last_dt || 1 / 60);
+        }
     }
     _draw_debug_overlay(dt) {
         // Python Engine._draw_debug_overlay portu: FPS/nesne/kamera + oyuncu durumu.

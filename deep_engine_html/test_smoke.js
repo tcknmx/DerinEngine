@@ -558,6 +558,89 @@ BIOMES.forEach(function (b) {
   });
 });
 
+/* ---------------- FIZIK KAPISI: tazeleme hizindan bagimsiz mi? ----------------
+ * Python `clock.tick(60)` ile SABIT 60 Hz'de birer fizik adimi atar.
+ * JS bunu yapmiyorsa 144/240 Hz monitorde ziplama yuksekligi, duvar
+ * kaymasi ve carpisma cozumu farkli olur -> "fizik Python kadar iyi degil".
+ * Bu kapı ayni tus basisiyla 60 / 144 / 240 Hz'de ziplama TEPESINI olcer ve
+ * ucunu birbirine yaklasik (2px) olmasini ister.
+ */
+function jump_apex_px(hz) {
+  const hb = boot();
+  if (!hb.engine) return null;
+  const DE2 = hb.sandbox.DE, DG2 = hb.sandbox.DE_GAME;
+  const e = hb.engine;
+  const dt = 1000 / hz;
+  DE2.Engine.switch_scene(DG2.build_campaign_entrance("forest", 1, 0));
+  hb.frames(120, dt);                       // yere yarş
+  const sc = DE2.Engine.instance.active_scene;
+  const p = sc.find_by_tag("Player");
+  if (!p) return null;
+  const y0 = p.position.y;
+  let apex = 0, steps = 0, renders = 0;
+  const realStep = e._step.bind(e), realRender = e._render_frame.bind(e);
+  e._step = function (dtv) { steps += 1; return realStep(dtv); };
+  e._render_frame = function () { renders += 1; return realRender(); };
+  hb.hold(" ");                             // ziplamayi baslat
+  const N = 150;
+  for (let i = 0; i < N; i++) {
+    hb.frames(1, dt);
+    const dy = y0 - p.position.y;
+    if (dy > apex) apex = dy;
+  }
+  hb.release(" ");
+  e._step = realStep; e._render_frame = realRender;
+  const seconds = (renders * dt) / 1000;    // gecirilen GERCEK sure
+  return { apex: apex, per_sec: steps / seconds, renders: renders };
+}
+
+const APEX = {};
+["60", "144", "240"].forEach(function (hz) {
+  const r = jump_apex_px(hz);
+  APEX[hz] = r ? r.apex : -1;
+  if (r) {
+    console.log("   fizik " + hz + "Hz: ziplama tepesi=" + r.apex.toFixed(1) +
+      "px | fizik adimi/saniye=" + r.per_sec.toFixed(1) + " (hedef 60, Python clock.tick(60))");
+    gate(hz + "Hz: fizik tam 60 adim/saniye (Python ile ayni)",
+      Math.abs(r.per_sec - 60) < 1.5, "adim/s=" + r.per_sec.toFixed(2));
+  } else gate(hz + "Hz: oyuncu bulundu", false, "Player yok");
+});
+gate("60Hz: ziplama tepesi makul (>20px, <400px)", APEX["60"] > 20 && APEX["60"] < 400, "tepe=" + APEX["60"].toFixed(1));
+gate("144Hz tepesi = 60Hz tepesi (fizik ekran hizindan bagimsiz)",
+  Math.abs(APEX["144"] - APEX["60"]) < 2, "60=" + APEX["60"].toFixed(1) + " 144=" + APEX["144"].toFixed(1));
+gate("240Hz tepesi = 60Hz tepesi (fizik ekran hizindan bagimsiz)",
+  Math.abs(APEX["240"] - APEX["60"]) < 2, "60=" + APEX["60"].toFixed(1) + " 240=" + APEX["240"].toFixed(1));
+
+/* ---------- Python referansiyla ayni mi? ----------
+ * Bu sayilar DONMUS PYTHON motorundan olculdu:
+ *   python tests\probe_physics_ref.py  ->  ziplama tepesi 132.2px,
+ *   dururken grounded=True.
+ * NOT: "yurulecek mesafe" karsilastirilamaz — JS ve Python FARKLI RNG
+ * kullandigi icin (JS DE._rng, Python random) ayni cagri farkli seviye
+ * uretir; engel 268'de degil 1200'de olabilir. Bu yuzden yalnizca
+ * yerlesimden BAGIMSIZ fizik olcumleri karsilastirilir. */
+const PY_REF = { apex: 132.2 };
+gate("JS ziplama tepesi = Python referansi (132.2px)",
+  Math.abs(APEX["60"] - PY_REF.apex) < 2.5, "JS=" + APEX["60"].toFixed(1) + " PY=" + PY_REF.apex);
+(function () {
+  const hb = boot();
+  if (!hb.engine) return gate("JS yurume/grounded referansi", false, "motor yok");
+  const D2 = hb.sandbox.DE, G2 = hb.sandbox.DE_GAME;
+  D2.Engine.switch_scene(G2.build_campaign_entrance("forest", 1, 0));
+  hb.frames(120);
+  const sc2 = D2.Engine.instance.active_scene;
+  const pl = sc2.find_by_tag("Player");
+  if (!pl) return gate("JS yurume/grounded referansi", false, "Player yok");
+  const rb = pl.get_component(D2.Rigidbody2D);
+  gate("JS yururken grounded=true (Python ile ayni)",
+    rb && rb.is_grounded === true, "grounded=" + (rb && rb.is_grounded));
+  gate("JS yururken dikey hiz 0 (zemin cekmez)", rb && Math.abs(rb.velocity.y) < 1,
+    "vy=" + (rb && rb.velocity.y));
+  const x0 = pl.position.x;
+  hb.hold("d"); hb.frames(60); const x1 = pl.position.x; hb.release("d"); hb.frames(5);
+  gate("D tusu ile oyuncu saga dogru kosuyor", (x1 - x0) > 100, "delta=" + Math.round(x1 - x0));
+})();
+
 /* ---------------- RAPOR ---------------- */
 const FRAMES = TOTAL_FRAMES;
 console.log("");

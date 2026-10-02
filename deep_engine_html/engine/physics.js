@@ -251,5 +251,73 @@ DE.Physics = class Physics {
                 }
             }
         }
+        DE.Physics._detect_ground(scene, solids);
+    }
+
+    /* Python scene.py "Stable ground detection" blogunun birebir JS karsiligi
+     * (Python L286-305). OYUNCU BU OLMADAN "is_grounded" HEP FALSE KALIYOR:
+     * yukaridaki itme kodu oyuncuyu platformdan tam DIŞARI ittiği için bir
+     * sonraki karede çakışma yoktur -> `is_grounded` set edilmez. Python'da
+     * bunu ayak probu (ayak altina 2px'lik dikdortgen) kurtarir: yalnizca
+     * zemine DEGMEK yeterlidir, çakışma gerekmez. Yoksa zıplama yalnizca
+     * 0.06s'lik coyote süresine bagli kalir, duvar kaymasi/iniş/toz
+     * efektleri tetiklenmez -> "fizik Python kadar iyi degil". */
+    static _detect_ground(scene, solids) {
+        for (const obj of scene.game_objects) {
+            const rb = obj.get_component(DE.Rigidbody2D);
+            if (!rb || rb.is_grounded || rb.velocity.y < 0) continue;
+            // Python: pygame.Rect(int(x+4), int(y+size.y), int(size.x-8), 2)
+            const fx = Math.trunc(obj.position.x + 4);
+            const fy = Math.trunc(obj.position.y + obj.size.y);
+            const fw = Math.trunc(obj.size.x - 8);
+            const fh = 2;
+            const foot_right = fx + fw;
+            const foot_bottom = fy + fh;
+            for (const sc of solids) {
+                if (sc instanceof DE.PolygonCollider) {
+                    // Egim: zemin seviyesi poligonun YUZEYI (AABB tepesi degil),
+                    // yoksa karakter rampa yerine gorunmez bir kutu kenarinda durur.
+                    const surf = DE.Physics._polygon_surface_y(sc, fx + fw / 2);
+                    if (surf !== null && fy <= surf + 3.0) {
+                        rb.is_grounded = true;
+                        rb.velocity.y = 0;
+                        obj.position.y = surf - obj.size.y;
+                        break;
+                    }
+                    continue;
+                }
+                if (!(sc instanceof DE.BoxCollider)) continue;
+                const r = sc.get_aabb();
+                if (fx >= r.right || foot_right <= r.x) continue;          // yatay kesisim yok
+                if (fy >= r.bottom || foot_bottom <= r.y) continue;       // dikey kesisim yok
+                rb.is_grounded = true;
+                rb.velocity.y = 0;
+                obj.position.y = r.y - obj.size.y;
+                break;
+            }
+        }
+    }
+
+    /* Python _polygon_surface_y birebir: dunya uzayindaki cokgenin world-x
+     * noktasindaki EN YUKSEK (en kucuk y) yuzey noktasi, yoksa None.
+     * Dikey kenarlar yuzey sayilmaz (duvardir). */
+    static _polygon_surface_y(poly, x) {
+        const pts = poly.get_world_points ? poly.get_world_points() : null;
+        if (!pts || !pts.length) return null;
+        let best = null;
+        for (let i = 0; i < pts.length; i++) {
+            const ax = pts[i].x !== undefined ? pts[i].x : pts[i][0];
+            const ay = pts[i].y !== undefined ? pts[i].y : pts[i][1];
+            const j = (i + 1) % pts.length;
+            const bx = pts[j].x !== undefined ? pts[j].x : pts[j][0];
+            const by = pts[j].y !== undefined ? pts[j].y : pts[j][1];
+            if (Math.abs(bx - ax) < 0.001) continue;
+            if (Math.min(ax, bx) - 0.001 <= x && x <= Math.max(ax, bx) + 0.001) {
+                const tt = (x - ax) / (bx - ax);
+                const y = ay + tt * (by - ay);
+                if (best === null || y < best) best = y;
+            }
+        }
+        return best;
     }
 }

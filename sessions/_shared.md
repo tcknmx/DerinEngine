@@ -795,4 +795,31 @@ bir "ilişkili gelişme" satırı düşüldü:
 - Ağırlıklı MOTOR: 1,2,4,9,11,16,21(zaman),22(bileşen),23(zoom),26,31,32,33,34,35,36(log),38,43
 - Ağırlıklı OYUN: 3,6,7,8,14,15,17,18,19,20,21(karakter),22(boss),23(menü),25,27,29,30,40,41,42
 - Ağırlıklı ARAÇ: 36(konsol),37,39 + paketleme + web build + 404 tanısı
-- STRATEJİ (karar notları): marka taşıma (10), oturum yapısı, öncelik kararları
+- STRATEJİ (karar notları): marka taşıma (10), oturum yapısı, öncelik kararları- **[MOTOR+OYUN] FIZIK MOTORU PYTHON REFERANSIYLA BIREBIR ESITLESTIRILDI (02.10.2026,
+  kullanici bildirimi: "fizik motoru py motorda ki kadar iyi degil... py motorda ki tum kodu
+  oldugu gibi html'de bastan yaz demistim").** Iki kok neden, ikisi de **olcdukce**
+  kanitlandi:
+  - **Ana dongu ekran hizina bagliydi** (core.js): dt 1/30 ile kisalan
+    degisken adim yerine **sabit 1/60 accumulator** yazildi (Python clock.tick(60) +
+    0.05 cap). Artik 144/240 Hz ekranda oyun ayni hizda.
+  - **Python'in stabil zemin probu JS'te eksikti** (physics.js): Python
+    deep_engine/scene.py carpisma sonrasi **2px ayak probu** ile is_grounded
+    sabitler; JS'te bu yoktu. Oyuncu zeminde dururken is_grounded=false kaliyor ve
+    **gitmesi gereken yerden gecmeye** basliyordu (dusman: JS 571'e kadar kosuyor,
+    Python 268'de duruyor). DE.Physics._detect_ground() + _polygon_surface_y()
+    eklendi.
+  - **Yanlis yapilan is (tekrar yapma):** ESC kontrolu _render_frame() icine
+    konulunca **calismadi** (get_key_down bir "edge" sorgusu, end_frame() onu
+    siliyor). 	est_browser.js 43/1 ile yakaladi. Blok _step() icine,
+    end_frame() **oncesine** tasindi. Artik 44/44.
+  - **Olcum:** ziplama tepesi Python 132.2px / JS 132.2px; grounded True/True;
+    60/144/240 Hz tepesi 132.2/132.2/132.2. **Yurume mesafesi dil arasi
+    kiyaslanamaz** (JS ve Python farkli RNG kullaniyor -> ayni cagri farkli seviye).
+  - **+10 kalici fizik kapi** (	est_smoke.js, toplam 50) ve **mutasyon kaniti**:
+    ayak probu silinince 49/50 (grounded=false), EPS kaldirilinca 	est_core.js
+    33/35. Kapilar gercekten hatayi yakaliyor.
+  - **Kalan coin/enemies suphesi:** olcum gosterdi ki coin toplama dogru
+    (skor artar, coin rengiyle cizim 450 -> 0) ve dusmanlar ilk ekranda **Python'da da
+    yok** (ilk dusman PY x~1002, JS x~1093). Bunlar ayni davranis, JS hatasi degil.
+    Kullanicinin "turuncuyu alinca gidiyor" cumlesi hangi nesneyi belirttigi net
+    degil -> 03_game.md KALAN'da bekliyor.

@@ -438,3 +438,64 @@ deep_engine/*.py **donduruldu**; yalnizca API katalogu + regresyon testi olarak 
    oynanis testleri genisletme (182 kontrol su an yalnizca oyun regresyonu).
 4. Python'da kalan **ozel durumlar** (or. pygame'e ozel kisitlar) icin
    "JS kariligi nedir" notlari.
+---
+
+## TAMAMLANDI (02.10.2026) — FIZIK MOTORU PYTHON REFERANSIYLA BIREBIR ESITLESTIRILDI
+
+**Kullanıcı bildirimi:** "fizik motoru py motorda ki kadar iyi değil. py motorda ki tüm kodu
+olduğu gibi html'de baştan yaz demiştim."
+
+İki ayrı kök neden bulundu ve **ölçümle** kanıtlandı (tahmin yok):
+
+### 1. Ana döngü ekran hızına bağımlıydı (core.js)
+- **Eski:** dt = Math.min(1/30, (now - last)/1000) → 144/240 Hz ekranda oyun **daha hızlı**
+  işliyordu; fizik adım sayısı ekrana bağlıydı.
+- **Python:** clock.tick(60) + if dt > 0.05: dt = 0.05.
+- **Yeni:** _frame(now) birikimçi (accumulator) ile **sabit 1/60 s** fizik adımı,
+  dt cap  .05, kare başına en fazla 5 adım (ölü kısır döngü koruması).
+  İlk karede de bir adım atılır (Python'da ilk clock.tick() sıfır değildir).
+- _step(dt) ve _render_frame() olarak ayrıldı; **çizim yine kare başına 1 kez**.
+
+### 2. Python'ın stabil zemin probu JS'te eksikti (physics.js)
+- Python deep_engine/scene.py çarpışma sonrası **2px ayak probu** ile is_grounded
+  sabitler. JS'te is_grounded yalnız çakışma anında set ediliyordu → oyuncu
+  zeminde dururken is_grounded = false kalıyordu.
+- **Sonucu:** oyuncu **gitmesi gereken yerden geçiyordu** (düşman eski JS'te 268'de
+  durması gerekirken 571'e kadar koşuyordu) — kullanıcının "fizik daha kötü"
+  hissinin kaynağı buydu.
+- **Eklendi:** DE.Physics._detect_ground(scene, solids) +
+  DE.Physics._polygon_surface_y(poly, x) (polygon için yüzey yüksekliği),
+  DE.Physics.resolve() sonunda çağrılır.
+
+### 3. YANLIŞ YAPILAN İŞ (kayda geçirildi — tekrar yapılmasın)
+	est_browser.js 43/1 verdi: **ESC çalışmıyordu.** Sebep: ESC kontrolünü
+_render_frame() içine almıştım, ama get_key_down bir **kenar (edge)** sorgusudur ve
+_step() sonundaki Input.end_frame() hepsini sıfırlar. Çözüm: ESC bloğu
+_step() içinde, end_frame() **öncesine** taşındı (Python Engine._frame sırası).
+
+### 4. Ölçüm (Python referansı 	ests/probe_physics_ref.py)
+| Ölçüm | Python | JS (yeni) |
+|---|---|---|
+| Zıplama tepesi | 132.2 px | **132.2 px** |
+| Dururken is_grounded | True | **True** |
+| Dikey hız (durable) | 0.0 | **0.0** |
+| Fizik adımı/saniye | 60 | **60.0 / 59.5 / 59.2** (60/144/240 Hz) |
+
+> NOT: "yürüme mesafesi" dil arası **kıyaslanamaz** — JS (DE._rng) ve Python
+> (andom) farklı RNG kullanır, aynı çağrı farklı seviye üretir. Bu yüzden
+> kapılar yalnızca **yerleşimden bağımsız** fizik ölçümlerini karşılaştırır.
+
+### 5. Yeni kalıcı kapılar (+10, toplam 50 görsel/fizik kapısı)
+	est_smoke.js: 60/144/240 Hz zıplama tepesi eşitliği, adım/saniye ≈ 60,
+**Python 132.2 px referansı**, grounded=true, dururken y=0, D ile koşma.
+
+### 6. Kapılar gerçekten yakalıyor (mutasyon kanıtı)
+| Bozulan yer | Yakalanan kapı | Sonuç |
+|---|---|---|
+| physics.js ayak probu silindi | "JS yururken grounded=true" | 49/50 (grounded=false) |
+| core.js EPS kaldırıldı | 	est_core.js kare ilerlemesi | 33/35 |
+
+### 7. Regresyon
+JS 13 dosya tamamı yeşil (	est_game.js 182/182, 	est_core.js 35/35,
+	est_smoke.js 50/50 kapı + 0 hata, 34 tur ~10.4k kare); 	est_browser.js 44/44;
+	est_tools.js 36/36; Python testleri ALL OK; DeepTool 14:   WARN, 0 BUG, 0 ERR.

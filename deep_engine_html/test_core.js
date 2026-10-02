@@ -293,7 +293,7 @@ console.log("TEST13 engine.run_async (await edilebilir dongu):");
   const drive = (n) => {
     for (let i = 0; i < n && rAFs.length; i++) {
       const cb = rAFs.shift();
-      t += 16;
+      t += 1000 / 60;      // 60 Hz: Python `clock.tick(60)` ile ayni sabit adim
       cb(t);
     }
   };
