@@ -7,15 +7,14 @@
  *     oyuncu buna yetişmek zorunda, alt çizgiye düşerse yeniden başlar.
  *   - YÜKSEKLİK SKILL: DOUBLE_JUMP_FLOOR katmanına ulaşınca "Çift Zıplama"
  *     pop-up ile açılır; sonraki katmanlar çift zıplama gerektirecek kadar açılır.
- *   - CHECKPOINT YOK: respawn 0. katmana döner; rekor (best_floor/skor) korunur.
- *   - KIRILABİLİR KATMAN: üstünde BEKLEYİNCE kırılır (sekiş yok artık).
- *   - ZORLUK SEVİYESİ (07.10.2026): 8. katmandan sonra kule "oyun" açar —
- *     HAREKETLİ katmanlar (yatay kayar), DAR katmanlar ve DİKENLİ engeller.
- *     Kamera max_floor arttıkça hızlanır (CAM_SPEED katmanı).
- *   - GÖRSEL (07.10.2026): player ana oyundaki gibi mavi yuvarlak gövde
- *     (AÇIK tank gözler yazılmaz — kullanıcı isteği); arka plan etekte
- *     mario/minecraft yeşil çevre, yükseldikçe ASTRO (yıldızlı uzay) teması.
- *   Python'da bu özellikler eklenmeyecek (dondurulmuş referans).
+*  - CHECKPOINT YOK: respawn 0. katmana döner; rekor (best_floor/skor) korunur.
+ *  - KIRILABİLİR KATMAN: üstünde BEKLEYİNCE kırılır (sekiş yok artık).
+ *  - KULLANICI GERİ BİLDİRİMİ (08.10.2026, v2): DİKENLER KALDIRILDI (adil olmuyor,
+ *    ölüm döngüsü doğuruyordu). Kule artık YATAY HAREKET İSTER: NO-STACK güçlü
+ *    zig-zag (merkezler ~70px sallanır), FREE_CLIMB 3 kata indi. Ölüm döngüsü
+ *    yumuşatıldı (kamera hız tavanı 1.5, çift zıplama boşluk tavanı 52px, ölüm payı
+ *    140px). Arka plan GRID'SİZ pürüzsüz biyom arazi (tümsek tepeler + gradyan).
+ *  Python'da bu özellikler eklenmeyecek (dondurulmuş referans).
  *   Görseller yine kodla çizilir (resim dosyası yok).
  */
 "use strict";
@@ -29,56 +28,56 @@ const GAP_GROWTH = 1.5;            // her katmanda boşluk artar
 const GAP_MAX_ADD = 40.0;          // tek zıplama bölgesinde en geniş ek boşluk
 const DOUBLE_JUMP_FLOOR = 8;       // bu katmana ulaşınca çift zıplama skill'i açılır
 const DOUBLE_GAP_PER = 8.0;        // skill sonrası her katmanda ek boşluk (çift zıplama ister)
-const DOUBLE_GAP_CAP = 60.0;       // ... üst sınırı
+const DOUBLE_GAP_CAP = 52.0;       // ... üst sınırı (v2: 60 → 52, daha adil)
 const AHEAD = 16;                  // oyuncunun üstünde kaç katman önceden üretilir
 const JUMP_FORCE = 640.0;          // manuel zıplama gücü (yükselen kameraya yetişmek için)
 const DOUBLE_JUMP_FORCE = 0.86;    // çift zıplama güç oranı (ilk sekişe göre)
 const COYOTE_TIME = 0.10;          // platformdan çıkınca zıplama penceresi
 const JUMP_BUFFER = 0.10;          // yere inmeden az önce basılan zıplama affı
 const CAM_SPEED = 66.0;            // kamera TABAN yükselme hızı (px/sn); max_floor arttıkça hızlanır
-const CAM_BOOST_PER = 0.012;       // her katmanda kamera hızına eklenen çarpan (ör. 10. kat ~ +12%)
-const CAM_BOOST_CAP = 1.8;         // kamera hız çarpanı tavanı
+const CAM_BOOST_PER = 0.008;       // her katmanda kamera hızına eklenen çarpan (v2: 0.012 → 0.008)
+const CAM_BOOST_CAP = 1.5;         // kamera hız çarpanı tavanı (v2: 1.8 → 1.5 — ölüm döngüsü azalır)
 const PLAYER_W = 30.0, PLAYER_H = 40.0;
 const BASE_SPEED = 250.0;
 const SPEED_PER_LEVEL = 0.16;      // her zıplama seviyesi için %16 hız
 const MAX_LEVEL = 5;
 const LEVEL_DECAY = 1.6;           // zıplama seviyesi sönme süresi
-const BREAK_CHANCE = 0.18;         // daha az kırılabilir (hareketli/dikenler zorluğu ekliyor)
+const BREAK_CHANCE = 0.18;         // kırılabilir katman oranı
 const BREAK_WAIT = 0.45;           // kırılabilir katman üstünde beklenince kırılma
-const DEATH_MARGIN = 80.0;
+const DEATH_MARGIN = 140.0;        // v2: 80 → 140 — alt çizgi geç yükselir, kurtuluş şansı var
 const PLATFORM_H = 14.0;
 const PLATFORM_MIN_W = 96.0;       // örtüşme ağırlıklandırması için referans genişlik
 const PLATFORM_MAX_W = 150.0;
 const SIDE_MARGIN = 24.0;
-// Zorluk seviyesi: ONLY çift zıplama katmanının ÜZERİNDE (index > DOUBLE_JUMP_FLOOR).
+// Zorluk (09. katmandan itibaren): HARD_FROM üstünde her katman
+// tek bir "zorluk modu" alabilir — dar ya da hareketli.
 const HARD_FROM = DOUBLE_JUMP_FLOOR + 1;   // 9. katmandan itibaren kule zorlaşır
 const MOVE_CHANCE = 0.30;          // HARD_FROM üstünde hareketli katman oranı
-const MOVE_RANGE_MIN = 36, MOVE_RANGE_MAX = 70;   // yatay salınım genliği (px) [36→hafif zor]
-const MOVE_SPEED_MIN = 0.9, MOVE_SPEED_MAX = 1.9; // salınım hızı (rad/sn) [1.9→hafif zor]
-const NARROW_CHANCE = 0.24;        // HARD_FROM üstünde dar katman oranı [0.24→hafif zor]
+const MOVE_RANGE_MIN = 36, MOVE_RANGE_MAX = 70;   // yatay salınım genliği (px)
+const MOVE_SPEED_MIN = 0.9, MOVE_SPEED_MAX = 1.9; // salınım hızı (rad/sn)
+const NARROW_CHANCE = 0.24;        // HARD_FROM üstünde dar katman oranı
 const NARROW_W_MIN = 54, NARROW_W_MAX = 76;       // dar katman genişliği
-const SPIKE_CHANCE = 0.18;         // HARD_FROM üstünde dikenli katman oranı [0.18→hafif zor]
-const SPIKE_H = 9;                 // diken yüksekliği (px)
+const SPIKE_CHANCE = 0.0;          // DİKENLER KALDIRILDI (08.10.2026 v2): haksız
+const SPIKE_H = 9;                 // diken yüksekliği (px) — artık kullanılmıyor
 // Yükseklikle daralma (altitude shrink): platform genişliği index'e göre eğriden
 // küçülür. SWEEP_START'te geniş başlar, SWEEP_END'te minimuma iner (zorluk artar).
 const SWEEP_START = 1;
 const SWEEP_END = 30;
-const SWEEP_W_MIN = 100, SWEEP_W_MIN_END = 56;   // normal katman alt sınırı 100 -> 56
-const SWEEP_W_MAX = 158, SWEEP_W_MAX_END = 100;  // normal katman üst sınırı 158 -> 100
+const SWEEP_W_MIN = 100, SWEEP_W_MIN_END = 68;   // normal katman alt sınırı 100 -> 68 (v2: daha geniş)
+const SWEEP_W_MAX = 158, SWEEP_W_MAX_END = 108;  // normal katman üst sınırı 158 -> 108 (v2)
 // Yerleştirme algoritması (08.10.2026 — "üst üste binme" şikayetine çözüm):
 //  NO_STACK_SHIFT: ardışık katman MERKEZLERİ en az bu kadar yatay kaymalı
-//    (üst üste dizilme engellenir; oyuncu hareket etmek zorunda kalır).
-const NO_STACK_SHIFT = 44.0;
-//  TREND_PULL: önceki katmanın merkezi ekran ortasından ne kadar uzaksa yeni
-//    katman pensiyonu o kadar merkeze çekilir (in-bound trending).
-const TREND_PULL = 0.30;
+//    (üst üste dizilme engellenir; oyuncu YATAY HAREKET ETMEK ZORUNDA kalır).
+const NO_STACK_SHIFT = 110.0;      // v2: 44 → 70 → 110 — çoğu pencere buna yetmez,
+const TREND_PULL = 0.18;           // v2: 0.30 → 0.18 — kule daha çok gezinir
 //  ZIG_WINDOW: merkezdeyken her bu kadar katmanda yön değişir (zig-zag / akış).
-const ZIG_WINDOW = 3;
+const ZIG_WINDOW = 2;              // v2: 3 → 2 — sık yön değişimi (hareket zorunlu)
 // Ulaşılabilirlik: ardışık katmanlar arası en az yatay örtüşme (px).
-// Dar katmanlarda istek azalır (örn. 56px katman için 36px örtüşme yeterli).
-const REACH_OVERLAP = 70.0;
-const REACH_OVERLAP_MIN = 36.0;
-const FREE_CLIMB = 8;      // bu kata kadar katmanlar oyuncunun sütununda kalır
+// v2: 70 → 54 → 46 (min 34 → 30): koridor hâlâ oyuncuyu (30px) içine alır ama
+// yerleştirme penceresi genişler → zig-zag YATAY hareketi gerçekten zorunlu kılar.
+const REACH_OVERLAP = 46.0;
+const REACH_OVERLAP_MIN = 30.0;
+const FREE_CLIMB = 3;      // v2: 8 → 3 — ilk 3 katman oyuncunun sütununda; sonrası zig-zag
 const RESPAWN_CAM_RATE = 0.72;     // 0. katman respawn'da ekranın %72'sine konur
 const PLAYER_TOP_MARGIN = 96.0;    // oyuncunun başı bu üst payı kesmemeli (kamera kelepçesi)
 // Arka plan: YEŞİL (biyoma göre) çevre -> astro geçişi (yükseldikçe).
@@ -348,24 +347,49 @@ DE_GAME.ClimbBackdrop = class ClimbBackdrop extends DE.Component {
             ctx.fillRect(0, 0, w, h);
         }
 
-        // Biyom yüzeyi (bloklu zemin): çimen/kar/kum + toprak/kaya. Yükseldikçe
-        // yüksekliği azalır (%100 astro'da tamamen kaybolur).
+        // Biyom yüzeyi (GRID'SİZ — v2): pürüzsüz yuvarlanışlı tepelik arazi.
+        // Üst kenar hafif dalgalı bir çizgidir (blok/çizgi ızgara YOK); aşağısı
+        // biyom toprağının dikey gradyanı. Yükseldikçe yüksekliği azalır ve
+        // %100 astro'da tamamen kaybolur.
         const ground_h = Math.round(h * (0.55 - 0.45 * t));
         if (ground_h > 0) {
-            const soil = mix(b.soil, [40, 26, 40], t);
+            const soilBot = mix(b.soil, [40, 26, 40], t);        // dip (koyu)
+            const soilTop = shade(mix(b.soil, [60, 50, 60], t), 1.12); // üst
             const grass = mix(b.grass, [70, 90, 60], t);
-            const BLOCK = 48;
-            ctx.fillStyle = "rgb(" + soil.join(",") + ")";
-            ctx.fillRect(0, h - ground_h, w, ground_h);
-            ctx.fillStyle = "rgb(" + grass.join(",") + ")";
-            ctx.fillRect(0, h - ground_h, w, 8);
-            ctx.strokeStyle = "rgb(" + mix(soil, [255, 255, 255], 0.12).join(",") + ")";
-            ctx.lineWidth = 1;
-            for (let bxx = 0; bxx < w + BLOCK; bxx += BLOCK) {
-                for (let byy = h - ground_h + 8; byy < h; byy += BLOCK) {
-                    ctx.strokeRect(bxx, byy, BLOCK, BLOCK);
+            // toprak gradyanı
+            try {
+                const gg = ctx.createLinearGradient ? ctx.createLinearGradient(0, h - ground_h, 0, h) : null;
+                if (gg) {
+                    gg.addColorStop(0, "rgb(" + soilTop.join(",") + ")");
+                    gg.addColorStop(1, "rgb(" + soilBot.join(",") + ")");
+                    ctx.fillStyle = gg;
+                    ctx.fillRect(0, h - ground_h, w, ground_h);
+                } else {
+                    ctx.fillStyle = "rgb(" + soilBot.join(",") + ")";
+                    ctx.fillRect(0, h - ground_h, w, ground_h);
                 }
+            } catch (e) {
+                ctx.fillStyle = "rgb(" + soilBot.join(",") + ")";
+                ctx.fillRect(0, h - ground_h, w, ground_h);
             }
+            // Üst kenar: yumuşak tepeler (sinüs harmanı, her kare aynı).
+            const PEAK = 26, PEAK2 = 14;
+            ctx.fillStyle = "rgb(" + grass.join(",") + ")";
+            ctx.beginPath();
+            ctx.moveTo(0, h - ground_h);
+            for (let gx = 0; gx <= w; gx += 12) {
+                const y = h - ground_h
+                    - Math.round(Math.sin(gx * 0.0047) * PEAK
+                        + Math.sin(gx * 0.0113 + 1.7) * PEAK2);
+                ctx.lineTo(gx, y);
+            }
+            ctx.lineTo(w, h - ground_h + 14);
+            ctx.lineTo(0, h - ground_h + 14);
+            ctx.closePath();
+            ctx.fill();
+            // Çim bandı üstünde ince parlak vurgu (toprağa geçiş).
+            ctx.fillStyle = "rgba(255,255,255," + (0.10 * (1 - t)).toFixed(2) + ")";
+            ctx.fillRect(0, h - ground_h, w, 3);
         }
 
         // Yükseldikçe beliren yıldızlar (astro teması).
@@ -649,12 +673,31 @@ DE_GAME.ClimbGame = class ClimbGame extends DE.Component {
                 ? this._uniform(cLo, pc - NO_STACK_SHIFT)
                 : this._uniform(pc + NO_STACK_SHIFT, cHi);
         } else if (reachR > 0 || reachL > 0) {
-            // Tam shift sığmıyor (dar-dar): en uzak uca it → üst üste dizilmez.
-            // 0.02px içeride kalınır: tam sınırda oturur + kayan nokta 1e-4 sapması
-            // örtüşme >= need garantisini bozmasın (en az need kadar örtüşme).
-            c = (reachR >= reachL) ? cHi - 0.02 : cLo + 0.02;
+            // Tam shift sığmıyor (dar-dar): istenen yönde (side) en uzak uca it → üst
+            // üste dizilmez. 0.02px içeride kalınır: tam sınırda oturur + kayan nokta
+            // 1e-4 sapması örtüşme >= need garantisini bozmasın.
+            c = (side === 1) ? cHi - 0.02 : cLo + 0.02;
         } else {
             c = (cLo + cHi) / 2;                        // yatay pencere yok: merkez
+        }
+        // v2 ORTA-SÜTUN TEMİZLEME: oyuncu dümdüz zıplamasın (kullanıcı şikayeti).
+        // FREE_CLIMB aşıldıktan sonra katman merkezi ekran ortasının CLEAR kadar
+        // yakınına düşemez. Önce zig yönü (side) denenir; mümkün değilse uzak uca
+        // itilir. Böylece "sadece SPACE" tırmanışı imkânsız olur.
+        if (index > FREE_CLIMB) {
+            const CLEAR = 72.0, mid = SCREEN_W / 2;
+            if (c > mid - CLEAR && c < mid + CLEAR) {
+                const lx = mid - CLEAR, rx = mid + CLEAR;
+                const okR = rx <= cHi && rx >= cLo;
+                const okL = lx >= cLo && lx <= cHi;
+                if (okR && okL) c = (side === 1) ? rx : lx;
+                else if (okR) c = rx;
+                else if (okL) c = lx;
+                else {
+                    const distR = cHi - mid, distL = mid - cLo;
+                    c = (distR >= distL) ? cHi - 0.02 : cLo + 0.02;
+                }
+            }
         }
         return c - w / 2;
     }
@@ -668,7 +711,7 @@ DE_GAME.ClimbGame = class ClimbGame extends DE.Component {
             x = SIDE_MARGIN;
         } else {
             // Zorluk (09. katmandan itibaren): HARD_FROM üstünde her katman
-            // tek bir "zorluk modu" alabilir — dar, hareketli ya da dikenli.
+            // tek bir "zorluk modu" alabilir — dar ya da hareketli (DİKEN YOK, v2).
             if (index === 1 || index < HARD_FROM) {
                 w = this._platform_w(index);
             } else {
@@ -684,10 +727,7 @@ DE_GAME.ClimbGame = class ClimbGame extends DE.Component {
                         speed: this._uniform(MOVE_SPEED_MIN, MOVE_SPEED_MAX),
                         phase: this.rand() * 6.283185307,
                     };
-                } else if (roll < NARROW_CHANCE + MOVE_CHANCE + SPIKE_CHANCE) { // DİKENLİ
-                    w = this._uniform(PLATFORM_MIN_W + 20, PLATFORM_MAX_W + 10);
-                    spiked = true;
-                } else {
+                } else {                                          // NORMAL
                     w = this._platform_w(index);
                 }
             }
