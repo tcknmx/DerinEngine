@@ -560,6 +560,29 @@ araç/repo tarafına yapılanlar:
 
 ---
 
+## KÖK DİZİN ORGANİZASYONU — TAMAMLANDI (08.10.2026)
+
+Kullanıcı direktifi: **"tamamdır tools klasörünü sildim. tüm klasörleri organize
+et ve düzenle. ana dizinde ki kalabalığı minimalize etmeliyiz."** Yapılanlar:
+
+- **`tools/` kalıntısı:** kullanıcı kendisi silmişti; eklenecek bir şey kalmadı.
+- **3 yedek .bat silindi** (`git rm`): `deep-tool-js.bat`, `webpanel-js.bat`,
+  `test-tools-js.bat`. Artık kökte sadece **`deep-tool.bat` + `webpanel.bat`**
+  var (ikisi de `node tools_html\*.js %*`). Kullanıcı kararı: "Sadece 2 ana
+  kalsın". Eski `.bat` adları yalnız geçmiş kayıtlarda geçiyor — o adlar artık
+  geçersiz.
+- **`.gitignore` temizliği:** Python kalıntı girdiler silindi (`__pycache__/`,
+  `*.py[cod]`, `build/`, `web-cache/`, `motor.log`). `dist/` kaldı (paketleme
+  çıktısı, gitignore'lu).
+- **`dist/` (52MB eski py paketi):** kullanıcı kararı **"Hayır, kalsın"** —
+  silinmedi. Kodda `dist/` referansı yok (üretim bittiğinde silinebilir).
+- **`.opencode/` (53MB node_modules) + `custom_levels/`:** dokunulmadı.
+- **Doğrulama:** 13/13 JS test 0 FAIL, test_tools 36/36, test_browser 52/0,
+  `node tools_html\deep-tool.js --lang tr all` **0/0/0**.
+- Kalıcı kayıt: `_shared.md` → SON GELİŞMELER + bu not.
+
+---
+
 ## ARAÇLAR PY→JS GEÇİŞİ — TAMAMLANDI (08.10.2026)
 
 Kullanıcı direktifi: **"tools'ları da py'den js'ye geçiriyoruz."** Hepsi bitti:

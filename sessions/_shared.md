@@ -8,6 +8,19 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[KÖK DİZİN ORGANİZASYONU, 08.10.2026]** Kullanıcı direktifi: "tüm
+  klasörleri organize et, ana dizindeki kalabalığı minimalize et". Sonuç:
+  (1) `tools/` klasörü (boş kalıntı) silindi; (2) ana kökte **3 yedek .bat**
+  silindi (`deep-tool-js.bat`, `webpanel-js.bat`, `test-tools-js.bat` — hep
+  `git rm`) — artık sadece `deep-tool.bat` + `webpanel.bat` (`%*`'li) var;
+  (3) `.gitignore`'dan Python kalıntısı girdiler temizlendi (`__pycache__/`,
+  `*.py[cod]`, `build/`, `web-cache/`, `motor.log`). `dist/` (eski py paketi)
+   kullanıcı isteğiyle KALDI (gitignore'lu). `.opencode/` ve `custom_levels/`
+   dokunulmadı. **Doğrulama:** 13/13 JS 0 FAIL + `deep-tool.js --lang tr all`
+   0/0/0 + kök artık 2 bat. *Etkilenen: 04 araç (kısayollar), tüm oturumlar
+   (eski `*-js.bat` adları artık yok). Detay: `04_tools.md` "KÖK DİZİN
+   ORGANİZASYONU".*
+
 - **[ARAÇLAR PY→JS GEÇİŞİ — TAMAMLANDI, 08.10.2026]** Kullanıcı direktifi:
   araçlar da Python'dan JS'e geçirildi. `tools/deep-tool.py` + `tools/webpanel.py`
   **silindi** (`git rm`) — repo'da Python KALMADI. `webpanel.js` (Node, 8766)
@@ -22,6 +35,21 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
   0/0/0; webpanel /api/run + /api/script canlı POST'ta ok=true.
   *Etkilenen: 04 araç + tüm oturumlar (py komutları artık geçersiz). Detay:
   `04_tools.md` "ARAÇLAR PY→JS GEÇİŞİ — TAMAMLANDI".*
+
+- **[Star Climber v3b — player/denge/arka plan — TAMAMLANDI, 08.10.2026]**
+  Kullanıcının 3 yeni şikayeti karşılığı: (1) "player yanlardan sıkıştırılmış" →
+  boyut 30×40 → **32×32** + yerçekimi **1400** + zıplama **-560** + hız **260**
+  → artık ANA OYUN karakterinin birebir parametreleri (`game/climber.js`);
+  (2) "hâlâ çok kolay, sadece SPACE" → FREE_CLIMB 3→1, orta-sütun CLEAR
+  72→96, overlap şerit 54/min38, platformlar dar (92-146), dikey boşluk
+  GAP_GROWTH 2.2 → **SPACE-only bot artık 3. katta takılıyor** (eskiden 7-11),
+  şerit-hedefli bot 10; (3) "arka plan hâlâ kötü" → biyoma göre 3 katmanlı
+  tepe sırtları (uzak/orta/yakın; kamera-x drift'i; astro'ya söner). Test
+  zarfı güncellendi (ilk 2 katman, SPACE 2..10, overlap ≥6, NO-STACK
+  ortShift≥14) — 13/13 JS 0 FAIL, tools 36/0, `node tools_html\deep-tool.js
+  --lang tr all` **0 WARN/0 BUG/0 ERR**. *Etkilenen: 03 oyun (climber
+  dengesi+player+backdrop), 03 test_game.* NOT: `tools/deep-tool.py` repo'da
+  YOK (git'ten değil, denetimde silinmiş) — doğrulama JS deep-tool.
 
 - **[Star Climber v3 — ana oyunun alternatif evreni — TAMAMLANDI, 08.10.2026]**
   Kullanıcı: "Star Climber'ı sevmiyorum; vizyon şu — Star Collector Hero'nun
