@@ -38,8 +38,8 @@ kendi oturum dosyan ve `sessions/_shared.md` okunur. (Eski adı: MiniEngine → 
 >    `git show e6bf3e8:deep_engine/components.py`) + session kayıtları
 >    (özellikle `_shared.md`, `02_engine.md`).
 > 3. Eski Python testleri silindi; **tüm regresyon JS** ile yapılır (aşağıda).
-> 4. `tools/deep-tool.py` + `tools/webpanel.py` + `tools_html/*` **kaldı**
->    (aracılar JS/HTML motorunun hizmetinde).
+> 4. `tools/deep-tool.py` + `tools/webpanel.py` **08.10.2026 silindi**; araçlar
+>    `tools_html/deep-tool.js` + `tools_html/webpanel.js` (JS, Node).
 
 ## ÇALIŞMA KURALLARI (oturum bütünlüğü)
 
@@ -84,8 +84,11 @@ Detaylı çizelge + 2D v1 5 alan planı: `01_strategy.md`.
   - `game/` — `main.js` + `state.js`, `entities.js`, `bosses.js`, `ui.js`,
     `builders.js`, `scenes.js`, `climber.js`, `commands.js`.
   - `test_*.js` — **13 motor/oyun test dosyası** (node ile çalışır; hepsi yeşil).
-- `tools/` — deep-tool.py + deep-tool.bat (kısayol), webpanel.py (tarayıcı editörü).
-  (Eski `parity_check.py` + Modül 14 kaldırıldı; Python motoru silindi.)
+- `tools_html/` — araçların TAMAMI JS (Node): **deep-tool.js** (tarama aracı,
+  TR/EN interaktif, `.bat` kısayolu kökte: `deep-tool.bat`), **webpanel.js** +
+  webpanel.html (tarayıcı seviye editörü, `webpanel.bat` kısayolu),
+  `test_tools.js`, `test_browser.js`. (Eski `tools/deep-tool.py` +
+  `tools/webpanel.py` **08.10.2026 silindi** — JS tek kaynak.)
 - `sessions/` — oturum belgeleri (üstteki tablo).
 - Veri: `custom_level.json` (web editörü şablon kaynağı), `custom_levels/` (web
   editörü seviyeleri: `default.json` sıfır şablon + adlı seviyeler — oyundan
@@ -102,17 +105,17 @@ savegame sıfır kurulum: `{"lang":"tr","high_score":0}` (BOM'suz `{`).
 ## ÇALIŞTIRMA / DOĞRULAMA
 
 ```powershell
-node C:\Users\token\Desktop\DerinEngine\deep_engine_html\index.html   # tarayıcıda oyun
-python tools\deep-tool.py            # tarama aracı (TR/EN interaktif menü)
-python tools\deep-tool.py --lang en all
+deep-tool.bat            # tarama aracı (TR/EN interaktif menü) = node tools_html\deep-tool.js
+deep-tool.bat --lang en all
+node tools_html\deep-tool.js run game   # oyunu varsayılan tarayıcıda açar (index.html)
 ```
 
 Testler (pencere açmaz, hepsi yeşil olmalı):
 ```powershell
 node deep_engine_html\test_core.js    # JS motor çekirdeği -> ALL OK
-node deep_engine_html\test_game.js    # oyun (TEST17 dahil) -> SONUÇ: 182 geçti
+node deep_engine_html\test_game.js    # oyun (TEST17 dahil) -> 224 geçti
 node tools_html\test_tools.js         # deep-tool -> 36/36
-node tools_html\test_browser.js       # tarayıcı testi (gerçek tuş yolu) -> 51/51
+node tools_html\test_browser.js       # tarayıcı testi (gerçek tuş yolu) -> 52/0
 ```
 (13 test dosyasının tamamı: `deep_engine_html\test_*.js` — hepsi yeşil olmalı.)
 
@@ -121,7 +124,7 @@ T dil, P kampanya, 4 Sonsuz Mod (kilitli olabilir), **C Star Climber (tırmanı�
 F3 debug, ESC çıkış.
 Konsol: ` veya " ile aç (dev komutları: help, version, hp, god, tp, respawn, list...).
 Oyun kumandası: analòg/D-Pad + A zıpla, X ateş, LB dash, Start çıkış.
-Tarayıcı editörü: `python tools\webpanel.py` → 127.0.0.1:8765 (custom_levels/ klasörü).
+Tarayıcı editörü: `webpanel.bat` → 127.0.0.1:8766 (custom_levels/ klasörü).
 
 ## TÜM GEÇMİŞ KAYITLAR (hızlı erişim)
 

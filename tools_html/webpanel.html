@@ -181,10 +181,10 @@
   </div>
 
   <div class="ed-panel">
-    <h3 style="margin:0 0 6px 0">4) Başlat &mdash; oyunu veya bir .py dosyasını çalıştır</h3>
+    <h3 style="margin:0 0 6px 0">4) Başlat &mdash; oyunu veya bir .js dosyasını çalıştır</h3>
     <div class="ed-bar">
-      <button class="run" onclick="runFile('main.py')">Oyun (main.py)</button>
-      <input id="runPath" placeholder=".py yolu, ör. tools/webpanel.py" style="flex:1">
+      <button class="run" onclick="launchGame()">Oyun (index.html)</button>
+      <input id="runPath" placeholder=".js yolu, ör. deep_engine_html/test_game.js" style="flex:1">
       <button class="secondary" onclick="runFile(document.getElementById('runPath').value)">Çalıştır</button>
     </div>
     <pre id="runOut" style="margin-top:6px;min-height:70px"></pre>
@@ -201,9 +201,9 @@
 </div>
 
 <div class="panel" id="script">
-  <div class="row"><span class="status">Kısa bir Python komutu koş - çıktıyı burada gör.</span></div>
-  <textarea id="scriptSrc">import deep_engine
-print("DerinEngine", deep_engine.__version__)</textarea>
+  <div class="row"><span class="status">Kısa bir Node.js komutu koş - çıktıyı burada gör.</span></div>
+  <textarea id="scriptSrc">const DE = require('./deep_engine_html/engine/math2d.js');
+console.log('ok', DE ? 'motor modulleri yuklu degil (tarayici icin yazildi)' : '');</textarea>
   <div class="row" style="margin-top:8px">
     <button class="run" onclick="runScript()">Çalıştır</button>
     <span class="status" id="scriptStatus"></span>
@@ -213,8 +213,8 @@ print("DerinEngine", deep_engine.__version__)</textarea>
 
 <div class="panel" id="game">
   <div class="row">
-    <button class="run" onclick="launchGame()">main.py başlat</button>
-    <span class="status">Oyun ayrı bir pencere/pygame olarak açılır.</span>
+    <button class="run" onclick="launchGame()">Oyunu aç (index.html)</button>
+    <span class="status">index.html varsayılan tarayıcıda açılır.</span>
   </div>
   <pre id="gameOut"></pre>
 </div>
@@ -935,10 +935,10 @@ let gameId = 0;
 async function launchGame() {
   const out = document.getElementById('gameOut');
   const my = ++gameId;
-  out.textContent = 'main.py başlatılıyor... (konsol çıktısı)';
+  out.textContent = 'index.html açılıyor...';
   const d = await postJson('/api/launch', {});
   if (my !== gameId) return;
-  out.textContent = (d.stdout || '') + (d.stderr ? '\n[stderr]\n' + d.stderr : '') || '(konsol çıktısı yok)';
+  out.textContent = (d.stdout || '') + (d.stderr ? '\n[stderr]\n' + d.stderr : '') || '(index.html tarayıcıda açıldı)';
 }
 
 /* ---------- boot ---------- */

@@ -8,6 +8,39 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[ARAÇLAR PY→JS GEÇİŞİ — TAMAMLANDI, 08.10.2026]** Kullanıcı direktifi:
+  araçlar da Python'dan JS'e geçirildi. `tools/deep-tool.py` + `tools/webpanel.py`
+  **silindi** (`git rm`) — repo'da Python KALMADI. `webpanel.js` (Node, 8766)
+  python bağımlılığından kurtuldu: `/api/launch` oyunu tarayıcıda index.html
+  olarak açar, `/api/run` `.js` dosyasını `node` ile çalıştırır, `/api/script`
+  `node -e`, `py()`/`W64`/`NODE_BIN` silindi. `deep-tool.js`: Modül 3
+  builder/extractor → `deep_engine_html/game/*.js`, Modül 4 i18n → yalnız JS,
+  `SCRIPT_RUN` → game/webpanel/tool node hedefleri, `new script` → yalnız .js.
+  `deep-tool.bat` + `webpanel.bat` → `node tools_html\*.js`. AGENTS + README
+  komutları güncellendi (webpanel 8766). **Doğrulama:** 13/13 JS 0 FAIL,
+  test_tools 36/36, test_browser 52/0, `deep-tool.js --lang tr en all`** 14×
+  0/0/0; webpanel /api/run + /api/script canlı POST'ta ok=true.
+  *Etkilenen: 04 araç + tüm oturumlar (py komutları artık geçersiz). Detay:
+  `04_tools.md` "ARAÇLAR PY→JS GEÇİŞİ — TAMAMLANDI".*
+
+- **[Star Climber v3 — ana oyunun alternatif evreni — TAMAMLANDI, 08.10.2026]**
+  Kullanıcı: "Star Climber'ı sevmiyorum; vizyon şu — Star Collector Hero'nun
+  ALTERNATİF EVRENİ: portallar kapandı, koleksiyonerler Astro'ya kule diktiler,
+  oyuncu o kuleye tırmanıyor; oynanış/platform/asset/player ana oyunla BİREBİR."
+  Uygulandı (`game/climber.js`, `engine/i18n.js`): **1)** player = ana oyun
+  karakteri (mavi gövde + GÖZLER + yön hissi; v1 "gözsüz" isteği geri alındı —
+  kullanıcı artık AYNI istiyor) + dash (LSHIFT, 0.16s, hayalet izleri, ana
+  oyundan birebir eş) + zıplama squash; **2)** HUD hedef satırı "Hedef: Astro
+  Kulesi" + açılış banner'ı "PORTALLAR KAPANDI" (5sn söner); **3)** TEST17
+  güncellendi (dash, hayalet iz, görsel çizim, HUD hedefi, banner). Map
+  tırmanışça üretilir (v2'den beri). Ayrıca `tools_html/test_tools.js`
+  api/script test girdisi düzeltildi: `print(1+1)` → `console.log(1+1)`
+  (webpanel komut kutusu node ile çalışır, print yoktu — önceden var olan
+  36/36 kırıcısı; v3 ile ilgisiz). Doğrulama: 13/13 JS test **0 FAIL**
+  (test_game v3 ile yeşil), tools **36/0**, `deep-tool.py --lang tr 14`
+  **0 WARN/0 BUG/0 ERR**. *Etkilenen: 03 oyun (climber player/dash/HUD/evren),
+  02 motor (i18n yeni key'ler), 04 araç (test_tools girdisi).*
+
 - **[DENETİM + SADELEŞTİRME — TAMAMLANDI, 08.10.2026]** Kullanıcı görevi (tüm
   dosyalar; gereksiz sil, dağınığı sadeleştir, spagetti düzelt; `dist/` hariç
   onaylandı) bitti. **A — silinenler:** `StarCollectorHero.spec` (git rm),

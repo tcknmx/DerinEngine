@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /*
- * DeepTool (JS) — DerinEngine scan/checkup aracı — Node.js portu
- * Python tools/deep-tool.py ile birebir aynı yetenekler (13 modül + find/new/run + --api).
- * Fark: hem *.py hem *.js dosyalarını tarar (iki motor da aynı denetimden geçer).
+ * DeepTool (JS) — DerinEngine scan/checkup aracı (Node.js)
+ * Eski Python tools/deep-tool.py, 08.10.2026'da kaldırıldı — tek araç bu.
+ * 13 modül + find/new/run + --api; hem *.py hem *.js dosyalarını tarar.
  * Kullanım:
  *   node tools_html/deep-tool.js                -> interaktif menü (dil + ana menü)
  *   node tools_html/deep-tool.js --lang en all  -> İngilizce, tüm tarama modülleri
@@ -17,7 +17,7 @@
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { execFile } = require("child_process");
+const { execFile, spawn } = require("child_process");
 
 // Proje kökünü bul: burası tools_html/ içinde → bir üst astı = DerinEngine kökü.
 // (Gösterge olan deep_engine/ + game/ klasörleri 08.10.2026'da silindi — kök
@@ -262,7 +262,7 @@ function project_files() {
         if (SKIP_DIRS.includes(ent.name)) continue;
         walk(p);
       } else if (ent.name.endsWith(".py") || ent.name.endsWith(".js")) {
-        if (ent.name === "deep-tool.js" || ent.name === "deep-tool.py") continue;
+        if (ent.name === "deep-tool.js") continue;
         out.push(p);
       }
     }
@@ -485,11 +485,11 @@ const _EXTRACTOR_REG = /register_extractor\s*\(\s*['"]([^'"]+)['"]\s*,\s*(\w+)\s
 const _FN_DEF = /^(?:def|function|export\s+function|const\s+(\w+)\s*=\s*(?:async\s*)?\(?[^=]*\)?\s*=>)\s*(\w+)\s*\(/gm;
 
 function run_builder_extractor(collect) {
-  const src_files = [path.join(ROOT, "main.py")];
-  const game_dir = path.join(ROOT, "game");
+  const src_files = [];
+  const game_dir = path.join(ROOT, "deep_engine_html", "game");
   if (fs.existsSync(game_dir)) {
     for (const f of fs.readdirSync(game_dir).sort()) {
-      if (f.endsWith(".py")) src_files.push(path.join(game_dir, f));
+      if (f.endsWith(".js")) src_files.push(path.join(game_dir, f));
     }
   }
   const combined = src_files.filter(p => fs.existsSync(p)).map(read).join("\n");
@@ -528,41 +528,16 @@ function run_builder_extractor(collect) {
 }
 
 /* ======================= MODÜL 4 : i18n KEY ======================= */
-const _I18N_KEY = /^\s*['"]([^'"]+)['"]\s*:/gm;
-
-function i18n_keys(src) {
-  const keys = new Set();
-  let m;
-  _I18N_KEY.lastIndex = 0;
-  while ((m = _I18N_KEY.exec(src)) !== null) keys.add(m[1]);
-  return keys;
-}
-
 function run_i18n(collect) {
-  const py = path.join(ROOT, "deep_engine", "i18n.py");
   const js = path.join(ROOT, "deep_engine_html", "engine", "i18n.js");
-  const target = (fs.existsSync(js) && !fs.existsSync(py)) ? js : py;
-  if (!fs.existsSync(target)) {
+  if (!fs.existsSync(js)) {
     collect("WARN", t("i18n_no_file"));
     return;
   }
-  /* İkilisini de tara (hem py hem js i18n tablosu varsa — ikisi de MY olduğu için
-     tam ikili parity'yi ayrı ayrı raporla). */
-  const groups = [];
-  if (fs.existsSync(py)) groups.push([rel(py), i18n_keys(read(py).split("TRANSLATIONS = {")[1] || "")]);
-  if (fs.existsSync(js)) groups.push([rel(js), i18n_keys(read(js))]);
-  for (const [p, keys] of groups) {
-    const trk = new Set([...keys].filter(k => /^[\w_.]+$/.test(k) === false || false));
-    /* v1 basit: i18n.js tek nesne içinde tr/en anahtarlı değerler; py tarafındaki
-       TRANSLATIONS tr ve en ayrı. _I18N_KEY yalnız anahtar adlarını yakalar;
-       ayrımı JSON parse ile yap: */
-  }
-  // Derin parity: tablo nesnesini JSON'a çevirip tr/en ayrımlı karşılaştır.
-  const pyCodes = ["deep_engine", "i18n"];
-  void pyCodes;
-  // Pratik yaklaşım: .py TRANSLATIONS['tr'/'en'] blokları ile .js'in TR/EN dict'leri.
+  /* i18n.js tek nesne içinde tr/en anahtarlı değerler taşır; blokları ayırıp
+     tr ile en'in anahtar kümesi arasında parity denetler (eski py tablosu 08.10.2026'da
+     kaldırıldı — yalnız JS denetlenir). */
   const collectFrom = (p, src, tag) => {
-    /* src içindeki tr: { ... } ve en: { ... } bloklarını kabaca ayır. */
     const langKeys = { tr: new Set(), en: new Set() };
     const re = /(?:['"](\w+)['"])\s*:\s*\{([\s\S]*?)\n\s*\}/g;
     let mm;
@@ -583,8 +558,7 @@ function run_i18n(collect) {
       collect("WARN", p + " :: " + t("i18n_missing_tr") + " (" + key + ")");
     }
   };
-  if (fs.existsSync(py)) collectFrom(py, read(py), "py");
-  if (fs.existsSync(js)) collectFrom(js, read(js), "js");
+  collectFrom(js, read(js), "js");
 }
 
 /* ======================= MODÜL 5 : ASSET ======================= */
@@ -612,7 +586,7 @@ function run_asset(collect) {
 }
 
 /* ======================= MODÜL 6 : PERFORMANS ======================= */
-/* Sabit-küçük döngü tespiti (Python deep-tool.py _const_loop_size ile aynı mantık;
+/* Sabit-küçük döngü tespiti (eski Python deep-tool.py _const_loop_size'den taşındı;
  * bu araç .py VE .js dosyalarını taradığı için iki sözdizimini de tanır).
  * Döngünün yineleme sayısı kanıtlanabilir <= SMALL_LOOP_MAX ise döner, aksi hâlde null. */
 const SMALL_LOOP_MAX = 32;
@@ -1164,25 +1138,10 @@ function run_selected(selections) {
 
 /* ======================= ALT ARAÇLAR: FIND / NEW / RUN ======================= */
 const SCRIPT_RUN = {
-  game: ["main.py", "Oyunu baslat (main.py)"],
-  webpanel: ["tools/webpanel.py", "Tarayici editoru (127.0.0.1:8765) - py"],
-  tool: ["tools/deep-tool.py", "deep-tool (py)"],
-  jswebpanel: ["tools_html/webpanel.js", "Tarayici editoru (127.0.0.1:8766) - js"],
-  jstool: ["tools_html/deep-tool.js", "deep-tool (js, bu arac) - js"],
+  game: ["deep_engine_html/index.html", "Oyunu tarayicida baslat (index.html)"],
+  webpanel: ["tools_html/webpanel.js", "Tarayici editoru (127.0.0.1:8766)"],
+  tool: ["tools_html/deep-tool.js", "deep-tool (bu arac)"],
 };
-
-const NEW_SCRIPT_PY = `"""{name} - DerinEngine
-"""
-
-
-def main():
-    """Gecici giris noktasi."""
-    pass
-
-
-if __name__ == "__main__":
-    main()
-`;
 
 const NEW_SCRIPT_JS = `/* {name} - DerinEngine (JS) */
 'use strict';
@@ -1252,14 +1211,14 @@ function perform_new(kind, pth) {
   }
   const parent = path.dirname(absp);
   if (parent && !fs.existsSync(parent)) fs.mkdirSync(parent, { recursive: true });
-  const tmpl = absp.endsWith(".js") ? NEW_SCRIPT_JS : NEW_SCRIPT_PY;
-  fs.writeFileSync(absp, tmpl.replace("{name}", path.basename(absp)), "utf8");
+  if (!absp.endsWith(".js")) return { ok: false, error: "sadece .js script sablonu uretilir (py kaldirildi)" };
+  fs.writeFileSync(absp, NEW_SCRIPT_JS.replace("{name}", path.basename(absp)), "utf8");
   return { ok: true, kind: "script", path: pth };
 }
 
 function run_target(target) {
   if (SCRIPT_RUN[target]) return SCRIPT_RUN[target][0];
-  if (/\.(py|js)$/.test(target || "")) return target;
+  if (/\.(py|js|html)$/.test(target || "")) return target;
   return null;
 }
 
@@ -1278,6 +1237,10 @@ function do_run(cli_target) {
   const absp = path.isAbsolute(relp) ? relp : path.join(ROOT, relp);
   if (!fs.existsSync(absp)) { console.log(" " + t("run_bad", { s: target })); return; }
   console.log(" " + t("run_start", { cmd: rel(absp) }));
+  if (relp.endsWith(".html")) {
+    spawn("cmd", ["/c", "start", "", absp], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+    return;
+  }
   const isJs = relp.endsWith(".js");
   execFile(isJs ? process.execPath : "python", [absp], { cwd: ROOT }, (err, stdout, stderr) => {
     if (stdout) console.log(stdout);

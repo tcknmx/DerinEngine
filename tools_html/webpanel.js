@@ -1,15 +1,14 @@
 /* webpanel.js — DerinEngine yerel tarayıcı kontrol paneli + mini seviye editörü.
-   Felçli Python karşılığı: tools/webpanel.py (127.0.0.1:8765).
+   (Eski tools/webpanel.py'nin JS'e geçirilmiş hali — 08.10.2026'da py kaldırıldı.)
    Bu Node sürümü 127.0.0.1:8766'da çalışır ve deep-tool.js'i AYNI SÜREÇTE çağırır
-   (subprocess değil) — ama /api/run / /api/launch / /api/script hâlâ python ister
-   (oyun + script çalıştırma doğal olarak Python tarafındadır: henüz JS'e port
-   edilmedi). Dependencies: yalnızca Node standart kütüphanesi (http).
+   (subprocess değil). Oyun çağrıları tarayıcıda index.html açar; script çalıştırma
+   node -e ile yapılır. Dependencies: yalnızca Node standart kütüphanesi (http).
 
    YAPI
    - webpanel.html  : gömülü arayüz (PAGE) — ayrı dosya, %PORT% %TEMPLATES%
                       %SCHEMAS% %THEMES% %GRID% yer tutucuları sunucu tarafında doldurulur.
    - deep-tool.js   : tarayıcı editörü + deep-tool modülleri aynı panelde.
-   Kullanım:  node tools\webpanel.js   (veya tools\webpanel.js --no-open)
+   Kullanım:  node tools_html\webpanel.js   (veya tools_html\webpanel.js --no-open)
 */
 "use strict";
 
@@ -20,10 +19,9 @@ const { spawn } = require("child_process");
 
 const ROOT = path.join(__dirname, "..");
 const PORT = 8766;
-const W64 = process.env.ProgramW6432 || "";
-const NODE_BIN = process.execPath;          // kendimiz (python gerektiren çağrılar)
 const PAGE_PATH = path.join(__dirname, "webpanel.html");
 const DEEPT = path.join(__dirname, "deep-tool.js");
+const GAME_HTML = path.join(ROOT, "deep_engine_html", "index.html");
 
 let _deept = null;
 function deept() {
@@ -104,7 +102,7 @@ function _save_level(data, name) {
   return { ok: true, name: target };
 }
 
-/* ---------------- subprocess (python için) ---------------- */
+/* ---------------- subprocess (node için) ---------------- */
 function _run(cmd, cwd, timeoutMs) {
   return new Promise((resolve) => {
     let out = "", err = "", code = null;
@@ -170,7 +168,7 @@ function page_html() {
 function requireSafeTemplates() { return TEMPLATES; }
 function requireSafeSchemas() { return FIELD_SCHEMAS; }
 
-/* Palette + field schemas — tools/webpanel.py ile aynı. */
+/* Palette + field schemas — webpanel.html gömülü panel-data bloğuyla eşleşir. */
 const TEMPLATES = [
   { tag: "Ground", name: "Platform", w: 200.0, h: 40.0, color: [60, 90, 130], shape: "rect" },
   { tag: "Breakable", name: "Breakable", w: 64.0, h: 64.0, color: [150, 110, 60], hits: 1 },
@@ -287,7 +285,7 @@ const server = http.createServer(async (req, res) => {
         } catch (e) { sendJson(res, 500, { ok: false, error: String(e) }); }
       } else if (p === "/api/script") {
         const src = body.src || "";
-        const r = await _run([py(), "-c", src], ROOT, 30000);
+        const r = await _run([process.execPath, "-e", src], ROOT, 30000);
         sendJson(res, 200, { ok: r.code === 0, code: r.code, stdout: r.out, stderr: r.err });
       } else if (p === "/api/scan") {
         const lang = body.lang || "tr";
@@ -324,12 +322,18 @@ const server = http.createServer(async (req, res) => {
         }
       } else if (p === "/api/run") {
         const pth = (body.path || "").trim();
-        if (!/\.py$/.test(pth)) { sendJson(res, 400, { ok: false, error: "sadece .py dosyasi calistirilir" }); return; }
-        const r = await _run([py(), pth], ROOT, 120000);
+        if (!/\.js$/.test(pth)) { sendJson(res, 400, { ok: false, error: "sadece .js dosyasi calistirilir" }); return; }
+        const r = await _run([process.execPath, pth], ROOT, 120000);
         sendJson(res, 200, { ok: r.code === 0, code: r.code, stdout: r.out, stderr: r.err });
       } else if (p === "/api/launch") {
-        const r = await _run([py(), "main.py"], ROOT, 120000);
-        sendJson(res, 200, { ok: r.code === 0, code: r.code, stdout: r.out, stderr: r.err });
+        try {
+          if (!fs.existsSync(GAME_HTML)) throw new Error("index.html bulunamadi: " + GAME_HTML);
+          const u = "file:///" + GAME_HTML.split(path.sep).join("/");
+          require("child_process").spawn("cmd", ["/c", "start", "", u], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+          sendJson(res, 200, { ok: true, code: 0, stdout: "index.html varsayilan tarayicida acildi", stderr: "" });
+        } catch (e) {
+          sendJson(res, 200, { ok: false, code: 1, stdout: "", stderr: "ERROR: " + e });
+        }
       } else {
         sendJson(res, 404, { ok: false, error: "not found" });
       }
@@ -351,22 +355,6 @@ server.on("error", (e) => {
   }
   process.exit(0);
 });
-
-function py() {
-  /* Oyun / .py çalıştırma hâlâ Python gerektirir — PATH'te python, yoksa
-     %ProgramW6432%\Python* alt dizinlerine bak. */
-  if (process.env.PYTHON) return process.env.PYTHON;
-  try { require("child_process").execSync("python --version", { stdio: "ignore", windowsHide: true }); return "python"; }
-  catch (e) { }
-  if (W64) {
-    try {
-      const dirs = fs.readdirSync(path.join(W64, "Python"));
-      const picks = dirs.filter(d => /^Python/.test(d)).sort().reverse();
-      if (picks.length) return path.join(W64, "Python", picks[0], "python.exe");
-    } catch (e) { }
-  }
-  return "python";
-}
 
 function openBrowser() {
   try {

@@ -557,3 +557,31 @@ araç/repo tarafına yapılanlar:
   — kozmetik; deep-tool hâlâ `0 WARN/0 BUG/0 ERR` üretiyor.
 - **Doğrulama:** `test_tools.js` **36/36**, `test_browser.js` **52/0** (climber
   test sayısı arttı), 13/13 JS **0 FAIL**, `deep-tool.py --lang tr all` **0/0/0**.
+
+---
+
+## ARAÇLAR PY→JS GEÇİŞİ — TAMAMLANDI (08.10.2026)
+
+Kullanıcı direktifi: **"tools'ları da py'den js'ye geçiriyoruz."** Hepsi bitti:
+
+- **`webpanel.js` Python bağımlılığı kaldırıldı:** `py()` arama fonksiyonu,
+  `W64`/`NODE_BIN` sabitleri silindi; `/api/script` → `node -e`;
+  `/api/run` → `.js` dosyasını `node` ile çalıştırır; `/api/launch` →
+  `deep_engine_html/index.html`'i varsayılan tarayıcıda açar (kullanıcı onayı).
+- **`deep-tool.js` içi py kalıntıları temizlendi:** Modül 3 builder/extractor
+  `main.py`+`game/*.py` → `deep_engine_html/game/*.js`; Modül 4 i18n yalnız
+  `i18n.js` (ölü `i18n_keys`/`_I18N_KEY`/py tablo kodu silindi); `SCRIPT_RUN`
+  → game=index.html / webpanel=webpanel.js / tool=deep-tool.js; `do_run`
+  `.html` → tarayıcı; `new script` → yalnız `.js` şablonu (`NEW_SCRIPT_PY`
+  silindi). `spawn` import'u eklendi.
+- **py dosyaları SİLİNDİ:** `tools/deep-tool.py` + `tools/webpanel.py`
+  (`git rm`). `tools/__pycache__/` kalıntıları da silindi.
+- **Kısayollar + belgeler:** `deep-tool.bat` + `webpanel.bat` → `node
+  tools_html\*.js`; AGENTS.md (PROJE YERİ: tools_html tek satır, komutlar,
+  test sayıları 224 / 52/0, webpanel 8766); README.md (komutlar + yapı).
+- **Canlı test:** `/api/script` (`node -e`) + `/api/run` (`node
+  test_core.js`) gerçek sunucu üzerinde POST ile denendi → ok=true.
+- **Doğrulama:** 13/13 JS test **0 FAIL**; test_tools **36/36**; test_browser
+  **52/0**; `node tools_html\deep-tool.js --lang tr all` + `--lang en all` →
+  **14× 0 WARN/0 BUG/0 ERR**. Eski `deep-tool.py`/`webpanel.py` komutları
+  ARTIK GEÇERSİZ (repo'da Python kalmadı).

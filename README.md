@@ -21,7 +21,7 @@ konsol. Proje aktif geliştirmededir.
 - 3 kalpli sağlık + i-frame (dokunulmazlık) süreleri
 - TR/EN anlık dil değiştirme (T), kalıcı yüksek skor ve dil kaydı
 - **Star Climber** (C): yükselen kule tırmanma modu, kalıcı rekor + çift zıplama skill'i
-- Tarayıcı seviye editörü (`python tools\webpanel.py` → 127.0.0.1:8765)
+- Tarayıcı seviye editörü (`webpanel.bat` → 127.0.0.1:8766)
 - Oyun içi geliştirici konsolu ( ` veya " ): hp, god, tp, respawn, help...
 - Tam kumanda desteği, mobil dokunmatik kontroller
 - Test paketi (Node): 13 motor/oyun test dosyası, hepsi yeşil
@@ -55,14 +55,17 @@ node deep_engine_html\test_visual.js        # görsel/eğlence regresyonu (31/31
 
 # Araç testleri:
 node tools_html\test_tools.js               # 36/36
-node tools_html\test_browser.js             # gerçek tuş yolu, 51/51
+node tools_html\test_browser.js             # gerçek tuş yolu, 52/0
 
-# Tarama aracı (TR/EN interaktif):
-python tools\deep-tool.py
-python tools\deep-tool.py --lang en all
+# Tarama aracı (TR/EN interaktif): deep-tool.bat veya
+node tools_html\deep-tool.js
+node tools_html\deep-tool.js --lang en all
 
-# Tarayıcı seviye editörü (custom_levels/ klasörü):
-python tools\webpanel.py                    # http://127.0.0.1:8765
+# Oyunu tarayıcıda aç (deep-tool üzerinden):
+node tools_html\deep-tool.js run game
+
+# Tarayıcı seviye editörü (custom_levels/ klasörü): webpanel.bat veya
+node tools_html\webpanel.js                 # http://127.0.0.1:8766
 ```
 
 ## Proje Yapısı
@@ -79,10 +82,10 @@ deep_engine_html/          # BİRİNCİL motor + oyun (JS, tarayıcıda çalış
     main.js, state.js, entities.js, bosses.js, ui.js, scenes.js
     builders.js, climber.js, commands.js
   test_*.js                # 13 motor/oyun test dosyası (Node)
-tools/
-  deep-tool.py             # dev tarama/kontrol aracı (TR/EN)
-  webpanel.py              # tarayıcı seviye editörü (custom_levels/)
-tools_html/                # araçların JS portları + araç testleri
+tools_html/                # araçların TAMAMI (Node)
+  deep-tool.js             # dev tarama/kontrol aracı (TR/EN, deep-tool.bat kısayolu)
+  webpanel.js + webpanel.html  # tarayıcı seviye editörü (webpanel.bat, 127.0.0.1:8766)
+  test_tools.js, test_browser.js  # araç testleri
 custom_levels/             # kullanıcı seviyeleri (default.json + adlı seviyeler)
 custom_level.json          # şablon kaynağı (biçim sürümü: 1)
 version.txt                # sürüm geçmişi
