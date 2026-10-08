@@ -4,6 +4,10 @@
  */
 var DE = DE || {};
 
+/* Python `%` gibi hep pozitif sonuç verir (JS `%` işaretli).
+ * ORTA-5: negatif kamera kaydırmasında parallax karo/konumları kaymasın diye. */
+DE._pmod = function (n, m) { const r = n % m; return r < 0 ? r + m : r; };
+
 DE.ParallaxLayer = class ParallaxLayer {
     constructor(speed_factor = 0.2, color = [30, 40, 60], layer_type = "mountains", height_range = [150, 300]) {
         this.speed_factor = speed_factor;
@@ -16,7 +20,7 @@ DE.ParallaxLayer = class ParallaxLayer {
     _rgb(c) { return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")"; }
 
     draw(ctx, w, h, camera_offset) {
-        const scroll_x = Math.trunc(-camera_offset.x * this.speed_factor) % this.cached_width;
+        const scroll_x = DE._pmod(Math.trunc(-camera_offset.x * this.speed_factor), this.cached_width);
 
         if (this.layer_type === "stars") {
             ctx.fillStyle = "rgb(220,235,255)";
@@ -108,7 +112,7 @@ DE.ParallaxBackground = class ParallaxBackground {
         const sx = -Math.trunc(camera_offset.x * 0.02);
         // Nebula bulutları (yarı saydam renk lekeleri)
         for (let i = 0; i < 4; i++) {
-            const bx = ((i * 347 + sx) % (w + 400)) - 200;
+            const bx = DE._pmod(i * 347 + sx, w + 400) - 200;
             const by = (i * 173 + 40) % Math.trunc(h / 2);
             const rad = 90 + (i % 3) * 40;
             const cols = [[120, 60, 200], [60, 120, 220], [200, 60, 160], [80, 200, 180]];
@@ -123,7 +127,7 @@ DE.ParallaxBackground = class ParallaxBackground {
         }
         // Parlayan yıldız kümeleri
         for (let i = 0; i < 18; i++) {
-            const stx = (i * 211 + sx * 1.3) % w;
+            const stx = DE._pmod(i * 211 + sx * 1.3, w);
             const sty = (i * 89 + 30) % Math.trunc(h / 2);
             const size = i % 3 ? 1 : 2;
             const bright = 200 + (i % 3) * 20;
@@ -133,7 +137,7 @@ DE.ParallaxBackground = class ParallaxBackground {
             ctx.fill();
         }
         // Halkalı gezegen (üst sağda, kamerayla yavaş süzülür)
-        const px = Math.trunc(w * 0.20 + ((sx * 0.8) % (w + 400)));
+        const px = Math.trunc(w * 0.20 + DE._pmod(sx * 0.8, w + 400));
         const py = Math.trunc(h * 0.22);
         const planet_r = 42;
         ctx.fillStyle = "rgb(150,90,220)";

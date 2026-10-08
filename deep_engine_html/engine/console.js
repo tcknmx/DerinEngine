@@ -11,7 +11,7 @@ DE.register_command = function (name, help_text, fn) {
 };
 
 DE._cmd_help = function (scene, args) {
-    const lines = ["Komutlar:"];
+    const lines = ["Commands:"];
     for (const name of Object.keys(DE._CONSOLE_COMMANDS).sort()) {
         lines.push("  " + name + "  ->  " + DE._CONSOLE_COMMANDS[name].help);
     }
@@ -19,7 +19,13 @@ DE._cmd_help = function (scene, args) {
 };
 DE._cmd_clear = function (scene, args) { return "__CLEAR__"; };
 DE._cmd_version = function (scene, args) {
-    return "DerinEngine motor surumu: " + (DE.__version__ || "0.0.0");
+    // M10: motor sürümü DE.__version__; oyun sürümü DE_GAME.__version__ (ayrı
+    // sayılır). Python tek satır (0.1.19) gösteriyordu — JS ikisini de gösterir.
+    let out = "DerinEngine engine version: " + (DE.__version__ || "0.0.0");
+    if (typeof DE_GAME !== "undefined" && DE_GAME && DE_GAME.__version__) {
+        out += ", game version: " + DE_GAME.__version__;
+    }
+    return out;
 };
 
 DE.register_command("help", "komut listesini goster", DE._cmd_help);
@@ -39,12 +45,18 @@ DE.DevConsole = class DevConsole {
         this.font_size = 16;
         this._cursor_timer = 0.0;
         this._cmd_count = 0;
+        this.scroll_offset = 0; // 0 = en yeni satır görünür; >0 = geçmişe kaydırılmış
+    }
+    /* Panel içine kaç satır sığar (çıktı üst boşluk 36px, alt alan ipucu+girdi 54px). */
+    static _visible_lines(panel_h, line_h) {
+        return Math.max(1, Math.floor((panel_h - 90) / line_h));
     }
     _print(text) {
         for (const line of String(text).split("\n")) {
             this.output.push(line);
             if (this.output.length > this._output_max) this.output.shift();
         }
+        this.scroll_offset = 0; // yeni satır → en sona geri dön
     }
     toggle() {
         this.active = !this.active;
@@ -52,7 +64,8 @@ DE.DevConsole = class DevConsole {
             if (DE.Input && DE.Input.clear_typed) DE.Input.clear_typed();
             this.input_line = "";
             this.history_index = this.history.length;
-            this._print("Konsol acik. 'help' yazip ENTER'a bas.");
+            this.scroll_offset = 0;
+            this._print("Console open. Type 'help' and press ENTER.");
         }
         return this.active;
     }
@@ -63,6 +76,18 @@ DE.DevConsole = class DevConsole {
         if (!DE.Input) return;
         const typed = DE.Input.get_typed_text();
         if (typed) this.input_line += typed;
+
+        // Fare tekerleği: çıktı geçmişinde kaydırma (yukarı = eski, aşağı = yeni).
+        if (DE.Input.get_mouse_scroll) {
+            const wheel = DE.Input.get_mouse_scroll();
+            if (wheel !== 0) {
+                const panel_h = Math.floor(this.height * 0.42);
+                const vis = DevConsole._visible_lines(panel_h, 20);
+                const max_scroll = Math.max(0, this.output.length - vis);
+                const step = Math.max(1, Math.trunc(Math.abs(wheel) / 50));
+                this.scroll_offset = Math.min(max_scroll, Math.max(0, this.scroll_offset + (wheel > 0 ? -step : step)));
+            }
+        }
 
         if (DE.Input.get_key_down("BACKSPACE")) {
             this.input_line = this.input_line.slice(0, -1);
@@ -95,7 +120,7 @@ DE.DevConsole = class DevConsole {
         const args = parts.slice(1);
         const cmd = DE._CONSOLE_COMMANDS[name];
         if (!cmd) {
-            this._print("Bilinmeyen komut: '" + name + "' (help yaz)");
+            this._print("Unknown command: '" + name + "' (type 'help')");
             return;
         }
         let result;
@@ -103,7 +128,7 @@ DE.DevConsole = class DevConsole {
             const scene = (DE.Engine && DE.Engine.instance && DE.Engine.instance.active_scene) || null;
             result = cmd.fn(scene, args);
         } catch (exc) {
-            this._print("HATA: " + exc);
+            this._print("ERROR: " + exc);
             return;
         }
         if (result === "__CLEAR__") {
@@ -126,23 +151,29 @@ DE.DevConsole = class DevConsole {
         ctx.moveTo(0, panel_h); ctx.lineTo(w, panel_h);
         ctx.stroke();
         ctx.font = this.font_size + "px monospace";
-        // Çıktı satırları (en yeni altta)
+        // Çıktı satırları (en yeni altta). Tekerlek ile kaydırılabilir;
+        // ipucu (panel_h-54) ve girdi (panel_h-28) alanına taşmaz.
         const line_h = 20;
-        let y = panel_h - 34;
+        const vis = DevConsole._visible_lines(panel_h, line_h);
+        const n = this.output.length;
+        const start = Math.max(0, n - vis - this.scroll_offset);
+        const count = Math.min(vis, n - start);
         ctx.fillStyle = "rgb(210,220,235)";
         ctx.textBaseline = "middle";
-        for (let i = this.output.length - 1; i >= 0; i--) {
-            if (y < 18) break;
-            ctx.fillText(this.output[i], 12, y - line_h);
-            y -= line_h;
+        for (let i = 0; i < count; i++) {
+            ctx.fillText(this.output[start + i], 12, 36 + i * line_h);
+        }
+        if (this.scroll_offset > 0) {
+            ctx.fillStyle = "rgb(120,230,120)";
+            ctx.fillText("(mouse wheel: older - " + this.scroll_offset + " lines up)", 12, 20);
         }
         // Girdi satırı (panel altı)
         let prompt = "> " + this.input_line;
         if (Math.floor(this._cursor_timer * 2) % 2 === 0) prompt += "_";
         ctx.fillStyle = "rgb(120,230,120)";
-        ctx.fillText(prompt, 12, panel_h - 30);
+        ctx.fillText(prompt, 12, panel_h - 28);
         ctx.fillStyle = "rgb(120,130,150)";
-        ctx.fillText("` veya ESC ile kapat - help ile komutlari gor", 12, panel_h - 54);
+        ctx.fillText("mouse wheel: scroll - ` or ESC: close - help: commands", 12, panel_h - 54);
         ctx.textBaseline = "alphabetic";
         ctx.restore();
     }

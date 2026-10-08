@@ -214,12 +214,19 @@ DE.Health = class Health extends DE.Component {
         this.current_hp -= amount;
         if (this.is_player) {
             this.invulnerable_timer = (iframe !== null && iframe !== undefined) ? iframe : this.iframe_duration;
+            // Python components.py:683-686: oyuncu hasarında kırmızı vinyet flaşı
+            // (duruş/konum hissi) — JS'te yoktu (ORTA madde).
+            const eng = DE.Engine.instance;
+            const sc = eng ? eng.active_scene : null;
+            if (sc && sc.flash) sc.flash(0.55);
         }
         if (DE.SoundFX && DE.SoundFX.play) {
             if (this.is_player) DE.SoundFX.play("hurt");
             else DE.SoundFX.play(this.game_object.tag === "Boss" ? "boss_hit" : "hit");
         }
-        this._shake(this.game_object.tag === "Boss" ? 0.18 : 0.12);
+        // Python components.py:689: sarsıntı YALNIZ düşman/boss hasarında
+        // (oyuncuya gereksiz 0.12 sarsıntı JS ekleniyordu — ORTA madde).
+        if (!this.is_player) this._shake(this.game_object.tag === "Boss" ? 0.18 : 0.12);
         const pe = this.game_object.get_component(DE.ParticleEmitter);
         if (pe) pe.burst(15, [255, 60, 60], [60, 160], [3, 6], [0.2, 0.5], 120, [0, 0]);
         if (this.current_hp <= 0) {
@@ -238,7 +245,8 @@ DE.Health = class Health extends DE.Component {
         return;
     }
     _death_burst() {
-        // Partikül patlaması — üç renk katmanı (Python _death_burst birebir)
+        // Partikül patlaması - üç renk katmanı (Python _death_burst birebir)
+        this._shake(0.2);   // Python components.py:715: düşman ölümünde ekran sarsıntısı
         const scene = DE.Engine.instance ? DE.Engine.instance.active_scene : null;
         if (!scene) return;
         const o = this.game_object;

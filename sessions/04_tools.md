@@ -472,16 +472,62 @@ python tools\deep-tool.py
 python tools\deep-tool.py --lang tr 3
 python tools\deep-tool.py --lang en all
 
-# oyun
-python C:\Users\token\Desktop\DerinEngine\main.py
+# oyun → tarayıcıda (JS tek kaynak, 08.10.2026'dan beri):
+node deep_engine_html\index.html   # (index.html çift-tık da açılır)
 
-# Windows paketleme
-python -m PyInstaller --noconfirm --clean --onedir --windowed --name "StarCollectorHero" --add-data "custom_level.json;." --collect-submodules deep_engine main.py
-
-# tarayıcı build (ilk defa template CDN'den iner; sonra cached)
-$env:PYTHONUTF8=1; python -m pygbag --build --app_name StarCollectorHero .
+# PY PAKETLEME KOMUTLARI (PyInstaller main.py / pygbag) 08.10.2026'da
+# KULLANILMAZ HALE GELDİ — main.py + deep_engine/ silindi. Eski komutlar
+# git geçmişinde; web build/paketleme ihtiyacı JS hattında ayrı ele alınır.
 ```
+
+## SON KAYIT — ARAÇ oturumu (07.10.2026)
+
+- Web panel: Python `tools/webpanel.py`'nin `PAGE` bloğu (HTML+JS editör) başarıyla `tools_html/webpanel.html`'e çıkarıldı. Git HEAD'teki güvenli sürüm korunarak merge bozulması önlendi; yer tutucular (`%PORT%/%DATA%/%GRID%/%TEMPLATES%/%SCHEMAS%/%THEMES%`) sunucu tarafından dolduruluyor.
+- API eşleşmesi: Python ve JS webpanel route'ları **13/13 birebir** eşleşti (`/api/level/save/reset/delete/levels/level/find/modules/scan/new/script/run/launch/log`).
+- Doğrulama: `test_tools.js` **36/36**, `test_browser.js` **50/50** geçti. Tüm HTML motor testleri (13 dosya) yeşil, `test_smoke.js` 0 hata. Modül 14 (Python/JS parite) **0 WARN / 0 BUG / 0 ERR**. *(Not: Modül 14 bu tarihte vardı; 08.10.2026'da kaldırıldı — aşağıya bak.)*
+- Araçlar JS portu: `deep-tool.js` + `webpanel.js+html` Python muadiliyle eşit güçte; JS tarafı `.js` dosyalarını da tarıyor. Kod yazılmadan yalnızca çıkarım/port doğrulaması yapıldı.
+- **Düzeltme — `webpanel.html` doğrudan açıldığında boş palet:** `file://` ile çift-tıklayınca `panel-data` etiketi `%DATA%` dolmamış gelir, `TEMPLATES=[]` → editör boş açılırdı. Çözüm: sunucu verisiyle birebir aynı JSON `panel-embedded` bloğu olarak gömüldü; `_DATA` okuması "önce sunucu, yoksa gömül" oldu. Sunucu modu değişmedi (öncelik `panel-data`). `test_browser.js` Bölüm 3 artık file:// modunda **14 nesne** + **gomülü=sunucu parite** kontrolü yapıyor → **51/51**, `test_tools.js` 36/36.
 
 Uyarı: `build/` klasörü PyInstaller (`build/StarCollectorHero/`) ile pygbag
 (`build/web/`) tarafından paylaşılır; web çıktısını korumak istiyorsan temizlikte
 `build/web*` dışında tut ya da `dist/web/`'e kopyala.
+
+## SON KAYIT — ARAÇ oturumu (08.10.2026) — PARİTE KAPISI KALDI, PY SİLDİ
+
+- **Silme (kullanıcı kararı "Önce ORTA farkları kapat, sil" + "Modül 14 kaldırılsın"):**
+  `tools/parity_check.py` + `deep_engine/`, `game/*.py`, `main.py`, `tests/*.py`
+  silindi (git track'li, geri alınabilir). `deep-tool.py`/`webpanel.py` **kaldı**.
+- **deep-tool.py Modül 14 tamamen kaldırıldı:** `run_parity`, `elif num==14`,
+  `MODULES[14]`, EN/TR `menu_14` + `parity_*` metinleri, başlık notu. Ayrıca
+  py-motor bağımlı üç parça: Modül 1 **`run_smoke`** (pygame headless smoke —
+  ERR'a düşerdi), Modül 9 **`_reg_seed`** (py `procedural.generate` import'u),
+  `_SCRIPT_RUN["game"]` + `run_which` "game" girdisi; `mc_smoke_*`/`reg_seed_*`
+  i18n anahtarları ve başlık/menü "smoke" sözleri silindi (Modül 1-9 başlıkları
+  `reg_hdr`/`menu_1` güncellendi).
+- **Kök göstergesi düzeltmesi (kritik):** eski `ROOT` tespiti `deep_engine/` +
+  `game/` klasörlerini şart koşuyordu → silinince araç yanlış kökte açılırdı.
+  `deep-tool.py`: gösterge → **`deep_engine_html/`**; `deep-tool.js`: zaten her
+  zaman `tools_html/..` (ölü koşul temizlendi). `webpanel.py` zaten kök-üstü
+  kullanıyordu + `user_data_dir` import'u try/except'li (fallback ROOT).
+- **Modül 4 (i18n):** `deep_engine/i18n.py` yok → py tarafı artık **INFO** atlar
+  (kullanıcıyı WARN ile ovmasın); JS aracı `tools_html/deep-tool.js` Modül 4
+  zaten `engine/i18n.js`'e düşüyor (py varsa ikisini de tarar).
+- **test_tools.js düzeltmesi:** `find` testi arama klasörü `deep_engine` →
+  **`deep_engine_html`** (GameObject JS'te aranır). `modules 13 maddeli` ✓
+  (JS aracı 14'ü hiç edinmemişti — iki araç da artık 13 modül).
+- **Bilinen kozmetik (bilinçli bırakıldı):** `webpanel.py` "main.py başlat"
+  butonu ve `scriptSrc` şablonu (`import deep_engine`) tıklanınca hata gösterir
+  (arayüz metni); `tools_html/webpanel.html` de aynı eski py metnini taşır —
+  testler tıklamıyor, 51/51 yeşil. Modül 8/13 başlık metinleri hâlâ
+  "deep_engine -> game" sözünü taşır (modül artık yalnız kalan py dosyaları
+  tarar; ERR=0 doğrulandı).
+- **Doğrulama (08.10):** `python tools\deep-tool.py --lang tr all` →
+  **OZET: 0 WARN, 0 BUG, 0 ERR**; `py_compile` OK; `test_tools.js` **36/36**;
+  `test_browser.js` **51/51**; 13/13 `deep_engine_html\test_*.js` **0 FAIL**
+  (test_visual T1 +15 emoji/M10 kontrolüyle 31/31). py testleri silindi
+  (bilinçli — regresyon tamamen JS).
+
+Uyarı: `build/` klasörü PyInstaller (`build/StarCollectorHero/`) ile pygbag
+(`build/web/`) tarafından paylaşılır; web çıktısını korumak istiyorsan temizlikte
+`build/web*` dışında tut ya da `dist/web/`'e kopyala. *(Eski py araçların
+kaldırılması build klasörünü etkilemez; komutlar artık kullanılmıyor — yukarıda.)*

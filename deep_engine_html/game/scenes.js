@@ -19,6 +19,8 @@ function _play_theme(biome, is_boss = false, fallback = "level") {
 function _register_pause(scene) {
     const eng = DE.Engine.instance;
     const sm = eng ? eng.scene_manager : null;
+    // Mobil: dokunmatik kontroller (yalnız touch cihazda etkin görünür).
+    _attach_touch(scene);
     if (sm === null || sm === undefined) return;
     if (!sm.has("pause")) sm.register("pause", DE_GAME.build_pause_scene());
     scene.on_escape = function on_escape() {
@@ -28,6 +30,15 @@ function _register_pause(scene) {
         sm.push("pause");
         return true;
     };
+}
+
+/* Mobil dokunmatik kontrolleri sahneye bağlar (yalnız oyun sahneleri).
+ * TouchControls yalnız touch cihazda etkinleşir; masada no-op'tur. */
+function _attach_touch(scene) {
+    if (!scene || scene.find_by_tag("TouchUI")) return;
+    const t = new DE.GameObject("TouchUI", 0, 0, 0, 0, "TouchUI");
+    t.add_component(new DE_GAME.TouchControls());
+    scene.add_object(t);
 }
 
 /* Kilitli/jenerik prosedürel seviyedeki "campaign_boss" hedefi için güvenli rota. */
@@ -41,9 +52,10 @@ function _portal_campaign_boss() {
 
 /* Zemin Tilemap rasterizasyonu (Python game/scenes.py:_attach_ground_tilemap portu).
  * Prosedürel üretici zemini düz rect sprite'ları olarak üretir; bu yardımcı zemin
- * ayak izini 32px karo ızgarasına çevirip sahneye Tilemap ekler ve eski düz zemin
- * sprite'larını gizler (çarpışma alanları fizik için durur). Sahnede `_tilemap_ground`
- * ve `_tilemap_segments` (runtime <-> editör köprüsü) tutulur. */
+ * ayak izini 32px karo ızgarasına çevirip sahneye Tilemap ekler. Kullanıcı kararı
+ * (07.10): kare grid GÖRSELİ çizilmez — tilemap sadece `_tilemap_ground` /
+ * `_tilemap_segments` (runtime <-> editör köprüsü) için veri olarak durur, gorsel
+ * olarak eski düz, yumusak köseli (border_radius) zemin sprite'lari gösterilir. */
 function _attach_ground_tilemap(scene, data) {
     const bname = data["biome"];
     if (!bname) return;
@@ -94,22 +106,23 @@ function _attach_ground_tilemap(scene, data) {
     }
 
     const tm_obj = new DE.GameObject("TilemapGround", min_x, min_y, cols * ts, rows * ts, "Tilemap");
-    // Zemin EN SON ekleniyordu -> normal ekleme sirasinda EN USTTE ciziliyor ve
-    // zemine batan oyuncu/coin/dusmanin USTUNU kapatiyordu. Arkaya alinir.
     tm_obj.z_index = -100;
     const tm = tm_obj.add_component(new DE.Tilemap(ts, [min_x, min_y]));
     tm.set_tile_set({ 1: top, 2: soil });
     tm.add_layer(grid);
     scene.add_object(tm_obj);
 
-    // Eski düz zemin sprite'larını gizle (çarpışma alanları fizik için durur);
-    // adalar (one-way platformlar) sprite'ına kavuşur, yalnızca katı zemin gizlenir.
-    for (const obj of scene.find_all_by_tag("Ground")) {
-        const col = obj.get_component(DE.BoxCollider);
-        if (col && col.one_way) continue;
-        const spr = obj.get_component(DE.SpriteRenderer);
-        if (spr) spr.visible = false;
-    }
+    // Kullanici karari (07.10): kare grid GORSELI istemiyoruz -> tilemap veri
+    // koprusu olarak SAHNEDE durur ama aktif edilmez (cizilmez, update olmaz).
+    // Nesnenin verisi (to_data/to_segments) tilemap_save/webpanel icin aynen
+    // kullanilmaya devam eder; gorsele hic karismaz.
+    tm_obj.active = false;
+
+    // Eski düz zemin sprite'larini GIZLEMEYIZ: border_radius'lu yumusak koteli
+    // gorsel (23.09 oncesi tasarim) oyuncu tarafindan gosterilir. Collider'lar
+    // fizik icin zaten duruyor.
+    // (Python donmuş referansi tilemap cizimini + sprite gizlemeyi korur; bu
+    // bilincli JS gorsel sapmasidir.)
 
     // Geometri köprüsü: tilemap + çizgi segmentleri sahneye saklanır.
     scene._tilemap_ground = tm;
@@ -129,7 +142,10 @@ function export_scene_tilemap(scene) {
 function import_scene_tilemap(scene, data) {
     if (!scene || !data || !Array.isArray(data.layers) || !data.layers.length) return false;
     const fresh = DE.Tilemap.from_data(data);
-    const obj = scene.find_by_tag("Tilemap");
+    // Köprü nesnesi JS'te bilinçli active=false olduğundan (görsel çift çizimi
+    // önlemek için) find_by_tag (active filtreli) bulamaz; active dışı arama.
+    // Python referansı köprüyü active tutar ve find_by_tag ile bulur (es.py:140).
+    const obj = scene.find_all_by_tag("Tilemap")[0] || null;
     let tm = obj ? obj.get_component(DE.Tilemap) : null;
     if (tm) {
         tm.tile_size = fresh.tile_size;
@@ -140,12 +156,15 @@ function import_scene_tilemap(scene, data) {
         const grid = fresh.layers[0].grid || [];
         const cols = grid.length ? grid[0].length : 0;
         const rows = grid.length;
-        const newObj = new DE.GameObject({
-            "name": "TilemapGround", "x": fresh.offset[0], "y": fresh.offset[1],
-            "width": cols * fresh.tile_size, "height": rows * fresh.tile_size,
-            "tag": "Tilemap",
-        });
+        // Python scenes.py:152-154 konumsal/kwarg çağrı — JS kurucusu KONUMSAL
+        // (core.js:103): sözlük verilseydi name nesne olur, tag="Default" kalır
+        // ve her tekrar import mükerrer "Default" nesne eklerdi.
+        const newObj = new DE.GameObject(
+            "TilemapGround", fresh.offset[0], fresh.offset[1],
+            cols * fresh.tile_size, rows * fresh.tile_size,
+            "Tilemap");
         newObj.add_component(fresh);
+        newObj.active = false;   // gorsel cizilmez; sadece veri köprüsü
         scene.add_object(newObj);
         tm = fresh;
     }
@@ -425,6 +444,7 @@ DE_GAME._campaign_sector_commit = _campaign_sector_commit;
 DE_GAME._play_theme = _play_theme;
 DE_GAME._register_pause = _register_pause;
 DE_GAME._portal_campaign_boss = _portal_campaign_boss;
+DE_GAME._attach_touch = _attach_touch;
 DE_GAME._attach_ground_tilemap = _attach_ground_tilemap;
 DE_GAME.export_scene_tilemap = export_scene_tilemap;
 DE_GAME.import_scene_tilemap = import_scene_tilemap;

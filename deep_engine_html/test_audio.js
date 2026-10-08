@@ -47,6 +47,24 @@ function load(name) {
 }
 ["audio.js"].forEach(load);
 
+// ================= A0 ÜRETİM YOLU (initialize() çağırmadan) =================
+// Eski tuzak: test_audio.js:89 kendisi initialize() çağırıyordu → oyun yolunda
+// çağrı yokken 21 ses sessiz kalıyordu, test bunu görmüyordu. Artık play yolu
+// tembel initialize eder (audio.py:278-279 aynası).
+{
+    check("önceden initialize edilmedi", Object.keys(DE.SoundFX._sounds).length === 0);
+    DE.SoundFX.play("coin");
+    const n = Object.keys(DE.SoundFX._sounds).length;
+    check("play() tembel initialize üretti (21 preset)", n === 21, "uretilen=" + n);
+    check("_initialized işaretlendi", DE.SoundFX._initialized === true);
+    DE.SoundFX.play_jump();
+    DE.SoundFX.play_powerup();
+    check("play_jump/powerup üretim yolunda sorunsuz", true);
+    DE.SoundFX.play_music("menu");
+    check("play_music üretim yolunda", DE.SoundFX._current_music === "menu");
+    DE.SoundFX.stop_music();
+}
+
 // ================= A1 Frekans + LCG determinizm =================
 {
     check("_freq C4", Math.abs(DE.SoundFX._freq("C", 4) - 261.63) < 0.01);
@@ -81,7 +99,8 @@ function load(name) {
     const ctx = DE.SoundFX._ctx();
     check("buffer verisi yazildi", ctx.created.length > 0 && ctx.created[0]._data[0][0] !== 0);
     const sb = DE.SoundFX._stereo_sound([1, 2, 3], [4, 5], 22050);
-    check("stereo_sound buffer", !!sb && sb.numberOfChannels === 2 && sb.length === 3);
+    // ORTA-6: py _create_stereo_sound min(len(left), len(right)) — uzunluk 2.
+    check("stereo_sound buffer", !!sb && sb.numberOfChannels === 2 && sb.length === 2, "len=" + (sb && sb.length));
 }
 
 // ================= A4 Preset sesler =================

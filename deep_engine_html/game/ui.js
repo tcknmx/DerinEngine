@@ -43,7 +43,9 @@ DE_GAME.KitLabelSync = class KitLabelSync extends DE.Component {
     }
     update(dt) {
         const text = DE.I18n.t(this._key);
-        if (this._button.text !== text) this._button.set_text(text);
+        // auto_size=false: dil değişince metin güncellenir, buton boyutu sabit kalır
+        // (kullanıcı: "butonlar sadece metnin sığdığı kadar küçülmesin").
+        if (this._button.text !== text) this._button.set_text(text, null, false);
     }
 };
 
@@ -95,11 +97,25 @@ DE_GAME.BiomeProgress = class BiomeProgress extends DE.Component {
             "forest": [60, 150, 110], "cave": [120, 80, 160],
             "ice": [110, 190, 240], "desert": [210, 140, 60], "astro": [90, 90, 200],
         };
-        for (let i = 0; i < order.length; i++) {
+        const s = this.badge;
+        const n = order.length;
+        // Rozet adları hep 18px okunur çizilir; taşma, boşluğu (aralık) içeriğe
+        // göre genişleterek çözülür: en geniş etiket gap'ten büyükse gap genişler,
+        // satır merkezi korunduğu için göz ortalı hizada kalır. (Font küçültme yok.)
+        const label_fs = 18;
+        ctx.font = label_fs + "px monospace";
+        const labels = order.map((b) => DE.I18n.t("biome_" + b));
+        let widest = 0;
+        for (const lb of labels) {
+            widest = Math.max(widest, ctx.measureText(lb).width || lb.length * label_fs * 0.6);
+        }
+        const dyn_gap = Math.max(this.gap, Math.ceil(widest) + 8);
+        const center_x = this.x + ((n - 1) * this.gap + s) / 2;
+        const start_x = center_x - ((n - 1) * dyn_gap + s) / 2;
+        for (let i = 0; i < n; i++) {
             const biome = order[i];
-            const bx = this.x + i * this.gap;
+            const bx = start_x + i * dyn_gap;
             const by = this.y;
-            const s = this.badge;
             const color = colors[biome] || [150, 150, 150];
             const unlocked = this.completed.has(biome);
             ctx.beginPath();
@@ -138,9 +154,8 @@ DE_GAME.BiomeProgress = class BiomeProgress extends DE.Component {
                 ctx.lineWidth = Math.max(2, Math.trunc(s / 10));
                 ctx.stroke();
             }
-            const label = DE.I18n.t("biome_" + biome);
-            ctx.font = "18px monospace";
-            const tw = ctx.measureText(label).width || label.length * 9;
+            const label = labels[i];
+            const tw = ctx.measureText(label).width || label.length * label_fs * 0.6;
             ctx.fillStyle = "rgb(190,200,215)";
             ctx.fillText(label, bx + s / 2 - tw / 2, by + s + 22);
         }
@@ -260,9 +275,17 @@ DE_GAME.MenuController = class MenuController extends DE.Component {
         DE.SoundFX.play("win");
         DE_GAME.state.game_mode = "climber";
         this._pending_factory = DE_GAME.build_climber_scene;
-        // KRİTİK: karartmayı BAŞLAT. _fade_dir init'te 0'dır ve update()
+        // KRİTİK: karartmayı BA�?LAT. _fade_dir init'te 0'dır ve update()
         // yalnız _fade_dir=1 iken koyulaştırır — bu satır olmadan sahne hiç
         // değişmez (C tuşu / tıklama sessizce hiçbir şey yapmaz).
+        this._fade = 0;
+        this._fade_dir = 1;
+        this._fading_out = true;
+    }
+    // Ayarlar ekranı: aynı andaki menü gibi fade + ayrı sahne ile açılır.
+    _start_settings() {
+        DE.SoundFX.play("click");
+        this._pending_factory = DE_GAME.build_settings_scene;
         this._fade = 0;
         this._fade_dir = 1;
         this._fading_out = true;
@@ -273,6 +296,8 @@ DE_GAME.MenuController = class MenuController extends DE.Component {
             this._start_campaign();
         } else if (action === "climber") {
             this._start_climber();
+        } else if (action === "settings") {
+            this._start_settings();
         } else if (action === "endless") {
             if (this._endless_unlocked()) {
                 DE_GAME.state.game_mode = "endless";
@@ -347,6 +372,114 @@ DE_GAME.MenuController = class MenuController extends DE.Component {
     }
 };
 
+/* Ayarlar ekranı kontrolcüsü: butonlu dil + efekt/müzik ses seviyesi.
+ * Değerler SaveGame'de kalıcı; açılışta main.js bunları SoundFX'e uygular. */
+DE_GAME.SettingsController = class SettingsController extends DE.Component {
+    constructor() {
+        super();
+        this.is_ui = true;
+        this.scene = null;
+        this._click_zones = [];
+        this._volume_labels = {};
+    }
+    start() {
+        this.scene = DE.Engine.instance.active_scene;
+        this._click_zones = [];
+        const ui = (this.scene && this.scene._settings_ui) || [];
+        for (const o of ui) {
+            const rect = o._click_rect;
+            const action = o._click_action;
+            if (rect && action !== undefined && action !== null) {
+                this._click_zones.push([rect, action]);
+                if (action === "sfx-minus" || action === "sfx-plus" || action === "music-minus" || action === "music-plus") {
+                    this._volume_labels[action] = o;
+                }
+            }
+        }
+        // Kayıtlı ses seviyelerini bataryaya yükle (menüden gelinmiş olabilir).
+        try {
+            const p = DE_GAME.savegame();
+            DE.SoundFX.set_sfx_volume(p.get("sfx_volume", 1.0));
+            DE.SoundFX.set_music_volume(p.get("music_volume", 1.0));
+        } catch (e) { /* yok say */ }
+        this._refresh_volume_text();
+        this._refresh_lang_markers();
+    }
+    _dispatch(action) {
+        if (action === "lang-tr" || action === "lang-en") {
+            DE.I18n.set_language(action === "lang-tr" ? "tr" : "en");
+            try { DE_GAME.savegame().set("lang", DE.I18n.current_lang); DE_GAME.savegame().save(); }
+            catch (e) { /* yok say */ }
+            DE.SoundFX.play("click");
+            this._refresh_lang_markers();
+        } else if (action === "sfx-minus" || action === "sfx-plus") {
+            const step = 0.1;
+            let v = DE.SoundFX.get_sfx_volume();
+            v = action === "sfx-plus" ? Math.round((v + step) * 10) / 10 : Math.round((v - step) * 10) / 10;
+            v = Math.max(0.0, Math.min(1.0, v));
+            DE.SoundFX.set_sfx_volume(v);
+            try { DE_GAME.savegame().set("sfx_volume", v); DE_GAME.savegame().save(); }
+            catch (e) { /* yok say */ }
+            this._refresh_volume_text();
+            DE.SoundFX.play("click");
+        } else if (action === "music-minus" || action === "music-plus") {
+            const step = 0.1;
+            let v = DE.SoundFX.get_music_volume();
+            v = action === "music-plus" ? Math.round((v + step) * 10) / 10 : Math.round((v - step) * 10) / 10;
+            v = Math.max(0.0, Math.min(1.0, v));
+            DE.SoundFX.set_music_volume(v);
+            try { DE_GAME.savegame().set("music_volume", v); DE_GAME.savegame().save(); }
+            catch (e) { /* yok say */ }
+            this._refresh_volume_text();
+            DE.SoundFX.play("click");
+        } else if (action === "back") {
+            DE.SoundFX.play("click");
+            DE.Engine.switch_scene(DE_GAME.build_main_menu_scene());
+        }
+    }
+    _refresh_volume_text() {
+        if (!this.scene) return;
+        const sfx = DE.SoundFX.get_sfx_volume();
+        const music = DE.SoundFX.get_music_volume();
+        for (const o of this.scene.game_objects) {
+            if (o.name === "SFXVal") {
+                const tr = o.get_component(DE.TextRenderer);
+                if (tr) tr.text = "%" + Math.round(sfx * 100);
+            } else if (o.name === "MusicVal") {
+                const tr = o.get_component(DE.TextRenderer);
+                if (tr) tr.text = "%" + Math.round(music * 100);
+            }
+        }
+    }
+    _refresh_lang_markers() {
+        if (!this.scene) return;
+        const active = DE.I18n.current_lang === "tr" ? "LangTR" : "LangEN";
+        for (const o of this.scene.game_objects) {
+            if (o.name === "LangTR" || o.name === "LangEN") {
+                const tr = o.get_component(DE.TextRenderer);
+                if (tr) tr.color = (o.name === active) ? [255, 235, 140] : [200, 205, 220];
+            }
+        }
+    }
+    update(dt) {
+        if (!this.scene) return;
+        if (DE.Input.get_key_down("Escape")) {
+            this._dispatch("back");
+            return;
+        }
+        if (DE.Input.get_mouse_button_down(0)) {
+            const m = DE.Input.get_mouse_position();
+            for (let i = 0; i < this._click_zones.length; i++) {
+                const [rect, action] = this._click_zones[i];
+                if (m.x >= rect.x && m.x < rect.x + rect.w && m.y >= rect.y && m.y < rect.y + rect.h) {
+                    this._dispatch(action);
+                    return;
+                }
+            }
+        }
+    }
+};
+
 /* Ana menü: kampanyanın ilk giriş seviyesini CANLI arka plan yapar, sağda menü seçenekleri. */
 DE_GAME.build_main_menu_scene = function build_main_menu_scene() {
     const scene = DE_GAME.start_campaign();
@@ -366,101 +499,119 @@ DE_GAME.build_main_menu_scene = function build_main_menu_scene() {
     const _menu_ui = [];
 
     // Başlık ve alt başlık (üst-orta, tek satır) — dili takip eder.
-    const t1 = new DE.GameObject("T1", 450, 18, 0, 0, "UI");
-    t1.add_component(new DE.TextRenderer(DE.I18n.t("menu_title"), 42, [255, 215, 50], true, [0, 0, 0], true, false));
+    // TÜM ekran metinleri center_x + center_y ile MERKEZ semantiğinde:
+    // position = metnin ortası (üst-kenar kayması yaşanmaz).
+    const t1 = new DE.GameObject("T1", 450, 40, 0, 0, "UI");
+    t1.add_component(new DE.TextRenderer(DE.I18n.t("menu_title"), 42, [255, 215, 50], true, [0, 0, 0], true, true));
     t1.add_component(new DE_GAME.LocalizedLabel("menu_title"));
     scene.add_object(t1);
     _menu_ui.push(t1);
 
-    const t2 = new DE.GameObject("T2", 450, 74, 0, 0, "UI");
-    t2.add_component(new DE.TextRenderer(DE.I18n.t("menu_subtitle"), 18, [180, 220, 255], true, [0, 0, 0], true, false));
+    const t2 = new DE.GameObject("T2", 450, 83, 0, 0, "UI");
+    t2.add_component(new DE.TextRenderer(DE.I18n.t("menu_subtitle"), 18, [180, 220, 255], true, [0, 0, 0], true, true));
     t2.add_component(new DE_GAME.LocalizedLabel("menu_subtitle"));
     scene.add_object(t2);
     _menu_ui.push(t2);
 
-    function _menu_item(name, key, x, y, font_size, color, action, locked, lock_key) {
-        const use_key = (locked && lock_key) ? lock_key : key;
-        const o = new DE.GameObject(name, x, y, 0, 0, "UI");
-        o.add_component(new DE.TextRenderer(DE.I18n.t(use_key), font_size,
-            locked ? [110, 115, 130] : color, true, [0, 0, 0], false, false));
-        o.add_component(new DE_GAME.LocalizedLabel(use_key));
-        o._click_rect = { x: x, y: y - 10, w: 900 - x, h: font_size + 20 };
-        o._click_action = action || null;
-        scene.add_object(o);
-        _menu_ui.push(o);
+    // Yerel yardımcı: sağ alttaki mod kutucuğu (Panel + merkezde başlık).
+    function _menu_box(name, x, y, w, h, bg, border, title_key, title_font, title_color, action, locked) {
+        const box = new DE.GameObject(name + "_box", x, y, w, h, "UI");
+        box.add_component(new DE.Panel(null, bg, border, 10));
+        scene.add_object(box);
+        _menu_ui.push(box);
+
+        const lbl = new DE.GameObject(name, x + w / 2, y + (locked ? 15 : h / 2), 0, 0, "UI");
+        lbl.add_component(new DE.TextRenderer(DE.I18n.t(title_key), title_font,
+            title_color, true, [0, 0, 0], true, true));
+        lbl.add_component(new DE_GAME.LocalizedLabel(title_key));
+        lbl._click_rect = { x: x, y: y, w: w, h: h };
+        lbl._click_action = action;
+        scene.add_object(lbl);
+        _menu_ui.push(lbl);
+
         if (locked) {
-            const icon = new DE.GameObject(name + "_icon", x - 30, y - 6, 0, 0, "UI");
-            icon.add_component(new DE_GAME.LockIcon([110, 115, 130], 16));
+            const icon = new DE.GameObject(name + "_icon", x + 12, y + 10, 0, 0, "UI");
+            icon.add_component(new DE_GAME.LockIcon([255, 230, 140], 18));
             scene.add_object(icon);
             _menu_ui.push(icon);
-            const lock = new DE.GameObject(name + "_lock", x, y + font_size + 4, 0, 0, "UI");
-            lock.add_component(new DE.TextRenderer(DE.I18n.t("menu_endless_locked"), 12, [125, 120, 135], true, [0, 0, 0]));
+            const lock = new DE.GameObject(name + "_lock", x + w / 2, y + h - 8, 0, 0, "UI");
+            lock.add_component(new DE.TextRenderer(DE.I18n.t("menu_endless_locked"), 12, [220, 200, 140], true, [0, 0, 0], true, true));
             lock.add_component(new DE_GAME.LocalizedLabel("menu_endless_locked"));
             scene.add_object(lock);
             _menu_ui.push(lock);
         }
+        return lbl;
     }
 
-    _menu_item("M_KAMP", "menu_campaign", 610, 180, 28, [120, 255, 120], "campaign");
-
-    // Sonsuz Mod satırı: motor UI kiti Button (hover/press/disabled görünümü).
-    const _endless_locked = !getp("endless_unlocked", false);
-    const _endless_key = _endless_locked ? "menu_random_locked" : "menu_random";
-    const _endless_theme = new DE.UITheme({
-        button_bg: [28, 66, 96], button_hover: [42, 88, 128], button_press: [20, 40, 64],
-        button_focus: [150, 200, 235], button_text: [100, 255, 180], button_disabled: [58, 60, 70],
+    // ÜST SA�?: Play + Settings (motor kit butonları). Dil artık Settings içinde.
+    const _play_theme = new DE.UITheme({
+        button_bg: [58, 132, 92], button_hover: [76, 164, 116], button_press: [36, 96, 64],
+        button_focus: [220, 255, 225], button_text: [245, 255, 245],
     });
-    const _rnd_go = new DE.GameObject("M_RND", 610, 214, 280, 44, "UI");
-    const _rnd_btn = new DE.Button(DE.I18n.t(_endless_key), null, _endless_theme, 23);
-    _rnd_btn.enabled = !_endless_locked;
-    _rnd_go.add_component(_rnd_btn);
-    _rnd_go.add_component(new DE_GAME.KitLabelSync(_rnd_btn, _endless_key));
-    _rnd_go._click_rect = { x: 610, y: 210, w: 290, h: 52 };
-    _rnd_go._click_action = _endless_locked ? null : "endless";
-    scene.add_object(_rnd_go);
-    _menu_ui.push(_rnd_go);
-    if (_endless_locked) {
-        const icon = new DE.GameObject("M_RND_icon", 580, 230, 0, 0, "UI");
-        icon.add_component(new DE_GAME.LockIcon([110, 115, 130], 16));
-        scene.add_object(icon);
-        _menu_ui.push(icon);
-        const lock = new DE.GameObject("M_RND_lock", 610, 263, 0, 0, "UI");
-        lock.add_component(new DE.TextRenderer(DE.I18n.t("menu_endless_locked"), 12, [125, 120, 135], true, [0, 0, 0]));
-        lock.add_component(new DE_GAME.LocalizedLabel("menu_endless_locked"));
-        scene.add_object(lock);
-        _menu_ui.push(lock);
-    }
+    const play_go = new DE.GameObject("M_PLAY", 610, 150, 280, 54, "UI");
+    const play_btn = new DE.Button(DE.I18n.t("menu_play"), null, _play_theme, 26);
+    play_go.add_component(play_btn);
+    play_go.add_component(new DE_GAME.KitLabelSync(play_btn, "menu_play"));
+    play_go._click_rect = { x: 610, y: 150, w: 280, h: 54 };
+    play_go._click_action = "campaign";
+    scene.add_object(play_go);
+    _menu_ui.push(play_go);
 
-    _menu_item("M4", "menu_lang", 610, 292, 23, [255, 230, 120], "lang");
-    _menu_item("M_CLIMB", "menu_climber", 610, 344, 21, [150, 225, 255], "climber");
+    const _set_theme = new DE.UITheme({
+        button_bg: [52, 82, 130], button_hover: [68, 104, 162], button_press: [34, 56, 92],
+        button_focus: [220, 230, 250], button_text: [240, 244, 252],
+    });
+    const set_go = new DE.GameObject("M_SETTINGS", 610, 216, 280, 46, "UI");
+    const set_btn = new DE.Button(DE.I18n.t("menu_settings"), null, _set_theme, 20);
+    set_go.add_component(set_btn);
+    set_go.add_component(new DE_GAME.KitLabelSync(set_btn, "menu_settings"));
+    set_go._click_rect = { x: 610, y: 216, w: 280, h: 46 };
+    set_go._click_action = "settings";
+    scene.add_object(set_go);
+    _menu_ui.push(set_go);
 
-    // Kontrol bilgisi + yüksek skor (alt-orta, hizalı).
-    const cinfo = new DE.GameObject("M5", 450, 520, 0, 0, "UI");
-    cinfo.add_component(new DE.TextRenderer(DE.I18n.t("controls_info"), 15, [165, 180, 205], true, [0, 0, 0], true, false));
+    // SA�? ALT: Sonsuz Mod + Star Climber kutucukları (gri "bot" yok; kilitliyken
+    // canlı panel + kilit ikonu). M_CLIMB adı/test kuralı korunur (TextRenderer
+    // "Climber" içermeli).
+    const _endless_locked = !getp("endless_unlocked", false);
+    _menu_box("M_RND", 610, 428, 280, 70,
+        _endless_locked ? [64, 58, 140] : [46, 110, 150], [168, 156, 220],
+        "endless_name", 22, _endless_locked ? [185, 175, 255] : [140, 240, 255],
+        "endless", _endless_locked);
+    _menu_box("M_CLIMB", 610, 508, 280, 70,
+        [34, 96, 120], [130, 200, 236], "menu_climber", 19, [175, 228, 255],
+        "climber", false);
+
+    // ALT-ORTA: kontroller + yüksek skor + kampanya rozetleri (kutucuklarla çakışmaz).
+    // Merkez semantiği: center_x + center_y true, y = metnin görsel merkezi.
+    const cinfo = new DE.GameObject("M5", 360, 450, 0, 0, "UI");
+    cinfo.add_component(new DE.TextRenderer(DE.I18n.t("controls_info"), 15, [165, 180, 205], true, [0, 0, 0], true, true));
     cinfo.add_component(new DE_GAME.LocalizedLabel("controls_info"));
     scene.add_object(cinfo);
     _menu_ui.push(cinfo);
 
     const high = getp("high_score", 0);
-    const hs_obj = new DE.GameObject("HighScore", 450, 555, 0, 0, "UI");
-    hs_obj.add_component(new DE.TextRenderer(DE.I18n.localize("menu_highscore", { score: high }), 18, [255, 215, 100], true, [0, 0, 0], true, false));
+    const hs_obj = new DE.GameObject("HighScore", 360, 483, 0, 0, "UI");
+    hs_obj.add_component(new DE.TextRenderer(DE.I18n.localize("menu_highscore", { score: high }), 18, [255, 215, 100], true, [0, 0, 0], true, true));
     hs_obj.add_component(new DE_GAME.LocalizedLabel("menu_highscore", { score: high }));
     scene.add_object(hs_obj);
     _menu_ui.push(hs_obj);
 
-    const prog_title = new DE.GameObject("ProgTitle", 450, 604, 0, 0, "UI");
-    prog_title.add_component(new DE.TextRenderer(DE.I18n.t("campaign_progress"), 15, [180, 195, 215], true, [0, 0, 0], true, false));
+    const prog_title = new DE.GameObject("ProgTitle", 360, 512, 0, 0, "UI");
+    prog_title.add_component(new DE.TextRenderer(DE.I18n.t("campaign_progress"), 15, [180, 195, 215], true, [0, 0, 0], true, true));
     prog_title.add_component(new DE_GAME.LocalizedLabel("campaign_progress"));
     scene.add_object(prog_title);
     _menu_ui.push(prog_title);
 
-    const prog = new DE.GameObject("Progress", 450, 632, 0, 0, "UI");
-    prog.add_component(new DE_GAME.BiomeProgress(getp("completed_biomes", []), 450, 632, 26, 86));
+    // Rozet serisi: 5 rozet, 360 merkezine hizalı (badge 22, gap 52 -> başlangıç 245).
+    // Etiketler rozetin 22px ALTINA çizilir -> son satır 524+22+22=568'de ekran içinde.
+    const prog = new DE.GameObject("Progress", 245, 524, 0, 0, "UI");
+    prog.add_component(new DE_GAME.BiomeProgress(getp("completed_biomes", []), 245, 524, 22, 52));
     scene.add_object(prog);
     _menu_ui.push(prog);
 
-    const ver = new DE.GameObject("Version", 15, 575, 0, 0, "UI");
-    ver.add_component(new DE.TextRenderer("DerinEngine v" + (DE.__version__ || "0.0.0"), 13, [110, 140, 180], true, [0, 0, 0]));
+    const ver = new DE.GameObject("Version", 450, 582, 0, 0, "UI");
+    ver.add_component(new DE.TextRenderer("DerinEngine v" + (DE_GAME.__version__ || DE.__version__ || "0.0.0"), 13, [110, 140, 180], true, [0, 0, 0], true, true));
     scene.add_object(ver);
     _menu_ui.push(ver);
 
@@ -471,6 +622,134 @@ DE_GAME.build_main_menu_scene = function build_main_menu_scene() {
     scene._menu_ui = _menu_ui;
     scene._hud_ui = scene.game_objects
         .filter(o => o.components.some(c => c.is_ui) && _menu_ui.indexOf(o) === -1);
+
+    return scene;
+};
+
+/* Ayarlar ekranı: butonlu dil + efekt/müzik ses seviyesi ayarı + ana menüye dönüş.
+ * Buraya open() ile gelinir (MenuController action "settings"); ESC veya Geri
+ * butonu ana menüyü yeniden kurar. */
+DE_GAME.build_settings_scene = function build_settings_scene() {
+    const scene = new DE.Scene("Settings", [12, 16, 28]);
+
+    if (scene.parallax_background === null) {
+        try {
+            scene.parallax_background = new DE.ParallaxBackground({ theme: "forest" });
+        } catch (e) { /* yok say */ }
+    }
+
+    const _sui = [];
+
+    const title = new DE.GameObject("SetTitle", 450, 61, 0, 0, "UI");
+    title.add_component(new DE.TextRenderer(DE.I18n.t("settings_title"), 42, [255, 215, 50], true, [0, 0, 0], true, true));
+    title.add_component(new DE_GAME.LocalizedLabel("settings_title"));
+    scene.add_object(title);
+    _sui.push(title);
+
+    // DİL: Türkçe / English butonları (aktif dil ★ ile vurgulur).
+    const lang_label = new DE.GameObject("LangLabel", 450, 140, 0, 0, "UI");
+    lang_label.add_component(new DE.TextRenderer(DE.I18n.t("settings_lang"), 20, [200, 210, 228], true, [0, 0, 0], true, true));
+    lang_label.add_component(new DE_GAME.LocalizedLabel("settings_lang"));
+    scene.add_object(lang_label);
+    _sui.push(lang_label);
+
+    function _lang_button(name, cx, lang) {
+        const key = lang === "tr" ? "settings_lang_tr" : "settings_lang_en";
+        const o = new DE.GameObject(name, cx, 180, 0, 0, "UI");   // cx = metin MERKEZİ
+        const tr = new DE.TextRenderer(DE.I18n.t(key), 22, [200, 205, 220], true, [0, 0, 0], true, true);
+        o.add_component(tr);
+        o.add_component(new DE_GAME.LocalizedLabel(key));
+        const w = 150;
+        o._click_rect = { x: cx - w / 2, y: 160, w: w, h: 40 };   // tıklama alanı metinle merkezli
+        o._click_action = "lang-" + lang;
+        scene.add_object(o);
+        _sui.push(o);
+        return o;
+    }
+    // İki dil butonu ekran merkezi (450) etrafında simetrik: 360 ve 540.
+    _lang_button("LangTR", 360, "tr");
+    _lang_button("LangEN", 540, "en");
+
+    // EFEKT SEVİYESİ: [-] %NN [+]
+    const sfx_label = new DE.GameObject("SfxLabel", 450, 260, 0, 0, "UI");
+    sfx_label.add_component(new DE.TextRenderer(DE.I18n.t("settings_sfx"), 20, [200, 210, 228], true, [0, 0, 0], true, true));
+    sfx_label.add_component(new DE_GAME.LocalizedLabel("settings_sfx"));
+    scene.add_object(sfx_label);
+    _sui.push(sfx_label);
+
+    const sfx_minus = new DE.GameObject("SfxMinus", 378, 288, 44, 40, "UI");
+    sfx_minus.add_component(new DE.Button("−", null, new DE.UITheme({
+        button_bg: [70, 76, 96], button_hover: [92, 100, 126], button_press: [50, 56, 72],
+    }), 22));
+    sfx_minus._click_rect = { x: 378, y: 288, w: 44, h: 40 };
+    sfx_minus._click_action = "sfx-minus";
+    scene.add_object(sfx_minus);
+    _sui.push(sfx_minus);
+
+    const sfx_val = new DE.GameObject("SFXVal", 450, 308, 0, 0, "UI");
+    sfx_val.add_component(new DE.TextRenderer("%100", 22, [140, 240, 200], true, [0, 0, 0], true, true));
+    scene.add_object(sfx_val);
+    _sui.push(sfx_val);
+
+    const sfx_plus = new DE.GameObject("SfxPlus", 478, 288, 44, 40, "UI");
+    sfx_plus.add_component(new DE.Button("+", null, new DE.UITheme({
+        button_bg: [70, 76, 96], button_hover: [92, 100, 126], button_press: [50, 56, 72],
+    }), 22));
+    sfx_plus._click_rect = { x: 478, y: 288, w: 44, h: 40 };
+    sfx_plus._click_action = "sfx-plus";
+    scene.add_object(sfx_plus);
+    _sui.push(sfx_plus);
+
+    // MÜZİK SEVİYESİ: [-] %NN [+]
+    const music_label = new DE.GameObject("MusicLabel", 450, 370, 0, 0, "UI");
+    music_label.add_component(new DE.TextRenderer(DE.I18n.t("settings_music"), 20, [200, 210, 228], true, [0, 0, 0], true, true));
+    music_label.add_component(new DE_GAME.LocalizedLabel("settings_music"));
+    scene.add_object(music_label);
+    _sui.push(music_label);
+
+    const music_minus = new DE.GameObject("MusicMinus", 378, 398, 44, 40, "UI");
+    music_minus.add_component(new DE.Button("−", null, new DE.UITheme({
+        button_bg: [70, 76, 96], button_hover: [92, 100, 126], button_press: [50, 56, 72],
+    }), 22));
+    music_minus._click_rect = { x: 378, y: 398, w: 44, h: 40 };
+    music_minus._click_action = "music-minus";
+    scene.add_object(music_minus);
+    _sui.push(music_minus);
+
+    const music_val = new DE.GameObject("MusicVal", 450, 418, 0, 0, "UI");
+    music_val.add_component(new DE.TextRenderer("%100", 22, [140, 220, 255], true, [0, 0, 0], true, true));
+    scene.add_object(music_val);
+    _sui.push(music_val);
+
+    const music_plus = new DE.GameObject("MusicPlus", 478, 398, 44, 40, "UI");
+    music_plus.add_component(new DE.Button("+", null, new DE.UITheme({
+        button_bg: [70, 76, 96], button_hover: [92, 100, 126], button_press: [50, 56, 72],
+    }), 22));
+    music_plus._click_rect = { x: 478, y: 398, w: 44, h: 40 };
+    music_plus._click_action = "music-plus";
+    scene.add_object(music_plus);
+    _sui.push(music_plus);
+
+    // GERİ: ana menüye dön
+    const back = new DE.GameObject("Back", 340, 500, 220, 48, "UI");   // merkez 450: 340..560
+    const back_btn = new DE.Button(DE.I18n.t("settings_back"), null, new DE.UITheme({
+        button_bg: [52, 82, 130], button_hover: [68, 104, 162], button_press: [34, 56, 92],
+        button_text: [240, 244, 252],
+    }), 20);
+    back.add_component(back_btn);
+    back.add_component(new DE_GAME.KitLabelSync(back_btn, "settings_back"));
+    back._click_rect = { x: 340, y: 500, w: 220, h: 48 };
+    back._click_action = "back";
+    scene.add_object(back);
+    _sui.push(back);
+
+    const ctrl = new DE.GameObject("SettingsFX", 0, 0, 0, 0, "UI");
+    ctrl.add_component(new DE_GAME.SettingsController());
+    scene.add_object(ctrl);
+
+    scene._settings_ui = _sui;
+    scene._menu_ui = _sui;   // SettingsController _settings_ui okur; menü sözleşmesi de korunur
+    scene._hud_ui = [];
 
     return scene;
 };
@@ -510,33 +789,108 @@ DE_GAME.VictoryController = class VictoryController extends DE_GAME.FireworksCon
 DE_GAME.GameOverController = class GameOverController extends DE.Component {
     constructor(restart_factory) {
         super();
+        this.is_ui = true;
         this.restart_factory = restart_factory;
+        this._focused_index = 0;
+        this._buttons = [];
+        this._button_keys = [];
+    }
+    start() {
+        const scene = DE.Engine.instance.active_scene;
+        this._buttons = scene._gameover_buttons || [];
+        for (let i = 0; i < this._buttons.length; i++) {
+            this._buttons[i][0].focused = (i === this._focused_index);
+        }
+    }
+    _retry() {
+        DE.SoundFX.play("click");
+        DE.Engine.switch_scene(this.restart_factory());
+    }
+    _to_menu() {
+        DE.SoundFX.play("click");
+        DE.Engine.switch_scene(DE_GAME.build_main_menu_scene());
     }
     update(dt) {
-        if (DE.Input.get_key_down("R") || DE.Input.get_key_down("SPACE") || DE.Input.get_key_down("ENTER")) {
-            DE.Engine.switch_scene(this.restart_factory());
-        } else if (DE.Input.get_key_down("M")) {
-            DE.Engine.switch_scene(DE_GAME.build_main_menu_scene());
+        // Dil değişimi buton metinlerini tazele (boyut sabit — KitLabelSync auto_size=false).
+        if (DE.Input.get_key_down("T")) {
+            for (let i = 0; i < this._button_keys.length; i++) {
+                const [btn, key] = this._button_keys[i];
+                btn.set_text(DE.I18n.t(key), null, false);
+            }
+        }
+        // Klasik kısayollar (eski tuş düzeni korunur).
+        if (DE.Input.get_key_down("R")) { this._retry(); return; }
+        if (DE.Input.get_key_down("M")) { this._to_menu(); return; }
+
+        const total = this._buttons.length;
+        if (total === 0) return;
+        if (DE.Input.get_key_down("DOWN") || DE.Input.get_key_down("S")) {
+            this._focused_index = (this._focused_index + 1) % total;
+            DE.SoundFX.play("click");
+        } else if (DE.Input.get_key_down("UP") || DE.Input.get_key_down("W")) {
+            this._focused_index = (this._focused_index - 1 + total) % total;
+            DE.SoundFX.play("click");
+        } else if (DE.Input.get_key_down("ENTER") || DE.Input.get_key_down("SPACE")) {
+            const [btn, callback] = this._buttons[this._focused_index];
+            if (callback) callback();
+            return;
+        }
+        for (let i = 0; i < this._buttons.length; i++) {
+            this._buttons[i][0].focused = (i === this._focused_index);
         }
     }
 };
 
+/* Oyun bitti ekranı: başlık + iki buton (Yeniden Dene / Ana Menü).
+ * Klavye: R yeniden dener, M ana menü, ↑/↓ + ENTER gezinir; fareyle tıklanır. */
 DE_GAME.build_game_over_scene = function build_game_over_scene(restart_factory) {
     const scene = new DE.Scene("Game Over", [20, 10, 15]);
-    const t1 = new DE.GameObject("T1", 280, 160, 0, 0, "UI");
-    t1.add_component(new DE.TextRenderer(DE.I18n.t("game_over_title"), 46, [255, 60, 60], true));
+
+    const theme = new DE.UITheme({
+        panel_bg: [30, 18, 22], panel_border: [120, 60, 60],
+        button_bg: [110, 45, 45], button_hover: [150, 60, 60],
+        button_focus: [255, 220, 200], button_text: [255, 235, 235],
+    });
+
+    // Başlıklar — merkez semantiği (center_x + center_y): position = metnin ortası.
+    const t1 = new DE.GameObject("T1", 450, 173, 0, 0, "UI");
+    t1.add_component(new DE.TextRenderer(DE.I18n.t("game_over_title"), 46, [255, 60, 60], true, [0, 0, 0], true, true));
+    t1.add_component(new DE_GAME.LocalizedLabel("game_over_title"));
     scene.add_object(t1);
-    const t2 = new DE.GameObject("T2", 310, 240, 0, 0, "UI");
-    t2.add_component(new DE.TextRenderer(DE.I18n.t("game_over_subtitle"), 24, [220, 180, 180], true));
+    const t2 = new DE.GameObject("T2", 450, 227, 0, 0, "UI");
+    t2.add_component(new DE.TextRenderer(DE.I18n.t("game_over_subtitle"), 24, [220, 180, 180], true, [0, 0, 0], true, true));
+    t2.add_component(new DE_GAME.LocalizedLabel("game_over_subtitle"));
     scene.add_object(t2);
-    const t3 = new DE.GameObject("T3", 240, 340, 0, 0, "UI");
-    t3.add_component(new DE.TextRenderer(DE.I18n.t("game_over_restart"), 20, [255, 220, 100], true));
-    scene.add_object(t3);
-    const t4 = new DE.GameObject("T4", 270, 390, 0, 0, "UI");
-    t4.add_component(new DE.TextRenderer(DE.I18n.t("game_over_menu"), 18, [160, 190, 230], true));
-    scene.add_object(t4);
+
+    const ctrl = new DE_GAME.GameOverController(restart_factory);
+
+    // BUTON 1: Yeniden Dene (350..550, merkez 450)
+    const retry_go = new DE.GameObject("GO_RETRY", 350, 290, 200, 46, "UI");
+    const retry_btn = new DE.Button(DE.I18n.t("game_over_retry"), null, theme, 22);
+    retry_go.add_component(retry_btn);
+    retry_go.add_component(new DE_GAME.KitLabelSync(retry_btn, "game_over_retry"));
+    scene.add_object(retry_go);
+
+    // BUTON 2: Ana Menü
+    const menu_go = new DE.GameObject("GO_MENU", 350, 350, 200, 46, "UI");
+    const menu_btn = new DE.Button(DE.I18n.t("game_over_menu_btn"), null, theme, 22);
+    menu_go.add_component(menu_btn);
+    menu_go.add_component(new DE_GAME.KitLabelSync(menu_btn, "game_over_menu_btn"));
+    scene.add_object(menu_go);
+
+    retry_btn.on_click = ctrl._retry.bind(ctrl);
+    menu_btn.on_click = ctrl._to_menu.bind(ctrl);
+    scene._gameover_buttons = [[retry_btn, retry_btn.on_click], [menu_btn, menu_btn.on_click]];
+    ctrl._button_keys = [[retry_btn, "game_over_retry"], [menu_btn, "game_over_menu_btn"]];
+
+    // Kısayol ipucu satırı (eski [R]/[SPACE]/[M] tuş düzeni hâlâ çalışır).
+    const hint = new DE.GameObject("GO_HINT", 450, 448, 0, 0, "UI");
+    hint.add_component(new DE.TextRenderer(DE.I18n.t("game_over_hint"), 16, [200, 170, 170], true, [0, 0, 0], true, true));
+    hint.add_component(new DE_GAME.LocalizedLabel("game_over_hint"));
+    scene.add_object(hint);
+
     const ctrl_obj = new DE.GameObject("GameOverCtrl", 0, 0, 0, 0, "UI");
-    ctrl_obj.add_component(new DE_GAME.GameOverController(restart_factory));
+    ctrl_obj.add_component(ctrl);
     scene.add_object(ctrl_obj);
     return scene;
 };
@@ -552,17 +906,18 @@ DE_GAME.build_victory_scene = function build_victory_scene() {
     fw_obj.add_component(new DE.ParticleEmitter());
     fw_obj.add_component(new DE_GAME.VictoryController());
     scene.add_object(fw_obj);
-    const t1 = new DE.GameObject("Title1", 180, 130, 0, 0, "UI");
-    t1.add_component(new DE.TextRenderer(DE.I18n.t("victory_title"), 36, [255, 220, 50], true));
+    // Merkez semantiği: tüm satırlar x=450, center_x + center_y (kayma yok).
+    const t1 = new DE.GameObject("Title1", 450, 148, 0, 0, "UI");
+    t1.add_component(new DE.TextRenderer(DE.I18n.t("victory_title"), 36, [255, 220, 50], true, [0, 0, 0], true, true));
     scene.add_object(t1);
-    const t2 = new DE.GameObject("Title2", 240, 210, 0, 0, "UI");
-    t2.add_component(new DE.TextRenderer(DE.I18n.t("victory_subtitle"), 23, [200, 240, 255], true));
+    const t2 = new DE.GameObject("Title2", 450, 222, 0, 0, "UI");
+    t2.add_component(new DE.TextRenderer(DE.I18n.t("victory_subtitle"), 23, [200, 240, 255], true, [0, 0, 0], true, true));
     scene.add_object(t2);
-    const t3 = new DE.GameObject("Title3", 290, 290, 0, 0, "UI");
-    t3.add_component(new DE.TextRenderer(DE.I18n.t("victory_praise"), 26, [100, 255, 160], true));
+    const t3 = new DE.GameObject("Title3", 450, 303, 0, 0, "UI");
+    t3.add_component(new DE.TextRenderer(DE.I18n.t("victory_praise"), 26, [100, 255, 160], true, [0, 0, 0], true, true));
     scene.add_object(t3);
-    const t4 = new DE.GameObject("Title4", 250, 410, 0, 0, "UI");
-    t4.add_component(new DE.TextRenderer(DE.I18n.t("victory_restart"), 20, [180, 180, 210], true));
+    const t4 = new DE.GameObject("Title4", 450, 420, 0, 0, "UI");
+    t4.add_component(new DE.TextRenderer(DE.I18n.t("victory_restart"), 20, [180, 180, 210], true, [0, 0, 0], true, true));
     scene.add_object(t4);
     DE.SoundFX.play_music("victory");
     return scene;
@@ -601,7 +956,8 @@ DE_GAME.PauseController = class PauseController extends DE.Component {
         if (DE.Input.get_key_down("T")) {
             for (let i = 0; i < this._button_keys.length; i++) {
                 const [btn, key] = this._button_keys[i];
-                btn.set_text(DE.I18n.t(key));
+                // auto_size=false: dil değişimi buton boyutunu bozmasın (200x46 sabit).
+                btn.set_text(DE.I18n.t(key), null, false);
             }
         }
         const total = this._buttons.length;
@@ -613,10 +969,9 @@ DE_GAME.PauseController = class PauseController extends DE.Component {
             this._focused_index = (this._focused_index - 1 + total) % total;
             DE.SoundFX.play("click");
         }
-        if (DE.Input.get_key_down("ESCAPE")) {
-            this._resume();
-            return;
-        }
+        // ESC burada işlenmez: yalnızca sahnenin on_escape'i (_resume) çağırır.
+        // (Python PauseController.update paritesi — ESC motorda update'ten önce
+        // işlendiği için burada tekrar bakılırsa pause aynı karede geri kapanır.)
         if (DE.Input.get_key_down("ENTER") || DE.Input.get_key_down("SPACE")) {
             const [btn, callback] = this._buttons[this._focused_index];
             if (callback) callback();
@@ -642,28 +997,32 @@ DE_GAME.build_pause_scene = function build_pause_scene() {
         button_focus: [220, 220, 235], button_text: [235, 240, 250],
     });
 
-    const dim = new DE.GameObject("PauseDim", 0, 0, 800, 600, "UI");
+    // Pause menüsü 900x600 canvas'ta MERKEZLENMİ�? (Python'da sol-yaslı 800 panel
+    // vardı; tarayıcıda oynanınca sola kayık görünüyordu — kullanıcı düzeltmesi.
+    // Python donmuş referans güncellenmez; kayıt _shared.md "şimdanlar" bölümünde.)
+    const dim = new DE.GameObject("PauseDim", 0, 0, 900, 600, "UI");
     dim.add_component(new DE.Panel(theme, [10, 12, 20], null, 0, 150));
     scene.add_object(dim);
 
-    const title = new DE.GameObject("PauseTitle", 400, 120, 0, 0, "UI");
-    title.add_component(new DE.TextRenderer(DE.I18n.t("pause_title"), 44, [255, 220, 90], true, [0, 0, 0], true, false));
+    const title = new DE.GameObject("PauseTitle", 450, 142, 0, 0, "UI");
+    title.add_component(new DE.TextRenderer(DE.I18n.t("pause_title"), 44, [255, 220, 90], true, [0, 0, 0], true, true));
     title.add_component(new DE_GAME.LocalizedLabel("pause_title"));
     scene.add_object(title);
 
-    const hint = new DE.GameObject("PauseHint", 400, 182, 0, 0, "UI");
-    hint.add_component(new DE.TextRenderer(DE.I18n.t("pause_hint"), 16, [170, 185, 210], true, [0, 0, 0], true, false));
+    const hint = new DE.GameObject("PauseHint", 450, 190, 0, 0, "UI");
+    hint.add_component(new DE.TextRenderer(DE.I18n.t("pause_hint"), 16, [170, 185, 210], true, [0, 0, 0], true, true));
     hint.add_component(new DE_GAME.LocalizedLabel("pause_hint"));
     scene.add_object(hint);
 
     const pause_controller = new DE_GAME.PauseController();
 
-    const resume = new DE.GameObject("ResumeBtn", 300, 240, 200, 46, "UI");
+    // 200px genişlik x=350 -> 350..550, merkez 450
+    const resume = new DE.GameObject("ResumeBtn", 350, 240, 200, 46, "UI");
     const resume_button = new DE.Button(DE.I18n.t("pause_resume_btn"), pause_controller._resume.bind(pause_controller), theme, 22);
     resume.add_component(resume_button);
     scene.add_object(resume);
 
-    const menu = new DE.GameObject("MenuBtn", 300, 306, 200, 46, "UI");
+    const menu = new DE.GameObject("MenuBtn", 350, 306, 200, 46, "UI");
     const menu_button = new DE.Button(DE.I18n.t("pause_menu_btn"), pause_controller._to_menu.bind(pause_controller), theme, 22);
     menu.add_component(menu_button);
     scene.add_object(menu);
@@ -679,4 +1038,246 @@ DE_GAME.build_pause_scene = function build_pause_scene() {
     // Overlay ESC = kapat ve donmuş oyuna dön
     scene.on_escape = pause_controller._resume.bind(pause_controller);
     return scene;
+};
+
+/* --- DOKUNMATİK KONTROLLER (mobil/tablet — itchio'da oynanabilirlik) ---
+ * Yalnızca dokunmatik cihazlarda görünür + etkin (maxTouchPoints / ontouchstart).
+ * Çizim ve giriş: HUD katmanı (is_ui), kamera/zoomdan bağımsız.
+ * Sol alt: sanal joystick (yatay eksen -> A/D sanal tuşları; yukarı itme -> SPACE).
+ * Sağ alt: üç buton — Zıpla (A, büyük, sağ altta), Ateş (X), Dash (B).
+ * DE.Input.set_virtual_key_down/up üzerinden oyun kodu değişmeden çalışır:
+ * PlayerController zaten get_horizontal_axis / get_key_down("SPACE|F|LSHIFT") okur.
+ * Statik sayfada test edilemez (gereçli dokunma yok) — tarayıcıda canlı denenir. */
+DE_GAME.TouchControls = class TouchControls extends DE.Component {
+    constructor() {
+        super();
+        this.is_ui = true;
+        this._active = false;
+        this._enabled = true;
+        this._cv = null;
+        this._ctx = null;
+        this._touches = {};            // throttle target
+        // Joystick durumu
+        this._joy = null;              // { id, x0, y0, x, y }
+        this._joy_keys = {};           // A/D basılı durumu
+        // Buton alanları (ekran uzayı 900x600)
+        this._buttons = [
+            { id: "jump", x: 780, y: 490, r: 62, label: "A", keys: ["SPACE", "W", "UP"] },
+            { id: "fire", x: 640, y: 490, r: 56, label: "X", keys: ["F"] },
+            { id: "dash", x: 860, y: 535, r: 50, label: "B", keys: ["LSHIFT"] },
+        ];
+        this._zone_joy = { x: 140, y: 430, r: 150 };   // sol alt joystick dokunma bölgesi
+        this._btn_map = {};            // touch.identifier -> buton id (multi-touch)
+        this._joy_pointer = null;      // touch.identifier (joystick aktif parmak)
+    }
+    start() {
+        this._cv = DE.Engine.instance ? DE.Engine.instance.canvas : null;
+        const nav = (typeof navigator !== "undefined") ? navigator : null;
+        const coarse = nav && nav.maxTouchPoints && nav.maxTouchPoints > 0;
+        const touch_api = (typeof window !== "undefined") && ("ontouchstart" in window);
+        this._active = !!(coarse || touch_api);
+        if (!this._active || !this._cv) return;
+        this._ctx = this._cv.getContext ? this._cv.getContext("2d") : null;
+        this._on_touch_start = this._on_touch_start.bind(this);
+        this._on_touch_move = this._on_touch_move.bind(this);
+        this._on_touch_end = this._on_touch_end.bind(this);
+        this._cv.addEventListener("touchstart", this._on_touch_start, { passive: false });
+        this._cv.addEventListener("touchmove", this._on_touch_move, { passive: false });
+        this._cv.addEventListener("touchend", this._on_touch_end);
+        this._cv.addEventListener("touchcancel", this._on_touch_end);
+    }
+    destroy() {
+        this._release_all();
+        if (this._cv) {
+            this._cv.removeEventListener("touchstart", this._on_touch_start);
+            this._cv.removeEventListener("touchmove", this._on_touch_move);
+            this._cv.removeEventListener("touchend", this._on_touch_end);
+            this._cv.removeEventListener("touchcancel", this._on_touch_end);
+        }
+        this._cv = null;
+    }
+    _canvas_pt(client) {
+        if (!this._cv || typeof this._cv.getBoundingClientRect !== "function") {
+            return { x: client.x, y: client.y };
+        }
+        const r = this._cv.getBoundingClientRect();
+        const bl = this._cv.clientLeft || 0, bt = this._cv.clientTop || 0;
+        const cw = this._cv.clientWidth || 1, ch = this._cv.clientHeight || 1;
+        const sx = this._cv.width / cw, sy = this._cv.height / ch;
+        return { x: (client.x - r.left - bl) * sx, y: (client.y - r.top - bt) * sy };
+    }
+    _point_in_circle(px, py, c) {
+        const dx = px - c.x, dy = py - c.y;
+        return (dx * dx + dy * dy) <= (c.r * c.r);
+    }
+    _button_at(px, py) {
+        for (let i = 0; i < this._buttons.length; i++) {
+            if (this._point_in_circle(px, py, this._buttons[i])) return this._buttons[i].id;
+        }
+        return null;
+    }
+    _on_touch_start(e) {
+        if (!this._enabled) return;
+        e.preventDefault();
+        const touches = e.changedTouches || [];
+        for (let i = 0; i < touches.length; i++) {
+            const t = touches[i];
+            const p = this._canvas_pt({ x: t.clientX, y: t.clientY });
+            const btn = this._button_at(p.x, p.y);
+            if (btn) {
+                this._btn_map[t.identifier] = btn;
+                this._press(btn);
+            } else if (this._joy_pointer === null && this._point_in_circle(p.x, p.y, this._zone_joy)) {
+                this._joy_pointer = t.identifier;
+                this._joy = { x0: p.x, y0: p.y, x: p.x, y: p.y };
+                this._update_joy_keys();
+            }
+        }
+    }
+    _on_touch_move(e) {
+        if (!this._enabled) return;
+        e.preventDefault();
+        const touches = e.changedTouches || [];
+        for (let i = 0; i < touches.length; i++) {
+            const t = touches[i];
+            if (this._joy_pointer === t.identifier && this._joy) {
+                const p = this._canvas_pt({ x: t.clientX, y: t.clientY });
+                this._joy.x = p.x; this._joy.y = p.y;
+                this._update_joy_keys();
+            }
+        }
+    }
+    _on_touch_end(e) {
+        const touches = e.changedTouches || [];
+        for (let i = 0; i < touches.length; i++) {
+            const t = touches[i];
+            if (this._joy_pointer === t.identifier) {
+                this._joy_pointer = null;
+                this._release_joy();
+            }
+            const btn_id = this._btn_map[t.identifier];
+            if (btn_id !== undefined) {
+                delete this._btn_map[t.identifier];
+                this._release(btn_id);
+            }
+        }
+    }
+    _press(id) {
+        const b = this._buttons.find(x => x.id === id);
+        if (!b) return;
+        b.pressed = true;
+        for (const k of b.keys) DE.Input.set_virtual_key_down(k);
+    }
+    _release(id) {
+        const b = this._buttons.find(x => x.id === id);
+        if (!b) return;
+        b.pressed = false;
+        for (const k of b.keys) DE.Input.set_virtual_key_up(k);
+    }
+    _update_joy_keys() {
+        if (!this._joy) return;
+        const dx = this._joy.x - this._joy.x0;
+        const dy = this._joy.y - this._joy.y0;
+        const dead = 18;
+        const want_left = dx < -dead;
+        const want_right = dx > dead;
+        const want_up = dy < -dead;
+        if (want_left && !this._joy_keys.left) { this._joy_keys.left = true; DE.Input.set_virtual_key_down("A"); }
+        if (!want_left && this._joy_keys.left) { this._joy_keys.left = false; DE.Input.set_virtual_key_up("A"); }
+        if (want_right && !this._joy_keys.right) { this._joy_keys.right = true; DE.Input.set_virtual_key_down("D"); }
+        if (!want_right && this._joy_keys.right) { this._joy_keys.right = false; DE.Input.set_virtual_key_up("D"); }
+        // Yukarı itme = zıpla (joystick üstüne) — sağ alt butona alternatif.
+        if (want_up && !this._joy_keys.up) { this._joy_keys.up = true; DE.Input.set_virtual_key_down("SPACE"); }
+        if (!want_up && this._joy_keys.up) { this._joy_keys.up = false; DE.Input.set_virtual_key_up("SPACE"); }
+    }
+    _release_joy() {
+        if (!this._joy) return;
+        if (this._joy_keys.left) { this._joy_keys.left = false; DE.Input.set_virtual_key_up("A"); }
+        if (this._joy_keys.right) { this._joy_keys.right = false; DE.Input.set_virtual_key_up("D"); }
+        if (this._joy_keys.up) { this._joy_keys.up = false; DE.Input.set_virtual_key_up("SPACE"); }
+        this._joy_keys = {};
+        this._joy = null;
+    }
+    release_held() {
+        this._joy_keys = {};
+        this._joy = null;
+        this._joy_pointer = null;
+        for (const id of Object.keys(this._btn_map)) this._release(this._btn_map[id]);
+        this._btn_map = {};
+        DE.Input.clear_virtual_keys();
+    }
+    _release_all() {
+        this._joy = null;
+        this._joy_pointer = null;
+        for (const b of this._buttons) if (b.pressed) this._release(b.id);
+        this._btn_map = {};
+    }
+    update(dt) {
+        if (!this._active) return;
+        // Sahne değişince bırakılmayan dokunuşları güvenli bırak (takılı tuş).
+        if (!this.game_object || !this.game_object.active) this.release_held();
+    }
+    draw(ctx, camera_offset) {
+        if (!this._active || !this._enabled) return;
+        const w = ctx.canvas ? ctx.canvas.width : 900;
+        const h = ctx.canvas ? ctx.canvas.height : 600;
+        ctx.save();
+        ctx.globalAlpha = 0.16;
+        // Joystick taban dairesi
+        ctx.beginPath();
+        ctx.arc(this._zone_joy.x, this._zone_joy.y, this._zone_joy.r, 0, Math.PI * 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        ctx.restore();
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.strokeStyle = "#e8f0ff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(this._zone_joy.x, this._zone_joy.y, this._zone_joy.r - 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+        // Joystick aktif ise topuz çiz
+        if (this._joy) {
+            const bx = this._zone_joy.x + Math.max(-this._zone_joy.r + 20, Math.min(this._zone_joy.r - 20, this._joy.x - this._joy.x0));
+            const by = this._zone_joy.y + Math.max(-this._zone_joy.r + 20, Math.min(this._zone_joy.r - 20, this._joy.y - this._joy.y0));
+            ctx.beginPath();
+            ctx.arc(bx, by, 42, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(220,235,255,0.55)";
+            ctx.fill();
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.strokeStyle = "rgba(255,255,255,0.5)";
+            ctx.beginPath();
+            ctx.moveTo(this._zone_joy.x, this._zone_joy.y);
+            ctx.lineTo(bx, by);
+            ctx.stroke();
+        }
+        // Buton daireleri
+        for (const b of this._buttons) {
+            const r = b.r;
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, r, 0, Math.PI * 2);
+            if (b.pressed) {
+                ctx.fillStyle = "rgba(170,230,255,0.5)";
+                ctx.fill();
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 3;
+            } else {
+                ctx.fillStyle = "rgba(255,255,255,0.14)";
+                ctx.fill();
+                ctx.strokeStyle = "rgba(230,240,255,0.6)";
+                ctx.lineWidth = 2;
+            }
+            ctx.stroke();
+            ctx.font = "26px monospace";
+            ctx.fillStyle = "rgba(240,248,255,0.9)";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(b.label, b.x, b.y + 1);
+            ctx.textAlign = "start";
+            ctx.textBaseline = "alphabetic";
+        }
+    }
 };

@@ -135,14 +135,14 @@ function done() {
     check("baslangic kapali", dc.active === false);
     dc.toggle();
     check("toggle acik", dc.active === true);
-    check("acilis mesaji", dc.output[dc.output.length - 1].includes("Konsol"));
+    check("acilis mesaji", dc.output[dc.output.length - 1].includes("Console"));
 
     // komut calistirma: version
     DE.Input._typed = ["v", "e", "r", "s", "i", "o", "n"];
     dc.update(1 / 60);
     DE.Input._keys_down = { "ENTER": true };
     dc.update(1 / 60);
-    check("version komutu", dc.output.some(l => l.includes("surumu")) || dc.output[dc.output.length - 1].includes("0.0.0"));
+    check("version komutu", dc.output.some(l => l.includes("engine version")) || dc.output[dc.output.length - 1].includes("0.0.0"));
     DE.Input._keys_down = {};
 
     // bilinmeyen komut
@@ -150,7 +150,7 @@ function done() {
     dc.update(1 / 60);
     DE.Input._keys_down = { "ENTER": true };
     dc.update(1 / 60);
-    check("bilinmeyen komut mesaji", dc.output[dc.output.length - 1].includes("Bilinmeyen"));
+    check("bilinmeyen komut mesaji", dc.output[dc.output.length - 1].includes("Unknown"));
     DE.Input._keys_down = {};
 
     // help (kayitli komutlari listeler)
@@ -158,7 +158,7 @@ function done() {
     dc.update(1 / 60);
     DE.Input._keys_down = { "ENTER": true };
     dc.update(1 / 60);
-    check("help komutu", dc.output.some(l => l.includes("Komutlar:")));
+    check("help komutu", dc.output.some(l => l.includes("Commands:")));
     DE.Input._keys_down = {};
 
     // BACKSPACE
@@ -185,7 +185,7 @@ function done() {
 
     // custom register_command
     let called = null;
-    DE.register_command("hp", "can ver", (scene, args) => { called = args; return "hp verildi"; });
+    DE.register_command("hp", "give health", (scene, args) => { called = args; return "hp done"; });
     dc.toggle();               // ac (typed temizlenir)
     DE.Input._typed = ["h", "p", " ", "5"];
     dc.update(1 / 60);
@@ -193,7 +193,7 @@ function done() {
     dc.update(1 / 60);
     DE.Input._keys_down = {};
     check("ozel komut args", JSON.stringify(called) === JSON.stringify(["5"]));
-    check("ozel komut cikti", dc.output[dc.output.length - 1].includes("hp verildi"));
+    check("ozel komut cikti", dc.output[dc.output.length - 1].includes("hp done"));
 }
 
 // ================= S6 Engine._frame: konsol + T + F3 (Python core.py eşi) =================

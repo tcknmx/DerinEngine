@@ -2,18 +2,24 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <title>DerinEngine HTML — Star Collector Hero</title>
 <style>
-  body { margin: 0; background: #0e1220; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: monospace; overflow: hidden; }
-  /* Oyun 900x600 çizilir ama pencere/kaydırma çubuğu küçükse KIRPILMASIN:
-     canvas en-boy oranını koruyarak pencereye sığacak şekilde küçülür. */
+  body { margin: 0; background: #0e1220; display: flex; align-items: center; justify-content: center; height: 100vh; height: 100dvh; font-family: monospace; overflow: hidden; }
+  /* Oyun HAM çözünürlüğünde (900x600) üretilir. Masaüstünde birebir gösterilir;
+     mobilde (touch/ince cihaz) canvas oranı bozmadan ekrana sığdırılır. */
   canvas {
-    image-rendering: pixelated; border: 2px solid #2a3350; border-radius: 6px;
-    max-width: 100vw; max-height: 100vh; width: auto; height: auto;
-    aspect-ratio: 900 / 600; object-fit: contain;
+    image-rendering: pixelated; box-sizing: border-box;
+    border: 2px solid #2a3350; border-radius: 6px;
+    width: 900px; height: 600px; max-width: none; max-height: none;
+    touch-action: none;   /* mobil: kaydırma/zoom canvas'ı bozmasın */
+  }
+  /* Mobil: 900x600 oranını koru, pencereye sığdır (en-boy kutu). */
+  @media (pointer: coarse), (max-width: 920px) {
+    canvas { width: min(100vw, calc(100dvh * 1.5)); height: auto; }
   }
   #info { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; color: #7c8db0; font-size: 13px; pointer-events: none; }
+  /* Mobilde alt çubuk bilgisi gizlenmez ama dokunmaya müsade etmez */
 </style>
 </head>
 <body>

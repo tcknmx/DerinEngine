@@ -20,9 +20,9 @@ const os = require("os");
 const { execFile } = require("child_process");
 
 // Proje kökünü bul: burası tools_html/ içinde → bir üst astı = DerinEngine kökü.
-const CLAIMED = path.resolve(__dirname, "..");
-const ROOT = (fs.existsSync(path.join(CLAIMED, "deep_engine")) &&
-             fs.existsSync(path.join(CLAIMED, "game"))) ? CLAIMED : CLAIMED;
+// (Gösterge olan deep_engine/ + game/ klasörleri 08.10.2026'da silindi — kök
+// her zaman tools_html'in bir üstü.)
+const ROOT = path.resolve(__dirname, "..");
 
 let LANG = "tr";
 

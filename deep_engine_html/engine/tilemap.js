@@ -12,10 +12,11 @@ DE.Tilemap = class Tilemap extends DE.Component {
         this.offset = offset ? [offset[0], offset[1]] : [0, 0];
         this.tile_set = {};      // tile id -> [r,g,b] veya None=boş
         this.layers = [];        // { grid: 2D dizi, z: sayı } — z sıralı
-        // Gorsel zenginlik (duz blok gorsun diye): yuzey isigi, derinlik
-        // gradyani ve karonun icine karo bazli doku. Kapali -> Python gibi
-        // tamamen duz kare (eski davranis, testler bunu bekliyor olabilir).
-        this.textured = true;
+        // Kullanici karari (07.10): 27.09 tilemap rasterizasyonuyla gelen
+        // "kare blok" dokusu iyi hissettirmedi -> texturing KAPALI (Python'un
+        // duz pygame.draw.rect davranisi). Izgara gorunmez, veri/segment
+        // koprusu (_tilemap_segments, to_data) editör icin aynen calisir.
+        this.textured = false;
     }
 
     add_layer(grid, z_index = 0) {

@@ -17,35 +17,37 @@ kendi oturum dosyan ve `sessions/_shared.md` okunur. (Eski adı: MiniEngine → 
 | **4. Araç** | deep-tool, paketleme, web build | `sessions/04_tools.md` | `tools/`, dist/build |
 | **Paylaşılan** | Çapraz-oturum haberler + tuzaklar | `sessions/_shared.md` | — |
 
-> ### ⚠️ MOTOR KARARI (03.10.2026) — JS BİRİNCİL, PYTHON DONDURULDU
+> ### ⚠️ MOTOR KARARI (03.10.2026 → 08.10.2026 TAMAMLANDI) — JS TEK KAYNAK
 >
-> Bundan sonra **geliştirme `deep_engine_html/` (JS/HTML) içinde yapılır.**
-> `deep_engine/` (Python) **DONDURULMUŞ REFERANS**'tır:
+> **Geliştirme `deep_engine_html/` (JS/HTML) içinde yapılır. Python motoru
+> 08.10.2026'da SİLİNDİ** (`deep_engine/*.py`, `game/*.py`, `main.py`,
+> `tests/*.py`) — ORTA parite farkları (M1–M11) JS'te kapatıldıktan sonra:
 >
-> | | Birincil (yeni özellik buraya) | Dondurulmuş referans |
+> | | Tek kaynak | Silinen (git geçmişinde) |
 > |---|---|---|
-> | Motor | `deep_engine_html/engine/*.js` | `deep_engine/*.py` |
-> | Oyun | `deep_engine_html/game/*.js` | `game/*.py`, `main.py` |
-> | Test | `deep_engine_html/test_*.js` | `tests/test_*.py` |
+> | Motor | `deep_engine_html/engine/*.js` | eski `deep_engine/*.py` |
+> | Oyun | `deep_engine_html/game/*.js` | eski `game/*.py`, `main.py` |
+> | Test | `deep_engine_html/test_*.js` + `tools_html/test_*.js` | eski `tests/*.py` |
 >
 > **Kurallar:**
-> 1. Yeni motor/oyun yeteneği **önce JS tarafına** yazılır.
-> 2. Python tarafına **yeni özellik EKLENMEZ** (yalnız hata düzeltilirse, o da JS
->    tarafına önce/aynı anda yansıtılır).
-> 3. Python bir **API kataloğudur**: JS'te bir şeyin "Python'daki karşılığı neydi"
->    sorusuna cevaptır. Davranış farkı varsa Python referans alınır.
-> 4. **deep-tool Modül 14 (Python/JS parite)** kapıdır: JS, Python API'sinin
->    tamamını taşımazsa `BUG` verir. `python tools\deep-tool.py --lang tr 14`
-> 5. Python testleri donmuş motoru korur (regresyon); **yeni motor testleri JS'e
->    yazılır.** Python'da motor özelliği arıyorsan önce JS'e bak.
+> 1. Yeni motor/oyun yeteneği **JS'e** yazılır; Python tarafına hiçbir şey eklenmez.
+> 2. Eski Python kodu git geçmişinde. **Parite kapısı (deep-tool Modül 14 +
+>    `tools/parity_check.py`) 08.10.2026'da kaldırıldı** — JS motoru artık
+>    ölçülen hedef değil, KAYNAĞIN kendisi. "Python'da nasıldı?" sorusunun
+>    cevabı: git geçmişi (`git log`, örn.
+>    `git show e6bf3e8:deep_engine/components.py`) + session kayıtları
+>    (özellikle `_shared.md`, `02_engine.md`).
+> 3. Eski Python testleri silindi; **tüm regresyon JS** ile yapılır (aşağıda).
+> 4. `tools/deep-tool.py` + `tools/webpanel.py` + `tools_html/*` **kaldı**
+>    (aracılar JS/HTML motorunun hizmetinde).
 
 ## ÇALIŞMA KURALLARI (oturum bütünlüğü)
 
 1. **Başlarken oku:** bu dosya → kendi oturum dosyan → `sessions/_shared.md`
    (özellikle **SON GELİŞMELER**).
-2. **Kendi bölgende kal:** motor saflığı korunur (`deep_engine/` içinde `game`/`main`
-   import YASAK — deep-tool Modül 8 denetler). `game/*.py` motora `deep_engine.*`
-   mutlak import ile bağlanır (göreli import çalışmaz).
+2. **Kendi bölgende kal:** motor saflığı korunur — `deep_engine_html/engine/`
+   (motor katmanı) içinde `game/`/`main` bağımlılığı YASAK (deep-tool Modül 8
+   denetler, ERR = 0 olmalı).
 3. **GÖREV DÖNGÜSÜ — her görevde üç kayıt:**
    - **Başlangıç:** kendi oturum dosyanda görevin `HEDEF`'ini yaz (neyi, hangi
      oturumda çözüyoruz, doğrulama komutu ne).
@@ -65,8 +67,8 @@ Kod bilmeyen kullanıcıyla **sıfırdan kendi oyun motorumuzu** JS/HTML (taray�
 Ürün zinciri: STAR COLLECTOR HERO → STAR COLLECTOR 2 → STARCUBES → TrenchBroom `.map`.
 Detaylı çizelge + 2D v1 5 alan planı: `01_strategy.md`.
 
-> Not: Python + pygame sürümü **aynı motorun referans uygulamasıdır** (bkz. MOTOR
-> KARARI). Artık yeni özellik oraya yazılmaz.
+> Not: Python + pygame referans uygulaması **08.10.2026'da silindi** (ORTA parite
+> farkları M1–M11 JS'te kapatıldıktan sonra). Eski koda git geçmişinde ulaşılır.
 
 ## PROJE YERİ
 
@@ -81,22 +83,19 @@ Detaylı çizelge + 2D v1 5 alan planı: `01_strategy.md`.
     `procedural.js`, `console.js`, `render.js`, `physics.js`, `ui.js`, `tilemap.js`.
   - `game/` — `main.js` + `state.js`, `entities.js`, `bosses.js`, `ui.js`,
     `builders.js`, `scenes.js`, `climber.js`, `commands.js`.
-  - `test_*.js` — **12 motor/oyun test dosyası, 584 kontrol** (node ile çalışır).
-- `deep_engine/` — **DONDURULMUŞ** Python referans motoru (API kataloğu).
-- `main.py` + `game/` — donmuş Python referans oyunu (regresyon için).
-- `tools/` — deep-tool.py + deep-tool.bat (kısayol), webpanel.py (tarayıcı editörü),
-  **parity_check.py** (Python↔JS API denetimi, deep-tool Modül 14'ün motoru).
+  - `test_*.js` — **13 motor/oyun test dosyası** (node ile çalışır; hepsi yeşil).
+- `tools/` — deep-tool.py + deep-tool.bat (kısayol), webpanel.py (tarayıcı editörü).
+  (Eski `parity_check.py` + Modül 14 kaldırıldı; Python motoru silindi.)
 - `sessions/` — oturum belgeleri (üstteki tablo).
 - Veri: `custom_level.json` (web editörü şablon kaynağı), `custom_levels/` (web
   editörü seviyeleri: `default.json` sıfır şablon + adlı seviyeler — oyundan
   bağımsız tasarım alanı), `savegame.json`, `version.txt`.
-- `tests/` — Python testleri: `test_engine_core.py` (motor), `test_climber.py`
-  (Star Climber mekanik + headless oynanış). JS testleri `deep_engine_html/test_*.js`.
 
 ## SÜRÜM MODELİ
 
 Motor **1.0.0**, oyun **0.1.19** (ayrı sayılır — tek sürüm satırı fikri iptal edildi).
-Kaynaklar: `deep_engine/__init__.py → __version__`, `version.txt`.
+Kaynaklar: `deep_engine_html/engine/core.js → DE.__version__`,
+`deep_engine_html/game/state.js → DE_GAME.__version__`, `version.txt`.
 `custom_level.json` `meta.version` = seviye **biçim** sürümü (1) — ayrı kavram.
 savegame sıfır kurulum: `{"lang":"tr","high_score":0}` (BOM'suz `{`).
 
@@ -104,24 +103,18 @@ savegame sıfır kurulum: `{"lang":"tr","high_score":0}` (BOM'suz `{`).
 
 ```powershell
 node C:\Users\token\Desktop\DerinEngine\deep_engine_html\index.html   # tarayıcıda oyun
-python C:\Users\token\Desktop\DerinEngine\main.py                    # donmuş referans
 python tools\deep-tool.py            # tarama aracı (TR/EN interaktif menü)
 python tools\deep-tool.py --lang en all
 ```
 
 Testler (pencere açmaz, hepsi yeşil olmalı):
 ```powershell
-python tests\test_engine_core.py     # motor (Event/Tween/kamera) -> ALL OK
-python tests\test_climber.py         # Star Climber mekanik + headless oynanış -> ALL OK
-node deep_engine_html\test_core.js    # JS motor çekirdeği -> ALL OK (35 kontrol)
+node deep_engine_html\test_core.js    # JS motor çekirdeği -> ALL OK
 node deep_engine_html\test_game.js    # oyun (TEST17 dahil) -> SONUÇ: 182 geçti
 node tools_html\test_tools.js         # deep-tool -> 36/36
-node tools_html\test_browser.js       # tarayıcı testi (gerçek tuş yolu) -> 44/44
+node tools_html\test_browser.js       # tarayıcı testi (gerçek tuş yolu) -> 51/51
 ```
-
-> Motor paritesi kapısı: `python tools\deep-tool.py --lang tr 14`
-> (veya `python tools\parity_check.py` doğrudan). JS'te Python'dan eksik
-> API varsa `BUG` verir — Python bu ölçümdeki **hedef** değil, referanstır.
+(13 test dosyasının tamamı: `deep_engine_html\test_*.js` — hepsi yeşil olmalı.)
 
 Kontroller: A/D hareket, SPACE/W/↑ zıplama (+çift), LSHIFT dash, F/sol-tık ateş,
 T dil, P kampanya, 4 Sonsuz Mod (kilitli olabilir), **C Star Climber (tırmanış)**,

@@ -6,7 +6,7 @@ A single CLI tool that scans every folder and .py game file in the DerinEngine
 root directory from start to finish, reporting problems/omissions/conflicts.
 
 Scan modules (selected from the menu):
-  [1] MOTOR CONSOLE    : syntax/import/pattern/media/smoke (internal engine)
+  [1] MOTOR CONSOLE    : syntax/import/pattern/media (project files)
   [2] IMPORT GRAPH     : who imports whom; unused imports;
                          circular import (A->B->A) detection
   [3] BUILDER/EXTRACTOR: register_builder/register_extractor mapping;
@@ -18,7 +18,7 @@ Scan modules (selected from the menu):
                          costly-pattern warnings
   [7] AST / DEAD-CODE : AST-based scan (unreachable/unused, dead literals)
   [8] ENGINE PURITY    : deep_engine -> game leak (forbidden imports)
-  [9] REGRESSION       : seed determinism / data / WARN trend
+  [9] REGRESSION       : savegame data / WARN trend
   [10] SECRET SCAN     : credentials / api keys / tokens / .env
   [11] DEAD CODE       : top-level functions/classes defined but never called
   [12] COMPLEXITY      : biggest files and longest structures (cleanup compass)
@@ -51,9 +51,10 @@ import json
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 
 # Source directory detection: deep-tool.py may sit in the root directory or under tools/.
-# The DerinEngine root is the directory containing the 'deep_engine/' and 'game/' folders.
+# The DerinEngine root contains the primary JS engine folder 'deep_engine_html/'
+# (Python motoru 08.10.2026'da silindi; eski iki klasor gostergesi kaldirildi).
 _BASE = os.path.dirname(os.path.abspath(__file__))
-if os.path.isdir(os.path.join(_BASE, "deep_engine")) and os.path.isdir(os.path.join(_BASE, "game")):
+if os.path.isdir(os.path.join(_BASE, "deep_engine_html")):
     ROOT = _BASE
 else:
     ROOT = os.path.dirname(_BASE)  # if inside tools/, go one level up -> root
@@ -74,7 +75,7 @@ EN = {
     "banner_sub_en": "Scans all folders and .py files from start to finish, reporting problems/omissions/conflicts.",
     "lang_prompt": "Choose language / Dil secin (tr/en): ",
     "menu_title": "Select a scan module:",
-    "menu_1": "[1] Motor Console (syntax / import / patterns / media / smoke)",
+    "menu_1": "[1] Motor Console (syntax / import / patterns / media)",
     "menu_2": "[2] Import Graph (unused imports, circular imports)",
     "menu_3": "[3] Builder/Extractor consistency",
     "menu_4": "[4] i18n key check (tr/en parity)",
@@ -94,18 +95,10 @@ EN = {
     "header_files": "Files scanned: {n}",
     "summary": "Summary: {w} WARN, {b} BUG, {e} ERR",
     "goodbye": "Goodbye.",
-    # 14 - Python <-> JS parity
-    "parity_gap": "PARITY {kind}: {file} :: {sym} -> {detail}",
-    "parity_bug": "JS engine does NOT match Python ({n} gap(s)). "
-                  "Finish the JS side first.",
-    "parity_fail": "parity check could not run: {err}",
-    "parity_missing": "parity_check.py not found: {path}",
     # 1 - motor console
     "mc_py": ".py files found: {n}",
     "mc_syntax": "Syntax: {ok}/{total} OK",
     "mc_import": "Import: {ok}/{total} OK",
-    "mc_smoke_start": "Running headless smoke test...",
-    "mc_smoke_ok": "Smoke OK",
     # 2 - import graph
     "ig_header": "Import graph",
     "ig_files": "Parsed {n} files",
@@ -151,7 +144,7 @@ EN = {
     "new_created": "created: {p}",
     "new_script_hint": "script template written to {p}",
     "run_list": "Available scripts:",
-    "run_which": "Which script (game / webpanel / tool) or a .py path (q = back): ",
+    "run_which": "Which script (webpanel / tool) or a .py path (q = back): ",
     "run_bad": "not found / unknown: {s}",
     "run_start": "starting: {cmd}",
     # check (module) menu
@@ -163,7 +156,6 @@ EN = {
     "menu_11": "[11] Dead code (defined but never called)",
     "menu_12": "[12] Complexity snapshot (biggest files / functions)",
     "menu_13": "[13] Crash trend (motor.log)",
-    "menu_14": "[14] Python/JS parity (JS engine must match Python API)",
     "menu_20": "[20] Scan ALL",
     "menu_b": "[b] Back to main menu",
     "menu_prompt": "Your choice (comma-separated, e.g. 1,4 / 10 / b / q): ",
@@ -182,10 +174,7 @@ EN = {
     "pur_cycle": "possible cyclic import at runtime: {modules}",
     "pur_ok": "engine layer is clean (no game/main references)",
     # 9 - Regression
-    "reg_hdr": "Regression (seed determinism / data / trend)",
-    "reg_seed_ok": "procedural: same seed -> same level ({seed})",
-    "reg_seed_bad": "NON-DETERMINISTIC: seed {seed} produced different levels",
-    "reg_seed_err": "procedural.generate could not be verified: {err}",
+    "reg_hdr": "Regression (data / WARN trend)",
     "reg_save_ok": "savegame.json is valid JSON",
     "reg_save_bad": "savegame.json is invalid/missing: {err}",
     "reg_trend": "motor.log WARN/ERR total: {n}",
@@ -200,7 +189,7 @@ _TR_DATA = {
     "banner_sub_en": "Scans all folders and .py files from start to finish, reporting problems/omissions/conflicts.",
     "lang_prompt": "Dil secin/Dil seçin (tr/en): ",
     "menu_title": "Tarama modulunu secin:",
-    "menu_1": "[1] Motor Konsolu (syntax / import / desen / medya / smoke)",
+    "menu_1": "[1] Motor Konsolu (syntax / import / desen / medya)",
     "menu_2": "[2] Import Grafı (kullanilmayan import, dongusel import)",
     "menu_3": "[3] Builder/Extractor tutarliligi",
     "menu_4": "[4] i18n anahtar denetimi (tr/en parity)",
@@ -220,17 +209,10 @@ _TR_DATA = {
     "header_files": "Taranan dosya: {n}",
     "summary": "OZET: {w} WARN, {b} BUG, {e} ERR",
     "goodbye": "Gorusuruz, iyi oyunlar!",
-    # 14 - Python <-> JS parite
-    "parity_gap": "PARITE {kind}: {file} :: {sym} -> {detail}",
-    "parity_bug": "JS motoru Python ile denk degil ({n} bosluk). Once JS tarafini tamamla.",
-    "parity_fail": "parite denetimi calistirilamadi: {err}",
-    "parity_missing": "parity_check.py bulunamadi: {path}",
     # 1 - motor console
     "mc_py": "Bulunan .py dosyasi: {n}",
     "mc_syntax": "Sozdizimi: {ok}/{total} OK",
     "mc_import": "Import: {ok}/{total} OK",
-    "mc_smoke_start": "Headless smoke testi calistiriliyor...",
-    "mc_smoke_ok": "Smoke OK",
     # 2 - import graph
     "ig_header": "Import grafı",
     "ig_files": "{n} dosya ayristirildi",
@@ -276,7 +258,7 @@ _TR_DATA = {
     "new_created": "olusturuldu: {p}",
     "new_script_hint": "script sablonu yazildi: {p}",
     "run_list": "Calistirilabilir scriptler:",
-    "run_which": "Hangi script (game / webpanel / tool) veya .py yolu (q = geri): ",
+    "run_which": "Hangi script (webpanel / tool) veya .py yolu (q = geri): ",
     "run_bad": "bulunamadi / bilinmiyor: {s}",
     "run_start": "baslatiliyor: {cmd}",
     # check (module) menu
@@ -306,10 +288,7 @@ _TR_DATA = {
     "pur_cycle": "runtime'da olasi dongusel import: {modules}",
     "pur_ok": "motor katmani temiz (game/main referansi yok)",
     # 9 - Regression
-    "reg_hdr": "Regression (seed determinizm / veri / trend)",
-    "reg_seed_ok": "procedural: ayni seed -> ayni seviye ({seed})",
-    "reg_seed_bad": "DETERMINISTIK DEGIL: {seed} farkli seviyeler uretti",
-    "reg_seed_err": "procedural.generate dogrulanamadi: {err}",
+    "reg_hdr": "Regression (veri / WARN trendi)",
     "reg_save_ok": "savegame.json gecerli JSON",
     "reg_save_bad": "savegame.json gecersiz/eksik: {err}",
     "reg_trend": "motor.log WARN/ERR toplami: {n}",
@@ -506,28 +485,6 @@ def check_import(path):
     return True, None
 
 
-def run_smoke(frames=20):
-    import os as _os
-    _os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-    _os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
-    _os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
-    try:
-        import pygame
-        from deep_engine import Engine
-        from game.ui import build_main_menu_scene
-        pygame.init()
-        eng = Engine(title="deep-tool-smoke", width=900, height=600, target_fps=60)
-        menu = build_main_menu_scene()
-        eng.set_scene(menu)
-        for _ in range(frames):
-            eng._frame(1 / 60)
-        pygame.quit()
-        return [(INFO, "Smoke OK: %d kare menu hatasiz calisti" % frames)]
-    except Exception as e:
-        tb = traceback.format_exc(limit=6).strip().splitlines()
-        return [(ERR, "Smoke COKTU: %r\n%s" % (e, "\n".join(tb[-4:])))]
-
-
 # ===========================================================================
 #  MODULE 1 : MOTOR CONSOLE
 # ===========================================================================
@@ -552,12 +509,6 @@ def run_motor_console(collect):
             collect("WARN", "%s :: %s" % (_rel(p), msg))
         for lvl, msg in check_media(p):
             collect("WARN", "%s :: %s" % (_rel(p), msg))
-    collect("INFO", t("mc_smoke_start"))
-    for lvl, msg in run_smoke():
-        if lvl >= WARN:
-            collect("WARN", "smoke :: %s" % msg)
-        if lvl == INFO:
-            collect("INFO", t("mc_smoke_ok"))
 
 
 # ===========================================================================
@@ -773,7 +724,10 @@ def _i18n_keys_by_lang(src):
 def run_i18n(collect):
     p = os.path.join(ROOT, "deep_engine", "i18n.py")
     if not os.path.exists(p):
-        collect("WARN", t("i18n_no_file"))
+        # Python motoru 08.10.2026'da silindi: i18n tablosu artik yalnizca
+        # deep_engine_html/engine/i18n.js'de. JS araci (tools_html/deep-tool.js
+        # Modul 4) o dosyayi tarar; burada uyari degil bilgi olarak atlansin.
+        collect("INFO", t("i18n_no_file"))
         return
     langs = _i18n_keys_by_lang(_read(p))
     trk = langs.get("tr", set())
@@ -1247,23 +1201,6 @@ def run_engine_purity(collect):
 # ===========================================================================
 #  MODULE 9 : REGRESSION
 # ===========================================================================
-def _reg_seed(collect):
-    """Same seed -> same level (deterministic)."""
-    try:
-        import json
-        from deep_engine.procedural import generate
-        a = generate(biome=None, seed=4242, chunks=8)
-        b = generate(biome=None, seed=4242, chunks=8)
-        ha = json.dumps(a, sort_keys=True, ensure_ascii=False)
-        hb = json.dumps(b, sort_keys=True, ensure_ascii=False)
-        if ha == hb:
-            collect("INFO", t("reg_seed_ok", seed=4242))
-        else:
-            collect("BUG", t("reg_seed_bad", seed=4242))
-    except Exception as e:
-        collect("ERR", t("reg_seed_err", err=e))
-
-
 def _reg_save(collect):
     """Is savegame.json valid JSON, and are the expected keys present?"""
     import json as _json
@@ -1303,7 +1240,6 @@ def _reg_trend(collect):
 
 def run_regression(collect):
     collect("INFO", t("reg_hdr"))
-    _reg_seed(collect)
     _reg_save(collect)
     _reg_trend(collect)
 
@@ -1475,45 +1411,6 @@ def run_module(num, collect):
         run_complexity(collect)
     elif num == 13:
         run_crashtrend(collect)
-    elif num == 14:
-        run_parity(collect)
-
-
-def run_parity(collect):
-    """Modul 14: Python <-> JS motor/oyun PARITE denetimi.
-
-    Kural (03.10.2026 karari): JS motoru birincil gelistirme hedefidir; Python
-    motoru donduruldu. Bu yuzden Python API'sinin TAMAMI JS tarafinda olmak
-    zorundadir. Denetim iki tarafi da GERCEKTEN yukleyip cikarir (tools/
-    parity_check.py): sinif yok / metot yok / modul fonksiyonu yok.
-    Bilinen-kasten farklar (dosya sistemi gibi) arac icin istisnadir, WARN
-    uretmez.
-    """
-    tool = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        "parity_check.py")
-    if not os.path.exists(tool):
-        collect("BUG", t("parity_missing", path=tool))
-        return
-    try:
-        proc = subprocess.run([sys.executable, tool, "--json"],
-                              capture_output=True, text=True, encoding="utf-8",
-                              timeout=300)
-    except Exception as exc:
-        collect("ERR", t("parity_fail", err=str(exc)))
-        return
-    if proc.returncode == 2:
-        collect("ERR", t("parity_fail", err=(proc.stderr or "").strip()[:200]))
-        return
-    try:
-        data = json.loads(proc.stdout)
-    except Exception as exc:
-        collect("ERR", t("parity_fail", err=str(exc)))
-        return
-    for gap in data.get("gaps", []):
-        collect("WARN", t("parity_gap", kind=gap["kind"], file=gap["file"],
-                          sym=gap["symbol"], detail=gap["detail"]))
-    if not data.get("ok"):
-        collect("BUG", t("parity_bug", n=len(data.get("gaps", []))))
 
 
 MODULES = {
@@ -1530,7 +1427,6 @@ MODULES = {
     11: "Dead code",
     12: "Complexity snapshot",
     13: "Crash trend",
-    14: "Python/JS parite",
 }
 
 
@@ -1538,7 +1434,6 @@ MODULES = {
 #  SUB-TOOLS: FIND / NEW / RUN
 # ===========================================================================
 _SCRIPT_RUN = {
-    "game": ("main.py", "Oyunu baslat (main.py)"),
     "webpanel": ("tools/webpanel.py", "Tarayici editoru (127.0.0.1:8765)"),
     "tool": ("tools/deep-tool.py", "deep-tool (bu aracin kendisi)"),
 }

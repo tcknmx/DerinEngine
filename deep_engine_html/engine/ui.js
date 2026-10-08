@@ -112,9 +112,11 @@ DE.Button = class Button extends DE.Component {
         ctx.font = this.font_size + "px monospace";
         return ctx.measureText(this.text) || { width: 10, actualBoundingBoxAscent: this.font_size, actualBoundingBoxDescent: 2 };
     }
-    set_text(text, ctx) {
+    set_text(text, ctx, auto_size = true) {
         this.text = text;
-        if (this.game_object) {
+        // auto_size=false: metni güncelle ama nesne boyutunu sabit tut
+        // (oyun katmanı dil değişiminde butonun kendi ölçüsünü korumak ister).
+        if (this.game_object && auto_size) {
             const m = ctx ? this._measure_text(ctx) : { width: this.text.length * (this.font_size * 0.6), actualBoundingBoxAscent: this.font_size, actualBoundingBoxDescent: 2 };
             const ascent = m.actualBoundingBoxAscent || this.font_size * 0.8;
             const descent = m.actualBoundingBoxDescent || this.font_size * 0.2;

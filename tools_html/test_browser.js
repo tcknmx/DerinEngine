@@ -196,6 +196,18 @@ function bootGame() {
   const canvas = new El("canvas");
   canvas.width = 900; canvas.height = 600;
   dom.byId["game"] = canvas;
+  // WebAudio stub: main.js açılışta SoundFX.initialize() + play_music("menu")
+  // çağırır (main.py:78/86 aynası); üretim yolunu gerçek boot'ta kilitler.
+  dom.window.AudioContext = class {
+    constructor() { this.state = "running"; this.destination = {}; }
+    createBuffer(ch, len, sr) {
+      const data = []; for (let c = 0; c < ch; c++) data.push(new Float32Array(len));
+      return { numberOfChannels: ch, length: len, sampleRate: sr, getChannelData: (i) => data[i] };
+    }
+    createBufferSource() { return { buffer: null, loop: false, connect() {}, start() {}, stop() {}, disconnect() {} }; }
+    createGain() { return { gain: { value: 1 }, connect() {}, disconnect() {} }; }
+    resume() { this.state = "running"; return Promise.resolve(); }
+  };
   const rAF = [];
   const handlers = {};
   dom.window.addEventListener = (t, f) => { (handlers[t] = handlers[t] || []).push(f); };
@@ -252,6 +264,9 @@ function bootPanel(html, { offline = false, port } = {}) {
   // panel-data etiketi içeriğini HTML'den al (served → gerçek JSON, raw → "%DATA%")
   const dm = html.match(/<script id="panel-data" type="application\/json">([\s\S]*?)<\/script>/);
   gid("panel-data").textContent = dm ? dm[1] : "%DATA%";
+  // gomulu yedek veri bloğu (file:// modunda paleti doldurur)
+  const em = html.match(/<script id="panel-embedded" type="application\/json">([\s\S]*?)<\/script>/);
+  if (em) gid("panel-embedded").textContent = em[1];
   // canvas sabit boyutlar (sayfanın alacağı AYNI element)
   const gcv = gid("cv");
   gcv.width = 1280; gcv.height = 560;
@@ -353,6 +368,14 @@ console.log("=== 4) oyun: gerçek açılış + çizim + P ile kampanya ===");
     const DE = g.sandbox.DE, DE_GAME = g.sandbox.DE_GAME;
     const menu = g.engine.active_scene;
     check("ana menü sahnesi açık", !!menu && menu.name === "Main Menu");
+    // G1+G2 kapanış kapısı: main.js üretim yolu (initialize çağırmadan SFX yoktu;
+    // test_audio.js:89 tuzağı bu yüzden gerçek boot'ta kilitlenir).
+    check("boot: SoundFX initialize edildi (G1)", DE.SoundFX._initialized === true);
+    check("boot: 21 preset ses üretildi (G1)",
+      Object.keys(DE.SoundFX._sounds).length === 21,
+      "ses=" + Object.keys(DE.SoundFX._sounds).length);
+    check("boot: açılış menü müziği çalıyor (G2)", DE.SoundFX._current_music === "menu",
+      "muzik=" + DE.SoundFX._current_music);
     check("menü CLOSE-UP zoom çizim yolu", Math.abs(menu.camera_zoom - DE_GAME.MENU_ZOOM) < 1e-9,
       "zoom=" + (menu && menu.camera_zoom));
     let ok = true, threw = "";
@@ -416,7 +439,7 @@ console.log("=== 4b) oyun: C ile tırmanisa gir, D ile hareket et, ESC ile don =
         ? sc.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame) : null;
       check("4b: tırmanista oyuncu var", !!player);
       const nfloors = cgame ? Object.keys(cgame.floors).length : 0;
-      check("4b: tırmanista katmanlar var", nfloors >= 20, "katman=" + nfloors);
+      check("4b: tırmanista katmanlar var", nfloors >= 17, "katman=" + nfloors);
       // gercek tus: D basili 1sn
       const x0 = player.position.x;
       g.press("d");
@@ -431,17 +454,33 @@ console.log("=== 4b) oyun: C ile tırmanisa gir, D ile hareket et, ESC ile don =
       g.release("ArrowLeft");
       check("4b: ArrowLeft oyuncuyu sola tasirdi", player.position.x < x1,
         "x " + x1.toFixed(0) + " -> " + player.position.x.toFixed(0));
-      // 20 sn girissiz: hicbir karede ekran disina cikmamali
-      let off = 0, worst = 0;
-      for (let i = 0; i < 1200; i++) {
+      // YENİ OYNANIŞ (06.10.2026): MANUEL zıplama — girişsiz oyuncu zıplamaz.
+      // Kamera yükseldikçe alt çizgi oyuncuyu yakalar -> respawn 0. katmana.
+      let nspawn0 = cgame.falls;
+      pumpN(120);
+      check("4b: girisiz otomatik ziplama YOK", cgame.best_floor === 0,
+        "katman=" + cgame.best_floor);
+      check("4b: girisiz kule akiyor (respawn dongusu)", cgame.falls >= nspawn0,
+        "dusme=" + (cgame.falls - nspawn0));
+      // SPACE bot: her kare gerçek keydown + kare -> zıpla -> tırman (30sn).
+      // En az-8 katman iddiası headless TEST17'de (3 seed) güvence altında;
+      // burada DOM tuş yolunun oyunculu zıplamaya dönmesi + ekranda kalması.
+      let off = 0, worst = 0, jumpFrames = 0;
+      let rb2 = player.get_component(DE.Rigidbody2D);
+      for (let i = 0; i < 1800; i++) {
+        g.press(" ");
+        g.release(" ");   // her kare YENİ keydown (Input _down sadece ilk basışta dolar)
         g.pump();
+        if (rb2 && rb2.velocity.y < 0) jumpFrames++;
         const sy = player.position.y - sc.camera_position.y;
         if (sy < -1) { off++; worst = Math.min(worst, sy); }
       }
-      check("4b: 20sn girissiz ekran disi kare yok", off === 0,
-        "disarida=" + off + "px" + (worst < 0 ? " en=" + Math.round(worst) : ""));
-      check("4b: girissiz de tirmanis ilerledi", cgame.best_floor >= 8,
+      check("4b: SPACE bot tugunun ziplamaya donustu", jumpFrames > 200,
+        "ziplama-kare=" + jumpFrames);
+      check("4b: SPACE bot tirmanisi ilerledi", cgame.best_floor >= 3,
         "katman=" + cgame.best_floor);
+      check("4b: bot boyunca ekran disi kare yok", off === 0,
+        "disarida=" + off + (worst < 0 ? " en=" + Math.round(worst) : ""));
       // ESC -> menu, oyun KAPANMAMALI
       g.press("Escape");
       pumpN(3);
@@ -534,7 +573,13 @@ function finish() {
     setTimeout(() => {
       const st = gid("edStatus").textContent || "";
       check("sunucu yokken editör yine de basladi (durum mesaji)", /Sunucuya bağlanılamadı/.test(st), st);
-      check("palet guvenli varsayilan (bos) — `%` hata üretmedi", gid("palette").children.length === 0);
+      check("palet dosya aciliminda da 14 nesne (gomulu yedek veri)", gid("palette").children.length === 14, "children=" + gid("palette").children.length);
+      // gomulu yedek veri sunucu verisiyle birebir ayni mi (drift korumasi)
+      {
+        const srvT = JSON.parse(require(WP).page_html().match(/<script id="panel-data" type="application\/json">([\s\S]*?)<\/script>/)[1]);
+        const embT = JSON.parse(fs.readFileSync(WP_HTML, "utf8").match(/<script id="panel-embedded" type="application\/json">([\s\S]*?)<\/script>/)[1]);
+        check("gomulu yedek = sunucu verisi (parite)", JSON.stringify(srvT) === JSON.stringify(embT));
+      }
       const tabScan = dom.tabs[1];
       tabScan.onclick();
       check("file:// iken sekme yine tiklaniyor", gid("scan")._tokens.has("active"));

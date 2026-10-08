@@ -8,11 +8,12 @@ const path = require("path");
 
 global.DE = {};
 
-function load(name) {
+function load(name, doc) {
   const code = fs.readFileSync(path.join(__dirname, "engine", name), "utf8");
-  new Function("DE", "window", "document", code)(global.DE, global, undefined);
+  new Function("DE", "window", "document", code)(global.DE, global, doc);
 }
 load("core.js");
+load("math2d.js");   // DE.polygons_overlap (egim testleri TEST14/15) + Vector2
 load("render.js");
 load("physics.js");
 // TEST13 (engine.run_async) DevConsole kullaniyor; konsol modulunu de yukle
@@ -21,6 +22,22 @@ load("log.js");
 load("i18n.js");
 load("savegame.js");
 load("console.js");
+
+// TEST16 (parite A5): lighting motoru. render_lights document.createElement
+// kullanir -> headless'ta sahte belge + sahte 2d baglami gerekir.
+const _light_doc = {
+  createElement: () => ({
+    width: 0, height: 0,
+    getContext: () => new Proxy({}, {
+      get(t, k) {
+        if (k === "canvas") return { width: 0, height: 0 };
+        return () => { };
+      },
+      set() { return true; },
+    }),
+  }),
+};
+load("lighting.js", _light_doc);
 
 // PlayerController (demo/main.js'ten, DOMContentLoaded olmadan) â€” test iÃ§in yÃ¼kle
 new Function("DE", "window", "document",
@@ -53,6 +70,24 @@ function fresh_scene() {
   ground.add_component(new DE.BoxCollider(false, false));
   scene.add_object(ground);
   return { scene, player };
+}
+
+// TEST14/15 (parite A4): sağa yükselen rampanın sahnesi.
+// rampa AABB'si dünya (300,400)-(600,500); hipotenüs (300,500)->(600,400);
+// x=420 (oyuncu merkezi) için yüzey = 500 - 120/3 = 460.
+function ramp_scene() {
+  const scene = new DE.Scene("Ramp", [16, 20, 34]);
+  const player = new DE.GameObject("Player", 400, 100, 40, 40, "Player");
+  player.add_component(new DE.BoxCollider(false, false));
+  player.add_component(new DE.Rigidbody2D(1400, true, 1800));
+  scene.add_object(player);
+  const ramp = new DE.GameObject("Ramp", 300, 400, 300, 100, "Ground");
+  ramp.add_component(new DE.PolygonCollider([[0, 100], [300, 100], [300, 0]]));
+  scene.add_object(ramp);
+  const ground = new DE.GameObject("Ground", 0, 560, 900, 40, "Ground");
+  ground.add_component(new DE.BoxCollider(false, false));
+  scene.add_object(ground);
+  return { scene, player, ramp };
 }
 
 let pass = 0, fail = 0;
@@ -310,6 +345,114 @@ console.log("TEST13 engine.run_async (await edilebilir dongu):");
   let threw = false;
   try { eng2.run_async(); } catch (e) { threw = true; }
   check("sahnesiz run_async hata verir", threw);
+}
+
+/* ---- Test 14: EGIM ZEMIN PROBUNDA AABB KAPISI (parite A4a) ----------------
+ * Python scene.py:293 ÖNCE foot_rect.colliderect(sc.get_aabb()) şartı koyar,
+ * sonra yüzey testini yapar. Eski JS'te kapı yoktu: havadayken (zıplarken/
+ * düşerken) ayağının x'i rampanın aralığındaysa `fy <= surf+3` tek başına
+ * yeterliydi → oyuncu rampanın yüzeyine IŞINLANIR, zıplama iptal olurdu. */
+console.log("TEST14 egimde AABB kapisi (havada isinlanma yok):");
+{
+  const { scene, player } = ramp_scene();
+  const rb = player.get_component(DE.Rigidbody2D);
+  const dt = 1 / 60;
+  // rampa AABB'si y 400..500; oyuncu ayakları 140 → tamamen ÜSTÜNDE
+  scene.update(dt);
+  const y1 = player.position.y;
+  check("havada ilk karede rampanya isinlanmadi", y1 < 400, "y=" + y1.toFixed(1));
+  check("havada grounded degil", rb.is_grounded === false);
+  // dusmeye devam eder ve rampa yuzeyine oturur (merkez x=420 -> surf=460)
+  for (let i = 0; i < 120; i++) scene.update(dt);
+  const expect = 460 - player.size.y;   // 420
+  check("sonunda egim yuzeyine oturdu", rb.is_grounded === true,
+    "y=" + player.position.y.toFixed(1));
+  check("yuzey konumu dogru (420)", Math.abs(player.position.y - expect) <= 3,
+    "y=" + player.position.y.toFixed(1) + " beklenen=" + expect);
+}
+
+/* ---- Test 15: EGIM DALI (_resolve_solid_collision, parite A4b) ------------
+ * Python scene.py:334-348: statik taraf poligon ise min-nüfuz itmesi yerine
+ * [surface-3, surface + max(16, aabb.h+8)] bandında yüzeye yapıştırır.
+ * Eski JS `if (!(s instanceof BoxCollider)) continue;` ile poligonu hiç çözüme
+ * sokmuyordu → karakter gövdesi rampanın içine girmişse yalnız 2px ayak probu
+ * yakalayabiliyordu (dik rampa inişinde kopma). */
+console.log("TEST15 egim resolve dali (gobde icinde yapisma):");
+{
+  const { scene, player } = ramp_scene();
+  const rb = player.get_component(DE.Rigidbody2D);
+  // gövde rampanın içine gömülü: yüzey (x=420 merkez) 460, ayaklar 480
+  player.position.y = 440;
+  const dt = 1 / 60;
+  scene.update(dt);
+  scene.update(dt);
+  const expect = 460 - player.size.y;   // 420
+  check("egim dali gobdeyi yuzeye yapistirdi", rb.is_grounded === true,
+    "y=" + player.position.y.toFixed(1));
+  check("yapisma konumu (420)", Math.abs(player.position.y - expect) <= 1,
+    "y=" + player.position.y.toFixed(1) + " beklenen=" + expect);
+  // kararli: 30 kare boyunca ziplama/secret yok
+  for (let i = 0; i < 30; i++) scene.update(dt);
+  check("30 kare kararli", Math.abs(player.position.y - expect) <= 1 && rb.is_grounded,
+    "y=" + player.position.y.toFixed(1));
+}
+
+/* ---- Test 16: LIGHTING AKTIF + SAHNE MUAFIYETI (parite A5) ---------------
+ * Python core.py:39-40 LightingEngine(ambient_darkness=130) kurulur;
+ * :134-135 her kare menü hariç sahnelerde render_lights cagrilir.
+ * Eski JS'te lighting alanhi yoktu ve render_lights hicbir yerden
+ * cagrilmazdi -> oyun isiksiz/karardanlarak calisirken menu de karardi. */
+console.log("TEST16 lighting (Engine.lighting + render_lights + muafiyet):");
+{
+  const draw_calls = [];
+  const ctx = new Proxy({}, {
+    get(t, k) {
+      if (k === "canvas") return { width: 320, height: 240 };
+      if (k === "measureText") return () => ({ width: 10 });
+      if (k === "drawImage") return (img, x, y) => draw_calls.push({ img, x, y });
+      return () => { };
+    },
+    set() { return true; },
+  });
+  const canvas = { width: 320, height: 240, getContext: () => ctx };
+  const eng = new DE.Engine(canvas, "LightTest", 320, 240);
+
+  check("Engine.lighting yoktan kuruldu (tembel)", eng.lighting === null);
+  eng._ensure_lighting();
+  check("lighting = LightingEngine", eng.lighting instanceof DE.LightingEngine);
+  check("ambient_darkness = 130 (py core.py:40)",
+    eng.lighting && eng.lighting.ambient_darkness === 130,
+    eng.lighting ? String(eng.lighting.ambient_darkness) : "null");
+
+  // isiksiz sahne: arka plan dolgusu cizilir, drawImage cagrisi OLMAZ
+  const dark = new DE.Scene("Derin Gece", [10, 12, 18]);
+  const lamp = new DE.GameObject("Lamp", 100, 100, 8, 8, "Lamp");
+  lamp.add_component(new DE.LightSource(90, [255, 240, 180], 1.0));
+  dark.add_object(lamp);
+  eng.set_scene(dark);
+  draw_calls.length = 0;
+  eng._render_frame();
+  const lit = draw_calls.length;
+  check("oyun sahnesinde karartma katmani cizildi", lit >= 1,
+    "drawImage=" + lit);
+
+  // muaf sahneler: Main Menu -> render_lights cagrilmaz
+  const menu = new DE.Scene("Main Menu", [8, 8, 14]);
+  eng.set_scene(menu);
+  draw_calls.length = 0;
+  eng._render_frame();
+  check("Main Menu muaf -> karartma yok", draw_calls.length === 0,
+    "drawImage=" + draw_calls.length);
+
+  // diger muaf adlar da
+  for (const nm of ["Pause", "Zafer Ekrani", "Game Over"]) {
+    const s = new DE.Scene(nm, [8, 8, 14]);
+    eng.set_scene(s);
+    draw_calls.length = 0;
+    eng._render_frame();
+    check("'" + nm + "' muaf -> karartma yok", draw_calls.length === 0,
+      "drawImage=" + draw_calls.length);
+  }
 }
 
 console.log("\nSONUC: " + pass + " gecti, " + fail + " kaldi" + (fail === 0 ? " -> ALL OK" : ""));

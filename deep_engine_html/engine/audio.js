@@ -7,9 +7,9 @@ var DE = DE || {};
 /* AudioBuffer builder: bir dizi örneği Float32Array'e dönüştürüp AudioBuffer yazar. */
 DE._build_buffer = function (ctx, samples, sample_rate, channels, split) {
     // split: true ise samples [sol[], sag[]] dizisi (stereo); false ise mono dizi
-    const n = channels === 2
-        ? Math.max(split[0].length, split[1].length)
-        : samples.length;
+        const n = channels === 2
+            ? Math.min(split[0].length, split[1].length)   // ORTA-6: py _create_stereo_sound min() — max döngüyü uzatıp parçaya sessizlik ekliyordu
+            : samples.length;
     const buf = ctx.createBuffer(channels, n, sample_rate);
     if (channels === 1) {
         const d = buf.getChannelData(0);
@@ -25,15 +25,51 @@ DE._build_buffer = function (ctx, samples, sample_rate, channels, split) {
 };
 
 DE.SoundFX = class SoundFX {
-    /* Senkron init yok: WebAudio gizli AudioContext ile çalışır. Python'daki
-     * _initialized/_generate_preset_sounds mantığı yerine üretim anında hazırlanır.
+    /* Python audio.py ile aynı sözleşmeyi izler: play / play_jump / play_powerup /
+     * play_music _initialized değilse önce initialize() çağırır (tembel başlatma).
+     * game/main.js açılışta initialize() + play_music("menu") çağırır (main.py:78,86).
      */
     static _audio_ctx = null;
+    static _initialized = false;
     static _sounds = {};
     static _music_buffer = null;
     static _current_music = null;
     static _music_node = null;
     static _music_gain = null;
+    static _sfx_gain = null;      // efekt sesleri için ortak gain düğümü (ses seviyesi)
+    static _sfx_volume = 1.0;     // 0..1 efekt seviyesi
+    static _music_volume = 1.0;   // 0..1 müzik seviyesi
+
+    /* Ses seviyeleri (0..1). Python'da karşılığı yok, ama parity korunur:
+     * JS'in fazladan API'si parite kapsamında zorunlu değildir. */
+    static set_sfx_volume(v) {
+        const val = Math.max(0.0, Math.min(1.0, Number(v) || 0.0));
+        DE.SoundFX._sfx_volume = val;
+        if (DE.SoundFX._sfx_gain) {
+            try { DE.SoundFX._sfx_gain.gain.value = val; } catch (e) { /* sessiz */ }
+        }
+        return val;
+    }
+    static set_music_volume(v) {
+        const val = Math.max(0.0, Math.min(1.0, Number(v) || 0.0));
+        DE.SoundFX._music_volume = val;
+        if (DE.SoundFX._music_gain) {
+            try { DE.SoundFX._music_gain.gain.value = val; } catch (e) { /* sessiz */ }
+        }
+        return val;
+    }
+    static set_volume(kind, v) {
+        if (kind === "sfx") return DE.SoundFX.set_sfx_volume(v);
+        if (kind === "music") return DE.SoundFX.set_music_volume(v);
+        return v;
+    }
+    static get_sfx_volume() { return DE.SoundFX._sfx_volume; }
+    static get_music_volume() { return DE.SoundFX._music_volume; }
+    static get_volume(kind) {
+        if (kind === "sfx") return DE.SoundFX.get_sfx_volume();
+        if (kind === "music") return DE.SoundFX.get_music_volume();
+        return 1.0;
+    }
 
     static _ctx() {
         if (DE.SoundFX._audio_ctx) return DE.SoundFX._audio_ctx;
@@ -75,10 +111,19 @@ DE.SoundFX = class SoundFX {
         if (Object.keys(DE.SoundFX._sounds).length === 0) {
             DE.SoundFX._generate_preset_sounds();
         }
-        return true;
+        DE.SoundFX._initialized = Object.keys(DE.SoundFX._sounds).length > 0;
+        return DE.SoundFX._initialized;
+    }
+
+    /* Python play/play_jump/play_powerup/play_music'teki `if not _initialized:
+     * initialize()` karşılaması. */
+    static _ensure() {
+        if (!DE.SoundFX._initialized) DE.SoundFX.initialize();
+        return DE.SoundFX._initialized;
     }
 
     static play(sound_name) {
+        if (!DE.SoundFX._ensure()) return;
         const snd = DE.SoundFX._sounds[sound_name];
         if (!snd) return;
         DE.SoundFX._play_buffer(snd);
@@ -89,19 +134,27 @@ DE.SoundFX = class SoundFX {
         if (!ctx || !buf) return;
         try {
             if (ctx.state === "suspended" && ctx.resume) ctx.resume();
+            // Efekt sesleri ortak bir gain düğümüne bağlanır (set_sfx_volume).
+            if (!DE.SoundFX._sfx_gain) {
+                DE.SoundFX._sfx_gain = ctx.createGain();
+                DE.SoundFX._sfx_gain.gain.value = DE.SoundFX._sfx_volume;
+                DE.SoundFX._sfx_gain.connect(ctx.destination);
+            }
             const src = ctx.createBufferSource();
             src.buffer = buf;
-            src.connect(ctx.destination);
+            src.connect(DE.SoundFX._sfx_gain);
             src.start(0);
         } catch (e) { /* sessiz */ }
     }
 
     static play_jump() {
+        DE.SoundFX._ensure();
         const pick = ["jump", "jump_b", "jump_c"][Math.floor(Math.random() * 3)];
         DE.SoundFX.play(pick);
     }
 
     static play_powerup(power_type) {
+        DE.SoundFX._ensure();
         let key = (power_type && DE.SoundFX._sounds["powerup_" + power_type]) ? "powerup_" + power_type : null;
         if (Math.random() < 0.3) {
             key = Math.random() < 0.5 ? "powerup_b" : "powerup_c";
@@ -335,7 +388,10 @@ DE.SoundFX = class SoundFX {
     }
 
     static _lcg(state) {
-        return (state * 1103515245 + 12345) & 0x7fffffff;
+        // ORTA-6: JS sayılar float64 — `state * 1103515245` 2^61'e kadar
+        // büyüyüp tam sayı hassasiyetini kaybederdi. Math.imul tam 32-bit
+        // çarpar; Python'un keyfi hassasiyetli `& 0x7fffffff` ile aynı sonucu verir.
+        return (Math.imul(state, 1103515245) + 12345) & 0x7fffffff;
     }
 
     static _melody_walk(seed, length, sigma, rng = null) {
@@ -490,7 +546,12 @@ DE.SoundFX = class SoundFX {
     }
 
     static play_music(name = "menu") {
-        if (!DE.SoundFX._ctx()) return;
+        DE.SoundFX._ensure();
+        const ctx0 = DE.SoundFX._ctx();
+        if (!ctx0) return;
+        // Tarayıcı autoplay kilidi: açılışta suspended gelen context'i uyandır
+        // (kullanıcı etkileşiminden sonra geçerli olur; python karşılığı yok).
+        if (ctx0.state === "suspended" && ctx0.resume) { try { ctx0.resume(); } catch (e) { /* sessiz */ } }
         if (DE.SoundFX._current_music === name && DE.SoundFX._music_node) return;
         let snd = null;
         let boss = false;
@@ -512,7 +573,10 @@ DE.SoundFX = class SoundFX {
         src.buffer = snd;
         src.loop = true;
         const gain = ctx.createGain();
-        gain.gain.value = 0.4;
+        // Python'da mixer kanalı ek kazanç uygulamaz (1.0); örnek sesleri kendi
+        // seviyelerini taşır (menu 0.42, level 0.5 ...). Kullanıcı müzik seviyesi
+        // bu gain'e uygulanır (medya/ses paneli), müzik döngüsü olduğu gibi kalır.
+        gain.gain.value = DE.SoundFX._music_volume;
         src.connect(gain);
         gain.connect(ctx.destination);
         src.start(0);

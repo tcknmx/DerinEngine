@@ -393,7 +393,8 @@ deep_engine/*.py **donduruldu**; yalnizca API katalogu + regresyon testi olarak 
      GameObject.parent/children, dd_child/remove_child/find_child/world_position,
      alt agac update/draw (cocuklar kapaliysa cizilmez), Engine.run_async(),
      Engine.stop().
-   - ender.js — TextRenderer.start() + _font_css (font onbellegi).
+   - 
+ender.js — TextRenderer.start() + _font_css (font onbellegi).
    - particles.js — Particle.draw() (bagimsiz cizim).
    - log.js — set_file()/close_file()/file_buffer() (web'de dosya yazma yok,
      bellek tamponu; Python ile ayni arayuz).
@@ -401,7 +402,7 @@ deep_engine/*.py **donduruldu**; yalnizca API katalogu + regresyon testi olarak 
      DE.generate_boss_arena, DE.BIOMES/BIOME_NAMES/BOSSES/BOSS_TYPES.
    - game/climber.js — DE_GAME.floor_gap/floor_y/reset_floor_cache.
    - game/commands.js — DE_GAME.cmd_* takma adlari.
-2. **	ools/parity_check.py yazildi (yeni kalici arac).**
+2. **tools/parity_check.py yazildi (yeni kalici arac).**
    - Python tarafi st ile sinif/metot/fonksiyon envanteri.
    - JS motor tarafi **gercek Node yuklemesi** + DE.* introspection.
    - JS oyun tarafi DE_GAME.* atamalari + sinif/fonksiyon exportlari.
@@ -410,12 +411,13 @@ deep_engine/*.py **donduruldu**; yalnizca API katalogu + regresyon testi olarak 
      (JS'te karsiligi yok; oyun davranisi degil).
 3. **deep-tool Modul 14 eklendi:** [14] Python/JS parity.
    Bosluk = BUG; denetim calistirilamazsa acik ERR (sessiz gecis yok).
-   python tools\deep-tool.py --lang tr 14 ->   WARN, 0 BUG, 0 ERR.
+   python tools\deep-tool.py --lang tr 14 -> 0 WARN, 0 BUG, 0 ERR.
 4. **Parite araci mutasyonla dogrulandi:** GameObject.world_position yeniden
    adlandirildi -> METOT_YOK; DE_GAME.cmd_hp kaldirildi -> FONKSIYON_YOK.
    Denetim gercekten bosluk yakaliyor.
-5. **Yeni testler (	est_core.js):** Component event sistemi (8 kontrol),
-   GameObject sahne agaci (3), un_async/stop (4). Sonuc: **35 kontrol, ALL OK**.
+5. **Yeni testler (test_core.js):** Component event sistemi (8 kontrol),
+   GameObject sahne agaci (3), 
+un_async/stop (4). Sonuc: **35 kontrol, ALL OK**.
    > Tuzak: JS Engine yapicisi canvas.getContext("2d") ister ve DE.DevConsole
    > kurar -> headless testte sahte canvas + console.js yuklemesi sart
    > (ui.js, log.js, i18n.js, savegame.js bagimlilik zinciri).
@@ -424,16 +426,16 @@ deep_engine/*.py **donduruldu**; yalnizca API katalogu + regresyon testi olarak 
 ### Durum
 - Parite: **TAM** (SONUC: PARITE TAM — 115 motor + 59 oyun sembolu).
 - Regresyon: JS 12 dosya **584 kontrol** (402 motor + 182 oyun) yesil;
-  Python 	est_engine_core.py + 	est_climber.py ALL OK;
-  	est_tools.js 36/36; 	est_browser.js 44/44; deep-tool TR/EN **0/0/0**.
+  Python test_engine_core.py + test_climber.py ALL OK;
+  test_tools.js 36/36; test_browser.js 44/44; deep-tool TR/EN **0/0/0**.
 
 ### Motor KALAN (JS tarafi, sirayla)
-1. **Oynanis paritesi** (API denk, ama modul/modul davranis farki olabilir):
-   core/scene/components/physics/render/tween/input/particles/audio/lighting/
-   parallax/i18n/levelfile/savegame/log/procedural/console — her modul icin
-   "Python ne yapiyor, JS ne yapiyor" karsilastirmali test + oynanisi olcum.
+1. **Oynanis paritesi** — > **TAMAMLANDI (03.10.2026):** 5 paralel ajanla 20
+   dosya çifti davranışsal olarak karşılaştırıldı; sonuçlar "DAVRANIŞSAL PARİTE
+   ANALİZİ" bölümünde. **Sırada olan: bulunan 5 OYUNU BOZAR + ORTA farkların
+   JS tarafında düzeltilmesi** (bkz. aynı bölümün KALAN özeti).
 2. Engine.run_async() tarayicida smoke testi (Promise + requestAnimationFrame
-   yasam dongusu, 	ools_html/test_browser.js icine eklenmeli).
+   yasam dongusu, tools_html/test_browser.js icine eklenmeli).
 3. Oyun tarafi: state/entities/bosses/ui/scenes/builders icin public API +
    oynanis testleri genisletme (182 kontrol su an yalnizca oyun regresyonu).
 4. Python'da kalan **ozel durumlar** (or. pygame'e ozel kisitlar) icin
@@ -452,7 +454,7 @@ olduğu gibi html'de baştan yaz demiştim."
   işliyordu; fizik adım sayısı ekrana bağlıydı.
 - **Python:** clock.tick(60) + if dt > 0.05: dt = 0.05.
 - **Yeni:** _frame(now) birikimçi (accumulator) ile **sabit 1/60 s** fizik adımı,
-  dt cap  .05, kare başına en fazla 5 adım (ölü kısır döngü koruması).
+  dt cap 0.05, kare başına en fazla 5 adım (ölü kısır döngü koruması).
   İlk karede de bir adım atılır (Python'da ilk clock.tick() sıfır değildir).
 - _step(dt) ve _render_frame() olarak ayrıldı; **çizim yine kare başına 1 kez**.
 
@@ -468,12 +470,12 @@ olduğu gibi html'de baştan yaz demiştim."
   DE.Physics.resolve() sonunda çağrılır.
 
 ### 3. YANLIŞ YAPILAN İŞ (kayda geçirildi — tekrar yapılmasın)
-	est_browser.js 43/1 verdi: **ESC çalışmıyordu.** Sebep: ESC kontrolünü
+test_browser.js 43/1 verdi: **ESC çalışmıyordu.** Sebep: ESC kontrolünü
 _render_frame() içine almıştım, ama get_key_down bir **kenar (edge)** sorgusudur ve
 _step() sonundaki Input.end_frame() hepsini sıfırlar. Çözüm: ESC bloğu
 _step() içinde, end_frame() **öncesine** taşındı (Python Engine._frame sırası).
 
-### 4. Ölçüm (Python referansı 	ests/probe_physics_ref.py)
+### 4. Ölçüm (Python referansı tests/probe_physics_ref.py)
 | Ölçüm | Python | JS (yeni) |
 |---|---|---|
 | Zıplama tepesi | 132.2 px | **132.2 px** |
@@ -482,20 +484,250 @@ _step() içinde, end_frame() **öncesine** taşındı (Python Engine._frame sır
 | Fizik adımı/saniye | 60 | **60.0 / 59.5 / 59.2** (60/144/240 Hz) |
 
 > NOT: "yürüme mesafesi" dil arası **kıyaslanamaz** — JS (DE._rng) ve Python
-> (andom) farklı RNG kullanır, aynı çağrı farklı seviye üretir. Bu yüzden
+> (random) farklı RNG kullanır, aynı çağrı farklı seviye üretir. Bu yüzden
 > kapılar yalnızca **yerleşimden bağımsız** fizik ölçümlerini karşılaştırır.
 
 ### 5. Yeni kalıcı kapılar (+10, toplam 50 görsel/fizik kapısı)
-	est_smoke.js: 60/144/240 Hz zıplama tepesi eşitliği, adım/saniye ≈ 60,
-**Python 132.2 px referansı**, grounded=true, dururken y=0, D ile koşma.
+test_smoke.js: 60/144/240 Hz zıplama tepesi eşitliği, adım/saniye ≈ 60,
+**Python 132.2 px referansı**, grounded=true, dururken vy=0, D ile koşma.
 
 ### 6. Kapılar gerçekten yakalıyor (mutasyon kanıtı)
 | Bozulan yer | Yakalanan kapı | Sonuç |
 |---|---|---|
 | physics.js ayak probu silindi | "JS yururken grounded=true" | 49/50 (grounded=false) |
-| core.js EPS kaldırıldı | 	est_core.js kare ilerlemesi | 33/35 |
+| core.js FPS kaldırıldı | test_core.js kare ilerlemesi | 33/35 |
 
 ### 7. Regresyon
-JS 13 dosya tamamı yeşil (	est_game.js 182/182, 	est_core.js 35/35,
-	est_smoke.js 50/50 kapı + 0 hata, 34 tur ~10.4k kare); 	est_browser.js 44/44;
-	est_tools.js 36/36; Python testleri ALL OK; DeepTool 14:   WARN, 0 BUG, 0 ERR.
+JS 13 dosya tamamı yeşil (test_game.js 182/182, test_core.js 35/35,
+test_smoke.js 50/50 kapı + 0 hata, 34 tur ~10.4k kare); test_browser.js 44/44;
+test_tools.js 36/36; Python testleri ALL OK; DeepTool 14: 0 WARN, 0 BUG, 0 ERR.
+---
+
+## DAVRANIŞSAL PARİTE ANALİZİ (03.10.2026) — dosya dosya Python <-> JS motor
+
+**İstek:** "Python motorla HTML motorun denkliklerini analiz et, her betiğe bak,
+her scriptin birebir aynı işleve yaradığını tespit et — sadece motor dosyaları."
+**Yöntem:** `parity_check.py` yalnız API envanteri verdiği için 5 paralel ajan
+**davranışsal** (sabit/formül/sıra/kenar durumu) karşılaştırma yaptı; tüm çiftler
+okundu. Python = referans (çalışan ürün), JS = port.
+
+### Dosya bazlı sonuç tablosu
+
+| Python | JS karşılığı | VERDICT |
+|---|---|---|
+| core.py | core.js | **CİDDİ FARK** (ESC sırası, lighting çağırmıyor, transparent yok) |
+| game_object.py | core.js (GameObject) | KÜÇÜK FARK |
+| scene.py | core.js (Scene) + physics.js + render.js | **CİDDİ FARK** (eğim dalı + AABB kapısı yok, find_by_tag active filtresi yok, vinyet formülü 3.3x) |
+| components.py | components.js + render.js + physics.js + core.js parçaları | **CİDDİ FARK** (hasar flaşı yok, ölüm sarsıntısı yok) |
+| particles.py | particles.js | KÜÇÜK FARK (yarıçap yuvarlama/clip) |
+| lighting.py | lighting.js | KÜÇÜK FARK (ama render_lights hiç çağrılmıyor -> ORTA) |
+| procedural.py | procedural.js | KÜÇÜK FARK (RNG algoritması farklı -> ORTA) |
+| audio.py | audio.js | **CİDDİ FARK** (initialize() hiç çağrılmıyor -> SES YOK) |
+| ui.py | ui.js | KÜÇÜK FARK (scroll köprüsü yok, set_text ölçümü tahmin) |
+| tween.py | tween.js | **BİREBİR** |
+| parallax.py | parallax.js | KÜÇÜK FARK (negatif modulo -> yıldız seyrelmesi ORTA) |
+| i18n.py | i18n.js | **BİREBİR** (77/77 anahtar, değer farkı 0) |
+| input.py | input.js | **CİDDİ FARK** (fare clientX/Y, gamepad-A statik yok) |
+| tilemap.py | tilemap.js | KÜÇÜK FARK (textured=true bilinçli görsel ek) |
+| levelfile.py | levelfile.js | KÜÇÜK FARK (save_level imzası değişmiş ORTA) |
+| math2d.py | math2d.js | **BİREBİR** (tüm formüller) |
+| console.py | console.js | KÜÇÜK FARK |
+| log.py | log.js | KÜÇÜK FARK (set_file -> bellek tamponu, saat damgası yok) |
+| savegame.py | savegame.js | KÜÇÜK FARK (dosya yok; tarayıcıda beklenen) |
+| scenemanager.py | scenemanager.js | **BİREBİR** |
+| __init__.py | core.js:8 | KÜÇÜK FARK (0.1.19 -> 1.0.0) |
+
+### OYUNU BOZAR (5 kritik — "oyun eskisinden beter" çıkışının kaynakları)
+
+1. **SES YOK:** `audio.js` `initialize()` üretim yolunda hiç çağrılmıyor; `play/
+   play_jump/play_powerup` tembel başlatma yapmıyor -> 21 SFX'in tamamı sessiz.
+   `test_audio.js:89` önce initialize çağırdığı için test maskeliyor. Menü müziği de
+   yok (`main.py:85` -> `game/main.js` karşılığı eksik).
+2. **FARE KAYMIŞ:** `input.js:58` `clientX/Y` (pencere koordinatı) saklanıyor;
+   canvas ortalanmış + CSS ölçeklenmiş + 2px border -> `getBoundingClientRect`
+   düzeltmesi yok. Menü hover/tıklama, fare ile atış, seviye seçimi yanlış yerde.
+3. **ESC ÇİFT İŞLEME:** `core.js` ESC kontrolü `scene.update()` SONRASI -> pause
+   menüsü kapanıp aynı karede yeniden açılıyor (Python: core.py:113 update ÖNCESİ).
+4. **EĞİM FİZİĞİ:** (a) `physics.js:277-288` zemin probunda AABB kapısı yok ->
+   havadayken rampanın yüzeyine ışınlanma (`fy <= surf+3` tek başına yetiyor;
+   py:293 `colliderect` şartı eliyor). (b) `_resolve_solid_collision` eğim dalı
+   (py:334-348, 16px tolerans bandı) JS'te hiç yok -> `physics.js:213` sadece
+   BoxCollider kabul ediyor, dik rampa inişinde kopma.
+5. **LIGHTING ÖLÜ:** `Engine.lighting` + `render_lights` çağrısı JS'te yok
+   (`lighting.js:61` yalnız testten çağrılıyor); oyun 18+ ışık kaynağı kuruyor
+   -> ekran düz/ışıksız.
+
+### ORTA (görünür fark, düzeltme kolay)
+
+- `Scene.transparent` yok -> pause donmuş oyunu örtemiyor (tamamen opak dolgu).
+- `find_by_tag` `active` filtresini kaybetti -> ölü oyuncu hâlâ bulunuyor.
+- `Health.take_damage` -> `scene.flash(0.55)` yok (Scene.flash var ama ölü kod);
+  `_death_burst` -> `_shake(0.2)` yok; oyuncuya gereksiz 0.12 sarsıntı ekleniyor.
+- Vinyet/flaş: JS doğrusal alfa ~3.3x daha koyu (py piksel-maske `strength=0.30`).
+- `TextRenderer`: baseline farkı (~fs px yukarı), emoji segmentasyonu yok.
+- Parallax negatif modulo (`% 2400`) -> uzun seviyelerde yıldızlar kayboluyor,
+  siluet 2400px kaymış (py pozitif modül).
+- `_lcg` JS'te float64 -> melodi Python'dan farklı (`Math.imul` ile birebir olur);
+  stereo loop max/py min -> parçalar 1-2.3s uzuyor, sol kanal kuyrukta sessiz;
+  müzik kazancı 0.4 (py 1.0).
+- Prosedürel RNG: Mulberry32 vs random.Random -> aynı seed FARKLI seviye
+  (dağılımlar eşdeğer, kalite regresyonu yok — ama tekrarlanabilirlik kaybı).
+- `input.js` `DE.Input._gamepad_a_down` statik değil -> gamepad A ile menü onayı ölü.
+- `save_level(scene, path, extra_meta)` -> JS `save_level(scene, extra_meta)`:
+  Python çağrısı taşınırsa meta'ya string sağlanır.
+- Sürüm: JS 1.0.0 / Python 0.1.19 (menü rozeti + konsol `version` yanlış).
+
+### NEDEN TESTLER YAKALAMADI
+
+- `test_audio.js` initialize'i kendisi çağırıyor; `test_input.js` sahte olaylara
+  canvas-uzayı koordinat veriyor (getBoundingClientRect=0,0 stub) ve `_gamepad_a_down`
+  instance üzerinden test ediyor; `parity_check.py` `_` önekli metodları atlıyor
+  (özel fonksiyon sapmaları kapıdan geçiyor); davranış testi yok — yalnız API adı.
+
+### 5 OYUNU BOZAR DÜZELTİLDİ (06.10.2026 — A1-A5 tamamlandı)
+
+1. **SES YOK (A1):** `audio.js` tembel `_ensure_initialized()` eklendi — `play`/
+   `play_jump`/`play_powerup`/`play_music` artık gerekince kendisi kurar; `main.js`
+   açılışta `SoundFX.initialize()` + `play_music("menu")` çağırıyor (Python
+   `main.py:78/86` paritesi). 21 SFX + menü müziği artık duyulur.
+2. **FARE KAYMIŞ (A2):** `input.js:58` `clientX/Y` → `getBoundingClientRect` ile
+   canvas uzayına çevriliyor; tıklama/hover artık CSS-ölçekli canvas'ta doğru.
+3. **ESC ÇİFT İŞLEME (A3):** `core.js` ESC işleme `scene.update()` ÖNCESİNE taşındı
+   (Python core.py:113-123 paritesi); `game/ui.js` `PauseController.update`'teki
+   ESC kolu KALDIRILDI (Python ui.py:698-718'de ESC yok — ESC yalnız `on_escape`).
+   Artık pause tuşuyla kapanıp aynı karede yeniden açılmıyor.
+4. **EĞİM FİZİĞİ (A4):** `physics.js:277-288` zemin probuna AABB kapısı eklendi
+   (py:293 `colliderect` şartı) + `_resolve_solid_collision` eğim dalı port edildi
+   (py:334-348, 16px tolerans bandı) — havadayken rampaya ışınlanma durdu.
+5. **LIGHTING ÖLÜ (A5):** `core.js` `_ensure_lighting()` (tembel) + `_render_frame`'da
+   `render_lights` çağrısı eklendi; menü/pause/zafer/game-over muaf (Python core.py:134
+   + `LIGHTING_EXEMPT` listesi). Oyun ışıkları artık canlı.
+
+**KALAN (sıra):** ORTA listesinin JS tarafında düzeltilmesi (Python'a dokunulmaz).
+Düzeltirken her madde için mutasyon kapısı (mevcut test neden yakalamadı bilgisiyle)
+düşünülmeli. — Not 06.10: `test_smoke.js`'in flaky'liği (pause fix sonrası oyuncunun
+prosedürel sol kenarda ölmesi) giderildi: `campaign/play` turunda 40 karelik "a"
+sürüklenmesi kenar çukuruna düşürüyordu; 12+12 kare denge adımı + 8/8..10/10 koşu
+doğrulaması (aşağıda smoke kaydı).
+— Not 07.10: **ORTA'dan çözüldü → `TextRenderer` baseline farkı.** Python `blit`
+sol-üst köşe, JS `fillText` baseline tabanlıydı → üstteki yazılar ekran dışına
+taşıyordu (kullanıcı: "Star Collector Hero yarısı kesik"). `render.js` top-left
+semantiği + `ascent` eklendi; `center_y` yüzey yüksekliğine göre. Kaynak: 03 oturumu
+(görünüm suçlaması), kayıt `_shared.md`'de. Emoji segmentasyonu HÂLÂ eksik (ayrı Orta
+madde).
+— Not 07.10: **ORTA'dan çözüldü → zemin kare grid TAMAMEN kalktı, eski yumuşak
+köşeli sprite tasarımı geri.** Kullanıcı: "ben eski köşeleri yontulmuş yumuşak
+tasarımı istiyorum, bu kare grid değil; platformlar ince ama kareli görünüyor."
+Dünkü `textured=false` (ızgara içi doku) **yetersiz kaldı** → tilemap artık sahnede
+**SADECE veri köprüsü** olarak durur, çizilmez (`game/scenes.js` `tm_obj.active =
+false`; `import_scene_tilemap` yeni-nesne dalında da). Zemin sprite'ları
+**gizlenmez** (`border_radius=4` yumuşak köşe görünümü geri; collider'lar durur).
+`_tilemap_segments`/`to_data` editör köprüsü AYNEN çalışır. Bilinçli JS sapması
+(Python donmuş referansı tilemap çizimini korur). `test_smoke.js` kapısı →
+"tilemap gorsel kapali + veri dolu + zemin sprite'lari gorunur". Testler: game 194,
+core 50, smoke 50/50, browser 50, tools 36, tilemap 32, parity TAM.
+
+### ORTA M5-M9 KAPANDI (08.10.2026) + M7 PARİTE KAPISI GECTİ
+
+- **M5 parallax modül:** `parallax.js` `DE._pmod` (JS `%` negatif kalıyor) —
+  satır19 scroll_x, satır111 bx, satır126 stx, satır136 px. Doğrulama: pmod(-5,7)=2,
+  negatif kamerada yıldızlar 0'da kalmıyor.
+- **M6 audio/stereo:** `_lcg` → `(Math.imul(state,1103515245)+12345)&0x7fffffff`
+  (node↔py 13 değer birebir, big-state dahil); stereo loop `Math.max` → `Math.min`
+  (py `_create_stereo_sound` min); müzik kazancı zaten 1.0.
+  **Test düzeltmesi:** `test_audio.js` stereo eski `length===3` (max çağının
+  kalıntısı) → py min = `length===2` beklentisine çekildi → 33/33.
+- **M8 gamepad-A:** `input.js` `_gamepad_a_down()` instance metodu (py:
+  `_joy_buttons_down.size > 0`) + `DE.Input._gamepad_a_down` statik köprü
+  (`ui.js` guard'ı `undefined` ölüyordu).
+- **M9 save_level:** `DE.save_level(scene, path=null, extra_meta=null)` — non-string
+  2. arg → extra_meta (geri uyum); `_fs`/Node `require("fs")` ile
+  `JSON.stringify(data,null,2)`; `DE.load_level` string JSON başarısızsa fs'den okur.
+  Kapı: `test_tilemap_levelfile.js` M9 bloğu → 38/38.
+- **M7 RNG (tam MT19937 — CPython 3.14 birebir):** `procedural.js` `DE._pr_rng`
+  Mulberry32 → MT19937. C kaynak (`_randommodule.c` v3.14) okunarak port:
+  `init_by_array` **iki geçiş** (1664525 + 1566083941) + `if (i>=N){mt[0]=mt[N-1];i=1;}`
+  taşıma hilesi + `mt[0]=0x80000000` (klasik tek-geçiş portu 6 seed'te FARKLI çıktı —
+  kök neden bu); seed → abs → küçük-sondan 32-bit kelimeler (0 → [0]);
+  `random()` = ((genrand>>5)*2^26+(genrand>>6))/2^53; `getrandbits(k<=32)` =
+  `genrand>>(32-k)`; `_randbelow` = `bit_length` + ret ederek çekme;
+  `randint`/`choice` py ile aynı. Tüm 32-bit karma `Math.imul` + `>>>0`.
+  Kapı (geçici, temp\m7gate\): py `generate`/`generate_boss_arena` — py tarafında
+  `_maybe_ramp` no-op (BİLİNÇLİ SAPMA #4: JS rampa üretmiyor, iki taraf da RNG
+  harcamıyor) — **6 seviye + 6 arena nesne listesi BİREBİR** (biyom-seed seti:
+  forest0/cave42/None77777/ice1234/desert99999999/astro2147483647 + shield boss seed 9).
+  `seed=None` zaman tohumu py'de farklı (bilinçli, parity gerekmez).
+  **Test düzeltmesi:** `test_game.js` TEST7 — parite seviyesinde (cave, seed 7)
+  spawn düşüş yolunda 1 coin + teleportsa komşu-küme coin'leri birlikte toplanıyordu;
+  sayaç hedef-coin bazlıydı (26/31). "Başlangıçta aktif" build anına alındı,
+  sayaç aktif-coin azalmasından sayacak şekilde düzeltildi → tümü 31/31.
+- **Regresyon (M7 sonrası):** 13/13 JS dosya 0 FAIL (audio 33, game, core 50,
+  input 72, procedural 31, systems 73, tilemap 38, smoke 0 hata...); browser 51/51;
+  tools 36/36; `tests/test_engine_core.py` ALL OK; `tests/test_climber.py` ALL OK;
+  `parity_check.py` BİLİNEN fark 1 (ensure_dir); **M7 kapası GECTİ.**
+
+**ORTA KALAN (08.10):** M10 sürüm (py `__version__`=0.1.19 / JS'te oyun sürümü hiç
+yok — menü rozeti `ui.js:614`, konsol `version` `console.js`, debug overlay
+`core.js:834`) + M11 TextRenderer emoji segmentasyonu. Sonra: tam regresyon →
+silme aşaması (`deep_engine/`, `game/*.py`, `main.py`, `tests/*.py`,
+`tools/parity_check.py` + deep-tool Modül 14) → commit onayı.
+
+### ORTA M10+M11 DE KAPANDI — ORTA LİSTESİ TAMAMI (08.10.2026)
+
+- **M10 sürüm:** `game/state.js` → `DE_GAME.__version__ = "0.1.19"` (AGENTS:
+  motor `DE.__version__`=1.0.0 ile AYRI sayılır; py'nin tek satırı JS'te oyun
+  sürümü oldu). Menü rozeti `ui.js` "DerinEngine v" + `DE_GAME.__version__`
+  (py-parite değer 0.1.19); konsol `version` → "DerinEngine engine version: 1.0.0,
+  game version: 0.1.19" (motor katmanı `typeof DE_GAME` koruması — motor-only testte
+  oyun bilgisi yok). Debug overlay motor sürümü (motor katmanı, ORA'da işaretli
+  değildi). Kapı: `test_systems` version komutu ("engine version" içerir) ✓.
+- **M11 emoji segmentasyonu:** `render.js` TextRenderer — py `_is_emoji_char`
+  aralıkları birebir (1F000-1FAFF/2600-27BF/2300-23FF/2B00-2BFF/FE0F/200D);
+  emoji VARS segmentli yol (py `_render_complex`): bitişik aynı tür tek segment,
+  emoji segmenti `` `${fs}px "Segoe UI Emoji", "Apple Color Emoji", ...` `` (py
+  gibi kalın değil), normal `bold Arial`; her segment kendi fontuyla ölçülür,
+  x bitişik akar; center_x toplam genişlikten; center_y max ascent/descent;
+  gölge ikinci geçiş +2,+2. **Emoji YOKSA eski tek-parça yol aynen** (ölçüm/
+  TEST13d regresyonu sıfır). Neden gerekli: HUD'da ❤️🖤🛡️⚡🔱⏳ ve i18n
+  metinleri var; py renkli Segoe UI Emoji ile çiziyor, JS'te Arial tek fonttu.
+  Kapı: `test_visual.js` T1 —15 yeni kontrol (segment sayıları: "⚡ x3" =2,
+  "❤️ ❤️ ❤️"=5 py parite, font zincirleri, center_x toplamı, gölge ofseti,
+  emoji-yok tek parça) → **31/31**.
+- **Nihai regresyon (ORTA bitti):** 13/13 JS 0 FAIL (visual 31, audio 33,
+  game, systems 73, input 72, procedural 31, tilemap 38, ui 33, core 50...);
+  browser 51/51; tools 36/36; py core+climber ALL OK; parity TAM (1 bilinçli);
+  **M7 kapası GECTİ.** ORTA listesi (M1-M11) TAMAMEN KAPANDI → sıra silme
+  aşamasında: `deep_engine/`, `game/*.py`, `main.py`, `tests/*.py`,
+  `tools/parity_check.py` + deep-tool Modül 14 (`deep-tool.py`/`webpanel.py`
+  KALIR) → session kayıtları → **commit onayı (32+ dosya)**.
+
+### PYTHON MOTOR SİLDİ — ORTA SONRASI SİLME AŞAMASI TAMAMLANDI (08.10.2026)
+
+- **Silinen dosyalar (33, hepsi git track'li → `git checkout e6bf3e8 -- <yol>`):**
+  `deep_engine/` (21 py + `__pycache__`), `game/*.py` (9 + `__pycache__`),
+  `main.py`, `tests/*.py` (test_engine_core, test_climber, probe_physics_ref),
+  `tools/parity_check.py`, `deep_engine_html/PARITE_RAPORU.md`.
+- **deep-tool.py py-motor bağımlı kontrolleri kaldırıldı/güncellendi:** Modül 14
+  (parite: `run_parity`, `elif num==14`, `MODULES[14]`, `menu_14` + `parity_*`
+  i18n en/tr), Modül 1 `run_smoke` (py pygame smoke) + `mc_smoke_*`,
+  Modül 9 `_reg_seed` (py `procedural.generate`) + `reg_seed_*`,
+  `_SCRIPT_RUN["game"]`, `run_which` "game" girdisi, başlık/menü "smoke" sözleri.
+  Kök göstergesi: `deep_engine/`+`game/` klasörleri → **`deep_engine_html/`**;
+  py modül 4 (`deep_engine/i18n.py` yok) artık **INFO** atlar (JS tarayıcı:
+  `tools_html/deep-tool.js` Modül 4 zaten `i18n.js`'e düşüyor).
+  `check_import`/`_engine_purity_*` dosya-yok dalları zaten güvenli.
+  **Doğrulama:** `python tools\deep-tool.py --lang tr all` → **0 WARN, 0 BUG, 0 ERR**;
+  `py_compile` OK.
+- **tools_html tarafı:** `deep-tool.js` kök göstergesi düzeltildi (eski
+  `deep_engine`+`game` koşulu artık anlamsız — `path.resolve(__dirname,"..")`);
+  `test_tools.js` find testi klasörü `deep_engine` → **`deep_engine_html`**.
+  **36/36** ✓.
+- **AGENTS.md yenilendi:** MOTOR KARARI kutusu → "JS TEK KAYNAK / py silindi /
+  parite kapısı kaldırıldı / git geçmişi referans"; `main.py`+py test komutları +
+  "Motor paritesi kapısı" notu çıkarıldı; PROJE YERİ py girdileri silindi; sürüm
+  kaynakları `core.js DE.__version__` + `state.js DE_GAME.__version__`; test
+  sayıları (13 dosya, browser 51/51, tools 36/36).
+- **Nihai regresyon (silme sonrası):** 13/13 JS 0 FAIL; browser **51/51**;
+  tools **36/36**; `deep-tool.py all` 0/0/0. py testleri (silindi — çalıştırılamaz,
+  bilinçli). **Motor KALAN listesi bu kayıtla kapandı; kalan tek iş: session
+  `_shared`/`01`/`03`/`04` kayıtları + COMMIT ONAYI (40+ dosya).**

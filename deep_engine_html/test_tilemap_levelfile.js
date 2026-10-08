@@ -156,5 +156,28 @@ console.log("L2 bilinmeyen tag atlanir (uyari):");
     check("registered_tags icerir", DE.registered_tags().includes("Platform") && DE.registered_tags().includes("Enemy2"));
 }
 
+console.log("M9 save_level/load_level Python imzasi:");
+{
+    const os = require("os");
+    const tmp = path.join(os.tmpdir(), "de_m9_test_level.json");
+    DE._fs = fs;   // Node'da dosya yazma kancasi (engine levelfile.js DE._fs okur)
+    const sc = new DE.Scene("M9Level", [10, 20, 30]);
+    sc.add_object(new DE.GameObject("Player", 5, 6, 7, 8, "Player"));
+    const pf = DE.place_object(sc, { tag: "Platform", name: "B", x: 1, y: 2, w: 3, h: 4, color: [9, 9, 9] });
+    sc.start();
+    const data = DE.save_level(sc, tmp, { author: "m9" });
+    check("save_level(scene, path, extra_meta) veri dondu", !!data && Array.isArray(data.objects));
+    check("extra_meta meta'ya girdi", data.meta.author === "m9", String(data.meta.author));
+    check("path'e yazildi (fs)", fs.existsSync(tmp) && JSON.parse(fs.readFileSync(tmp, "utf8")).meta.name === "M9Level");
+    const sc2 = DE.load_level(tmp);
+    check("load_level(path) yuklendi", sc2 && sc2.name === "M9Level");
+    const pfs = sc2.find_all_by_tag("Platform");
+    check("yuklenen platform", pfs.length === 1 && pfs[0].position.x === 1, "n=" + pfs.length);
+    const legacy = DE.save_level(sc, { old_style: 7 });
+    check("eski imza save_level(scene, extra_meta) hala calisir", legacy.meta.old_style === 7 && legacy.meta.author === undefined);
+    try { fs.unlinkSync(tmp); } catch (e) { /* temizlik */ }
+    delete DE._fs;
+}
+
 console.log("\nSONUC: " + pass + " gecti, " + fail + " kaldi" + (fail === 0 ? " -> ALL OK" : ""));
 process.exit(fail === 0 ? 0 : 1);

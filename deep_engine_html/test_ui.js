@@ -133,6 +133,13 @@ DE.Input = input;
     const c2 = ctx_stub();
     b.set_text("UzunBaslik", c2);
     check("set_text boyut", go.size.x > 10 && go.size.y > 5);
+
+    // auto_size=false: metin degisir, boyut SABIT kalir (dil degisimi butonu kucultmesin)
+    const w0 = go.size.x, h0 = go.size.y;
+    b.set_text("CokUzunBirDilDegisimiMetni", null, false);
+    check("set_text auto_size=false metin gunceller", b.text === "CokUzunBirDilDegisimiMetni");
+    check("set_text auto_size=false boyut sabit", go.size.x === w0 && go.size.y === h0,
+        "w=" + go.size.x + " h=" + go.size.y);
 }
 
 // ================= U4 ScrollContainer =================

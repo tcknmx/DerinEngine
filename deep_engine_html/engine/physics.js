@@ -201,8 +201,9 @@ DE.Physics = class Physics {
     }
     static resolve(scene, dt) {
         const solids = DE.Physics._solid_colliders(scene);
-        // Çözüm yalnızca BoxCollider solid'ler için (Python _resolve_solid_collision mantığı).
-        // Polygon/Circle solid şimdilik sadece on_collision bildirir.
+        // Çözüm: BoxCollider → min-nüfuz itmesi, PolygonCollider → eğim dalı
+        // (Python _resolve_solid_collision, scene.py:309-399). CircleCollider
+        // solid'ler (Python'da da) yalnız on_collision bildirir.
         for (const go of scene.game_objects) {
             if (!go.active) continue;
             const rb = go.get_component(DE.Rigidbody2D);
@@ -210,6 +211,31 @@ DE.Physics = class Physics {
             rb.is_grounded = false;
             for (const s of solids) {
                 if (s === rb.collider) continue;
+                // Eğim (rampa): statik taraf poligon ise itme çözümü yerine
+                // Python _resolve_solid_collision eğim dalı (scene.py:334-348)
+                // uygulanır — karakter poligonun yüzeyinde düzgün yürür.
+                // Eski kod `if (!(s instanceof BoxCollider)) continue;` ile poligonu
+                // hiç çözüme sokmuyordu → dik rampa inişinde kopma (yalnız 2px ayak
+                // probu yakalayabiliyordu).
+                if (s instanceof DE.PolygonCollider) {
+                    if (rb.velocity.y >= 0) {
+                        const sx = go.position.x + go.size.x / 2.0;
+                        const surface = DE.Physics._polygon_surface_y(s, sx);
+                        if (surface !== null) {
+                            const bottom = go.position.y + go.size.y;
+                            // Yalnız ayaklar yüzeye yakınken yapıştır (dik alt
+                            // duvardan yukarı ışınlanma yok): bant
+                            // [surface-3, surface + max(16, aabb.h+8)].
+                            if (bottom >= surface - 3.0 &&
+                                bottom <= surface + Math.max(16.0, s.get_aabb().h + 8.0)) {
+                                go.position.y = surface - go.size.y;
+                                rb.velocity.y = 0;
+                                rb.is_grounded = true;
+                            }
+                        }
+                    }
+                    continue;
+                }
                 if (!(s instanceof DE.BoxCollider)) continue;
                 const rect = rb.collider.get_aabb();
                 const srect = s.get_aabb();
@@ -275,10 +301,19 @@ DE.Physics = class Physics {
             const foot_bottom = fy + fh;
             for (const sc of solids) {
                 if (sc instanceof DE.PolygonCollider) {
+                    // Python scene.py:293 ÖNCE foot_rect.colliderect(sc.get_aabb())
+                    // kapısı, SONRA yüzey testi. Kapı yoksa oyuncu havadayken
+                    // (zıplarken/düşerken) ayağının x'i rampanı aralığındaysa
+                    // yüzeye çekilirdi → görünmez tavan, zıplama iptal.
+                    const sa = sc.get_aabb();
+                    if (foot_right <= sa.x || fx >= sa.right ||
+                        foot_bottom <= sa.y || fy >= sa.bottom) continue;
                     // Egim: zemin seviyesi poligonun YUZEYI (AABB tepesi degil),
                     // yoksa karakter rampa yerine gorunmez bir kutu kenarinda durur.
                     const surf = DE.Physics._polygon_surface_y(sc, fx + fw / 2);
-                    if (surf !== null && fy <= surf + 3.0) {
+                    // Python: foot_rect.bottom (= fy + fh, ayak probunun ALTı)
+                    // Eski JS `fy` (probun ÜSTÜ) kullanıyordu → 2px geniş eşik.
+                    if (surf !== null && foot_bottom <= surf + 3.0) {
                         rb.is_grounded = true;
                         rb.velocity.y = 0;
                         obj.position.y = surf - obj.size.y;

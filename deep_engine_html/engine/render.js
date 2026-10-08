@@ -23,7 +23,10 @@ DE.SpriteRenderer = class SpriteRenderer extends DE.Component {
     draw(ctx, camera_offset) {
         if (!this.visible || !this.game_object.active) return;
         const o = this.game_object;
-        const x = o.position.x, y = o.position.y;
+        // Kamera ofseti Python SpriteRenderer.draw ile aynı şekilde uygulanır
+        // (components.py: screen_x = obj.position.x - camera_offset.x).
+        const cam = camera_offset || { x: 0, y: 0 };
+        const x = o.position.x - cam.x, y = o.position.y - cam.y;
         const w = o.size.x, h = o.size.y;
 
         // Görsel (Image) modu — sprite olarak çizer (Python'daki "image" desteği)
@@ -102,6 +105,35 @@ DE.TextRenderer = class TextRenderer extends DE.Component {
         // icin start() yine de font dizesini bir kez hesaplar.
         this._font_css = `bold ${this.font_size}px Arial`;
     }
+    /* M11 — Python TextRenderer._is_emoji_char birebir: emoji UÇLARI ayrı fontla
+     * çizilir (py Segoe UI Emoji); aralıklar py ile aynı. U+FE0F/U+200D de
+     * emoji sayılır (varyasyon birleştirici dizileri py'de emoji segmentinde). */
+    static _is_emoji_char(ch) {
+        const o = ch.codePointAt(0);
+        return (o >= 0x1F000 && o <= 0x1FAFF) || (o >= 0x2600 && o <= 0x27BF)
+            || (o >= 0x2300 && o <= 0x23FF) || (o >= 0x2B00 && o <= 0x2BFF)
+            || o === 0xFE0F || o === 0x200D;
+    }
+    static _has_emoji(text) {
+        return /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/u.test(text);
+    }
+    _segments() {
+        // py _render_complex segmentasyonu: bitişik aynı türdeki karakterler tek parça.
+        const segs = [];
+        let buf = "", cur = null;
+        for (const ch of this.text) {
+            const e = DE.TextRenderer._is_emoji_char(ch);
+            if (cur === null) cur = e;
+            if (e !== cur) { segs.push([buf, cur]); buf = ""; cur = e; }
+            buf += ch;
+        }
+        segs.push([buf, cur === null ? false : cur]);
+        return segs;
+    }
+    _emoji_font_css() {
+        // py: pygame.font.SysFont("Segoe UI Emoji", fs) — kalın DEĞİL.
+        return `${this.font_size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Segoe UI Symbol", Arial`;
+    }
     draw(ctx, camera_offset) {
         if (!this.game_object.active) return;
         const o = this.game_object;
@@ -110,16 +142,49 @@ DE.TextRenderer = class TextRenderer extends DE.Component {
             x -= camera_offset.x;
             y -= camera_offset.y;
         }
-        ctx.font = this._font_css || `bold ${this.font_size}px Arial`;
-        const metrics = ctx.measureText(this.text);
-        let tx = x, ty = y;
-        if (this.center_x) tx = x - metrics.width / 2;
-        if (this.center_y) ty = y + this.font_size / 2;
-        if (this.shadow) {
-            ctx.fillStyle = `rgb(${this.shadow[0]},${this.shadow[1]},${this.shadow[2]})`;
-            ctx.fillText(this.text, tx + 2, ty + 2);
+        const base_css = this._font_css || `bold ${this.font_size}px Arial`;
+        // Emoji OLMAYAN metin: eski tek-parça yolu aynen (ölçüm/merkezleme testleri
+        // değişmeden kalır). Emoji VARSA py _render_complex segmentli yolu.
+        if (!DE.TextRenderer._has_emoji(this.text)) {
+            ctx.font = base_css;
+            this._draw_segments(ctx, [[this.text, false]], x, y, base_css);
+            return;
         }
-        ctx.fillStyle = `rgb(${this.color[0]},${this.color[1]},${this.color[2]})`;
-        ctx.fillText(this.text, tx, ty);
+        this._draw_segments(ctx, this._segments(), x, y, base_css);
+    }
+    _draw_segments(ctx, segs, x, y, base_css) {
+        const emoji_css = this._emoji_font_css();
+        // 1) ölçüm: her segment kendi fontuyla (py: her segment kendi fontuyla size()).
+        let total_w = 0, max_asc = 0, max_desc = 0;
+        const widths = [];
+        for (const [s, isE] of segs) {
+            ctx.font = isE ? emoji_css : base_css;
+            const m = ctx.measureText(s);
+            const w = m ? m.width : 0;
+            widths.push(w);
+            total_w += w;
+            const asc = (m && m.actualBoundingBoxAscent !== undefined)
+                ? m.actualBoundingBoxAscent : this.font_size * 0.8;
+            const desc = (m && m.actualBoundingBoxDescent !== undefined)
+                ? m.actualBoundingBoxDescent : this.font_size * 0.2;
+            if (asc > max_asc) max_asc = asc;
+            if (desc > max_desc) max_desc = desc;
+        }
+        // 2) yerleşim — mevcut top-left -> baseline semantiği (Not 07.10 + TEST13d).
+        let tx = x, ty = y;
+        if (this.center_x) tx = x - total_w / 2;
+        if (this.center_y) ty = y - (max_asc + max_desc) / 2;
+        ty += max_asc;
+        // 3) gölge (py: ikinci _render_complex(shadow) ile tüm segmentler) + metin.
+        for (const pass of (this.shadow ? [this.shadow, this.color] : [this.color])) {
+            ctx.fillStyle = `rgb(${pass[0]},${pass[1]},${pass[2]})`;
+            let cx = (pass === this.color || !this.shadow) ? tx : tx + 2;
+            const cy = (pass === this.color || !this.shadow) ? ty : ty + 2;
+            for (let i = 0; i < segs.length; i++) {
+                ctx.font = segs[i][1] ? emoji_css : base_css;
+                ctx.fillText(segs[i][0], cx, cy);
+                cx += widths[i];
+            }
+        }
     }
 }

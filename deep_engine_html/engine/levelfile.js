@@ -46,7 +46,17 @@ function _get_extractors() {
     return DE._EXTRACTORS;
 }
 
-DE.save_level = function (scene, extra_meta = null) {
+/* ORTA-9: Python levelfile.save_level(scene, path, extra_meta) imzası.
+ * - path string ise ve fs varsa (Node / DE._fs) dosyaya JSON yazar (py ile aynı
+ *   biçim: indent 2, utf-8), veriyi döndürür.
+ * - Eski JS çağrıları save_level(scene, extra_meta) olabilir: 2. argüman
+ *   string değilse extra_meta olarak alınır.
+ * - Tarayıcıda fs yoksa sadece veri döner (py'nin diske yazma adımı atlanır). */
+DE.save_level = function (scene, path = null, extra_meta = null) {
+    if (path !== null && path !== undefined && typeof path !== "string") {
+        extra_meta = path;
+        path = null;
+    }
     const extractors = _get_extractors();
     const data = {
         meta: {
@@ -82,6 +92,14 @@ DE.save_level = function (scene, extra_meta = null) {
         }
         data.objects.push(entry);
     }
+    if (path) {
+        const fsmod = DE._fs || (typeof require === "function"
+            ? (function () { try { return require("fs"); } catch (e) { return null; } })()
+            : null);
+        if (fsmod && fsmod.writeFileSync) {
+            fsmod.writeFileSync(path, JSON.stringify(data, null, 2), "utf8");
+        }
+    }
     return data;
 };
 
@@ -93,7 +111,18 @@ function _theme_of(scene) {
 
 DE.load_level = function (source, extra_builder_data = null, finalize = null) {
     let data = source;
-    if (typeof source === "string") data = JSON.parse(source);
+    if (typeof source === "string") {
+        try {
+            data = JSON.parse(source);
+        } catch (e) {
+            // Python load_level(path) gibi: dosya yolu verilmişse Node'da oku.
+            const fsmod = DE._fs || (typeof require === "function"
+                ? (function () { try { return require("fs"); } catch (err) { return null; } })()
+                : null);
+            if (!fsmod || !fsmod.readFileSync) throw e;
+            data = JSON.parse(fsmod.readFileSync(source, "utf8"));
+        }
+    }
     const meta = data.meta || {};
     const scene = new DE.Scene(
         meta.name || "Unnamed Level",

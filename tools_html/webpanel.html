@@ -236,6 +236,8 @@ print("DerinEngine", deep_engine.__version__)</textarea>
 
 <!-- Sunucu tarafı dolgulu veri bloğu (tarayıcı BUNU çalıştırmaz, sadece metindir) -->
 <script id="panel-data" type="application/json">%DATA%</script>
+<!-- file:// aciliminda da palet dolu olsun diye gomulu yedek (sunucu verisiyle birebir) -->
+<script id="panel-embedded" type="application/json">{"grid":8,"templates":[{"tag":"Ground","name":"Platform","w":200,"h":40,"color":[60,90,130],"shape":"rect"},{"tag":"Breakable","name":"Breakable","w":64,"h":64,"color":[150,110,60],"hits":1},{"tag":"Coin","name":"Coin","w":24,"h":24,"color":[255,210,40]},{"tag":"Spring","name":"Spring","w":40,"h":20,"color":[230,130,40],"bounce":850},{"tag":"Portal","name":"Portal","w":40,"h":60,"color":[70,70,90],"next":"victory"},{"tag":"Enemy","name":"Enemy","w":48,"h":48,"color":[220,60,50],"patrol_distance":90,"speed":65,"hp":25},{"tag":"Flyer","name":"Flyer","w":48,"h":48,"color":[200,120,220],"patrol_distance":160,"speed":55,"hp":20},{"tag":"Hopper","name":"Hopper","w":48,"h":48,"color":[140,200,90],"hop_force":430,"hop_interval":1.1,"speed":40,"hp":22},{"tag":"Turret","name":"Turret","w":48,"h":48,"color":[80,80,120],"fire_interval":2,"bullet_speed":240,"bullet_damage":25,"range":600,"hp":30},{"tag":"SniperEnemy","name":"SniperEnemy","w":40,"h":40,"color":[120,200,90],"fire_interval":2.8,"hp":30},{"tag":"Spikes","name":"Spikes","w":48,"h":24,"color":[190,190,200]},{"tag":"PowerUp","name":"PowerUp","w":32,"h":32,"color":[90,200,255],"power_type":"magnet","duration":8},{"tag":"Player","name":"Player","w":32,"h":32,"color":[255,120,60]},{"tag":"Boss","name":"Boss","w":80,"h":80,"color":[200,40,200],"hp":100,"boss_type":"archer","patrol_distance":160,"speed":65}],"schemas":{"Ground":[["w","Genişlik","num",1,4000],["h","Yükseklik","num",1,1000],["color","Renk","color"],["one_way","Tek yönlü platform","bool"]],"Breakable":[["hits","Kırılmak için darbe","int",1,50],["trigger","Trigger","bool"]],"Coin":[["color","Renk","color"]],"Spring":[["bounce","Fırlatma gücü","int",100,3000]],"Portal":[["next","Sonraki sahne","text"]],"Enemy":[["patrol_distance","Devriye mesafesi","int",0,2000],["speed","Hız","int",1,500],["hp","Can","int",1,999]],"Flyer":[["patrol_distance","Devriye mesafesi","int",0,2000],["speed","Hız","int",1,500],["hp","Can","int",1,999]],"Hopper":[["hop_force","Zıplama gücü","int",100,2000],["hop_interval","Zıplama aralığı","num",0.2,5],["speed","Hız","int",1,500],["hp","Can","int",1,999]],"Turret":[["fire_interval","Ateş aralığı","num",0.3,10],["bullet_speed","Mermi hızı","int",50,1000],["bullet_damage","Mermi hasarı","int",1,200],["range","Menzil","int",50,2000],["hp","Can","int",1,999]],"SniperEnemy":[["fire_interval","Ateş aralığı","num",0.3,10],["hp","Can","int",1,999]],"Spikes":[],"PowerUp":[["power_type","Güç tipi","select",["magnet","triple","shield","speed","slow"]],["duration","Süre (sn)","num",1,60]],"Player":[],"Boss":[["hp","Can","int",1,3000],["boss_type","Boss tipi","select",["archer","flying","sniper","shield","cosmic"]],["patrol_distance","Devriye mesafesi","int",0,2000],["speed","Hız","int",1,500]]},"themes":["none","forest","lava","cave","ice","desert","astro"]}</script>
 
 <script>
 /* ---------- shared state ---------- */
@@ -249,10 +251,16 @@ let camX = 0, camY = 0, zoom = 1;
 // (file://) etiket bozuk JSON içerir ve parse hata verir → güvenli varsayılanlar.
 // Sayfa bu sayede asla sözdizimi hatasıyla ÖLMEZ (tıklanabilirlik kaybolamaz).
 const _DATA = (function () {
-  try {
-    const el = document.getElementById('panel-data');
-    return JSON.parse(el && el.textContent ? el.textContent : 'null');
-  } catch (e) { return null; }
+  const read = (id) => {
+    try {
+      const el = document.getElementById(id);
+      const t = el && el.textContent ? el.textContent.trim() : '';
+      if (!t || t.charAt(0) !== '{') return null;  // %DATA% dolmamis -> null
+      return JSON.parse(t);
+    } catch (e) { return null; }
+  };
+  // once sunucu verisi, o da yoksa gomulu yedek (file:// aciliminda palet bos kalmasin)
+  return read('panel-data') || read('panel-embedded');
 })();
 const GRID = (_DATA && _DATA.grid) || 8;
 const TEMPLATES = (_DATA && _DATA.templates) || [];

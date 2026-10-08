@@ -253,6 +253,7 @@ DE.Scene = class Scene {
         // Vinyet (kenar karartması) + kırmızı isabet flaşı (Python Scene aynı).
         this.vignette_intensity = 0.22;  // 0..1 sürekli kenar karartması (oyunda hafif)
         this.hit_flash = 0.0;            // 0..1 anlık kırmızı isabet ramp'i
+        this.transparent = false;        // True = arka planı DOLDURMAZ (Python scene.py:77 — pause overlay: altındaki donmuş sahne görünür)
         this.screen_width = 900;
         this.screen_height = 600;
         this.parallax_background = null;
@@ -302,8 +303,9 @@ DE.Scene = class Scene {
         this._objects_to_destroy.push(obj);
     }
     find_by_tag(tag) {
+        // Python scene.py:122-126: active olmayan (ölü/gizli) nesneler bulunmaz.
         for (const o of [...this.game_objects, ...this._objects_to_add]) {
-            if (o.tag === tag) return o;
+            if (o.active && o.tag === tag) return o;
         }
         return null;
     }
@@ -475,32 +477,90 @@ DE.Scene = class Scene {
         }
         return false;
     }
+    _vignette_mask(w, h, color, falloff, edge_start, strength) {
+        // Python scene.py _build_vignette_surface: 4px karelerde piksel maske,
+        // a = 255 * strength * (ramp ** falloff); her boyut/renk 1 kez üretilip
+        // cache'lenir. document yoksa (test stub) null → gradient fallback.
+        if (typeof document === "undefined" || !document.createElement) return null;
+        const key = w + "x" + h + "|" + color.join(",") + "|" + falloff + "|" +
+            edge_start + "|" + strength;
+        if (!this.__vignette_cache) this.__vignette_cache = {};
+        if (this.__vignette_cache[key]) return this.__vignette_cache[key];
+        const cv = document.createElement("canvas");
+        cv.width = w; cv.height = h;
+        const c = cv.getContext && cv.getContext("2d");
+        if (!c || !c.createImageData) return null;
+        const img = c.createImageData(w, h);
+        if (!img || !img.data) return null;   // test stub'lar (Proxy no-op) -> gradient fallback
+        const d = img.data;
+        const cx = w / 2.0, cy = h / 2.0, mx = w / 2.0, my = h / 2.0;
+        const step = 4;
+        for (let y = 0; y < h; y += step) {
+            for (let x = 0; x < w; x += step) {
+                const dx = (x - cx) / mx, dy = (y - cy) / my;
+                let dist = Math.sqrt(dx * dx + dy * dy);  // merkez 0, köşe ~1.4 (1'e kırpılır)
+                if (dist > 1.0) dist = 1.0;
+                const ramp = Math.max(0.0, (dist - edge_start) / (1.0 - edge_start));
+                const a = Math.round(255 * strength * Math.pow(ramp, falloff));
+                if (a > 0) {
+                    const yMax = Math.min(y + step, h), xMax = Math.min(x + step, w);
+                    for (let yy = y; yy < yMax; yy++) {
+                        for (let xx = x; xx < xMax; xx++) {
+                            const i = (yy * w + xx) * 4;
+                            d[i] = color[0]; d[i + 1] = color[1]; d[i + 2] = color[2];
+                            d[i + 3] = a;
+                        }
+                    }
+                }
+            }
+        }
+        c.putImageData(img, 0, 0);
+        this.__vignette_cache[key] = cv;
+        return cv;
+    }
     _draw_vignette(ctx) {
         // Kenar karartması + kırmızı isabet flaşı (Python _draw_vignette karşılığı).
-        // Canvas gradyanı yoksa ya da boş dönerse (test stub'ları) sessizce atlanır.
+        // Gerçek piksel maske (strength 0.30 / 0.55, ramp**falloff) — eski doğrusal
+        // gradyan ~3.3x koyuydu (ORTA madde). Maske üretilemezse (test stub'lar)
+        // eski radial gradient fallback kalır.
         if (this.vignette_intensity <= 0.01 && this.hit_flash <= 0.01) return;
-        if (typeof ctx.createRadialGradient !== "function") return;
         const w = ctx.canvas.width, h = ctx.canvas.height;
         const cx = w / 2, cy = h / 2;
         const maxR = Math.sqrt(cx * cx + cy * cy);
         if (this.vignette_intensity > 0.01) {
-            const a = Math.min(1.0, this.vignette_intensity);
-            const g = ctx.createRadialGradient(cx, cy, maxR * 0.5, cx, cy, maxR);
-            if (g && typeof g.addColorStop === "function") {
-                g.addColorStop(0, "rgba(0,0,0,0)");
-                g.addColorStop(1, "rgba(0,0,0," + a.toFixed(3) + ")");
-                ctx.fillStyle = g;
-                ctx.fillRect(0, 0, w, h);
+            const mask = this._vignette_mask(w, h, [0, 0, 0], 1.6, 0.50, 0.30);
+            if (mask) {
+                ctx.save();
+                ctx.globalAlpha = Math.min(1.0, this.vignette_intensity);  // py vs.set_alpha
+                ctx.drawImage(mask, 0, 0);
+                ctx.restore();
+            } else if (typeof ctx.createRadialGradient === "function") {
+                const a = Math.min(1.0, this.vignette_intensity);
+                const g = ctx.createRadialGradient(cx, cy, maxR * 0.5, cx, cy, maxR);
+                if (g && typeof g.addColorStop === "function") {
+                    g.addColorStop(0, "rgba(0,0,0,0)");
+                    g.addColorStop(1, "rgba(0,0,0," + a.toFixed(3) + ")");
+                    ctx.fillStyle = g;
+                    ctx.fillRect(0, 0, w, h);
+                }
             }
         }
         if (this.hit_flash > 0.01) {
-            const a = Math.min(1.0, this.hit_flash);
-            const g = ctx.createRadialGradient(cx, cy, maxR * 0.3, cx, cy, maxR);
-            if (g && typeof g.addColorStop === "function") {
-                g.addColorStop(0, "rgba(255,40,30,0)");
-                g.addColorStop(1, "rgba(255,40,30," + (a * 0.55).toFixed(3) + ")");
-                ctx.fillStyle = g;
-                ctx.fillRect(0, 0, w, h);
+            const mask = this._vignette_mask(w, h, [255, 40, 30], 1.2, 0.30, 0.55);
+            if (mask) {
+                ctx.save();
+                ctx.globalAlpha = Math.min(1.0, this.hit_flash);
+                ctx.drawImage(mask, 0, 0);
+                ctx.restore();
+            } else if (typeof ctx.createRadialGradient === "function") {
+                const a = Math.min(1.0, this.hit_flash);
+                const g = ctx.createRadialGradient(cx, cy, maxR * 0.3, cx, cy, maxR);
+                if (g && typeof g.addColorStop === "function") {
+                    g.addColorStop(0, "rgba(255,40,30,0)");
+                    g.addColorStop(1, "rgba(255,40,30," + (a * 0.55).toFixed(3) + ")");
+                    ctx.fillStyle = g;
+                    ctx.fillRect(0, 0, w, h);
+                }
             }
         }
     }
@@ -510,7 +570,7 @@ DE.Scene = class Scene {
         const renderCam = this.render_camera;
         if (Math.abs(zoom - 1.0) < 0.001) {
             // Normal (zoomsuz) çizim — en yaygın yol, optimize (Python aynı).
-            if (this.background_color) {
+            if (!this.transparent && this.background_color) {
                 ctx.fillStyle = `rgb(${this.background_color[0]},${this.background_color[1]},${this.background_color[2]})`;
                 ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
             }
@@ -532,7 +592,7 @@ DE.Scene = class Scene {
         // UI nesneleri zoom'dan etkilenmez (Python scene.py aynı mantık).
         const w = ctx.canvas.width, h = ctx.canvas.height;
         ctx.save();
-        if (this.background_color) {
+        if (!this.transparent && this.background_color) {
             ctx.fillStyle = `rgb(${this.background_color[0]},${this.background_color[1]},${this.background_color[2]})`;
             ctx.fillRect(0, 0, w, h);
         }
@@ -557,6 +617,9 @@ DE.Scene = class Scene {
 
 /* --- Engine ------------------------------------------------------------- */
 DE.Engine = class Engine {
+    /* Python core.py:134-135 muafiyet listesi: bu sahnelerde isik katmani
+     * uygulanmaz (menü/duraklatma/zafer/game over tam aydinlik kalir). */
+    static LIGHTING_EXEMPT = ["Main Menu", "Pause", "Zafer Ekrani", "Game Over"];
     constructor(canvas, title = "DerinEngine HTML", width = 900, height = 600, target_fps = 60) {
         DE.Engine.instance = this;
         this.canvas = canvas;
@@ -579,6 +642,15 @@ DE.Engine = class Engine {
         this._next_scene = null;
         this._time_slow_remaining = 0.0;
         this._time_slow_factor = 0.4;
+        // Python core.py:39-40: LightingEngine(ambient_darkness=130).
+        // lighting.js bu dosyadan SONRA yüklenebilir → tembel kurulum.
+        this.lighting = null;
+    }
+    _ensure_lighting() {
+        if (this.lighting === null && typeof DE.LightingEngine !== "undefined") {
+            this.lighting = new DE.LightingEngine(130);   // py: ambient_darkness=130
+        }
+        return this.lighting;
     }
     set_scene(scene) {
         this.active_scene = scene;
@@ -675,24 +747,21 @@ DE.Engine = class Engine {
         if (_gkd("F3")) {
             this.show_debug_info = !this.show_debug_info;
         }
+        // TEMPORARY BISECT: ESC update sonrası (HEAD davranışı)
         if (this.active_scene) {
             this.active_scene.update(dt);
         }
-        // Python Engine._frame -> _handle_escape: ESC, aktif sahnenin on_escape
-        // olayını tetikler (duraklatma overlay'i, menüde çıkış). on_escape yoksa
-        // veya false dönerse oyun kapanır.
-        // DİKKAT: bu kontrol `end_frame()` ÖNCESİ yapılmalı — get_key_down bir
-        // "kenar" (edge) sorgusudur ve end_frame() hepsini sıfırlar. (Eski kodda
-        // bu blok _render_frame() içindeydi; sabit adıma geçince kenar çoktan
-        // temizlenmiş olduğu için ESC hiç çalışmıyordu.)
         if (_gkd("ESCAPE")) {
             const sc = this.active_scene;
+            let handled = false;
             if (sc && sc.on_escape) {
-                if (sc.on_escape() === false) this.is_running = false;
+                handled = sc.on_escape() !== false;   // TEMP: HEAD semantiği
             } else {
-                this.is_running = false;
+                handled = false;
             }
+            if (!handled) this.is_running = false;
         }
+        // TEMP-BISECT-end
         // Python Engine._frame -> Input._update_events eşdeğeri: one-shot durumu
         // (get_key_down / get_mouse_button_down / get_mouse_scroll) her kare sonunda
         // sıfırlanır, böylece bir tuş basışı tam olarak bir kare görünür.
@@ -701,12 +770,31 @@ DE.Engine = class Engine {
 
     /* Cizim: fizik adimindan SONRA bir kez (60Hz mantigi degismedi). */
     _render_frame() {
+        // Python core.py:126-130: şeffaf overlay sahne (pause) çizilmeden ÖNCE
+        // altındaki donmuş sahne çizilir (frozen world görünür kalır).
+        const _draw_overlay_below = () => {
+            const sc = this.active_scene;
+            if (sc && sc.transparent && this.scene_manager) {
+                const below = this.scene_manager.below_scene;
+                if (below && below !== sc) below.draw(this.ctx);
+            }
+        };
         if (this.console && this.console.active) {
+            _draw_overlay_below();
             if (this.active_scene) this.active_scene.draw(this.ctx);
             this.console.draw(this.ctx);
             return;
         }
+        _draw_overlay_below();
         if (this.active_scene) this.active_scene.draw(this.ctx);
+        // Python core.py:134-135: menü hariç sahnelerde 2D dinamik ışık katmanı.
+        // (konsol açıkken Python da erken dönüyor → ışık uygulanmıyor, aynı.)
+        const light = this._ensure_lighting();
+        if (light && this.active_scene &&
+            DE.Engine.LIGHTING_EXEMPT.indexOf(this.active_scene.name) === -1) {
+            light.render_lights(this.ctx, this.width, this.height,
+                this.active_scene, this.active_scene.render_camera);
+        }
         // Python Engine._frame -> _draw_debug_overlay: FPS/nesne/kamera/oyuncu.
         if (this.show_debug_info) {
             this._draw_debug_overlay(this._last_dt || 1 / 60);

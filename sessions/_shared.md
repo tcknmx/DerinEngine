@@ -8,6 +8,375 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[OYUN] STAR CLIMBER YÜKSELTME (08.10.2026, `03_game.md` "STAR CLIMBER
+  YÜKSELTME — TAMAMLANDI").** Evren kuralları kapsamı: (1) yüzey ANA OYUN
+  biyomlarından biri (astro hariç — `CLIMB_BIOMES` paleti, `_pick_biome()` seed'a
+  deterministik, `DE.PR_BIOME_NAMES` ile birebir), yükseldikçe astro'ya geçiş
+  (astro'da OYUN BİTMEZ); (2) her ölümde YENİ HARİTA (`_regen_map()`: yeni seed —
+  asla eskisiyle aynı olmaz, yeni yüzey biyomu, katmanlar sıfırdan); (3) rekor
+  kalıcı: `DE_GAME.state.climber_high` + yeni `ClimbRecord` HUD'u (i18n
+  `climber_record`). Çift zıplama skill'i ölümde REKOR GİBİ kalıcı (sıfırlanmaz).
+  **Yeni yerleştirme algoritması:** NO-STACK (merkezler ≥44px kayar) +
+  IN-BOUND TREND (merkeze çekme) + zig-zag (3 katman) + "en uzağa it" fallback
+  (0.02px iç pay — fp 1e-4 sapması örtüşme>=need garantisini bozmasın) +
+  altitude shrink (`_platform_w`). 3 sert kural (ilk kule/örtüşme/FREE_CLIMB)
+  korundu. **Doğrulama:** test_game **222/0** (+13 TEST17b); 13/13 test yeşil;
+  deep-tool `14` = **0 WARN/BUG/ERR**. *Etkilenen: 02 motor — yalnızca climber.js/
+  i18n.js/test_game.js (engine/ core'u değişmedi); 03 oyun — kayıt güncellendi.*
+
+- **[MOTOR + ARAÇ + STRATEJİ] ORTA M10-M11 + PYTHON MOTOR SİLME + PARİTE KAPISI
+  KALDIRILDI (08.10.2026).** **M10 sürüm:** `game/state.js` →
+  `DE_GAME.__version__="0.1.19"`; menü rozeti `ui.js` ve konsol `version`
+  (`console.js`) artık `DerinEngine engine version: 1.0.0, game version: 0.1.19`
+  (motor katmanı `typeof DE_GAME` korumalı). **M11 emoji segmentasyonu:**
+  `render.js` TextRenderer py `_is_emoji_char` aralıklarıyla segmentlere bölüyor
+  (emoji segmenti `Segoe UI Emoji` zinciri + kalın değil, normal `bold Arial`;
+  center_x toplam genişlikten, gölge +2,+2); **emoji yoksa eski tek-parça yol
+  aynen**. Kapı: `test_visual.js` T1 +15 kontrol → 31/31. **SİLME (kullanıcı
+  kararı):** `deep_engine/` (21 py), `game/*.py` (9), `main.py`, `tests/*.py` (3),
+  `tools/parity_check.py`, `deep_engine_html/PARITE_RAPORU.md` **silindi** (git
+  track'li → geri alınabilir). **deep-tool Modül 14** (parite), Modül 1 `run_smoke`
+  (py motor bağımlı), Modül 9 `_reg_seed` (py procedural) kaldırıldı; `_SCRIPT_RUN`
+  "game" girdisi, `reg_seed_*`/`mc_smoke_*`/`parity_*` i18n anahtarları, `menu_14`
+  silindi; kök göstergesi `deep_engine/`+`game/` → `deep_engine_html/`
+  (`deep-tool.py` + `deep-tool.js`); py modül 4 i18n eksik-dosya artık INFO.
+  `tools_html/test_tools.js` find testi klasörü → `deep_engine_html`. **Araçlar
+  yeşil:** `deep-tool.py --lang tr all` = **0 WARN/BUG/ERR**; tools 36/36;
+  browser 51/51; 13/13 JS test 0 FAIL. **AGENTS.md güncellendi** (MOTOR KARARI
+  kutusu "JS TEK KAYNAK", py komutları/parite kapısı/proje yeri/sürüm kaynakları
+  çıkarıldı). *Etkilenen: TÜM oturumlar — Python referansı YOK; "py'de nasıldı"
+  → git geçmişi (`git show e6bf3e8:...`) + eski session kayıtları. KALAN: 02/01/
+  04/03 session kayıt güncellemeleri + commit onayı (40+ dosya).*
+
+- **[MOTOR] ORTA M5-M9 kapatıldı + M7 RNG parite kapısı GECTİ (08.10.2026,
+  `02_engine.md` "ORTA M5-M9 KAPANDI + M7 PARİTE KAPISI GECTİ").** Parite farkları:
+  M5 parallax `DE._pmod`, M6 `_lcg` Math.imul + stereo `Math.min` + müzik gain 1.0,
+  M8 gamepad-A statik köprü, M9 `save_level(scene,path,extra_meta)`+`load_level`
+  (38/38). **M7:** `procedural.js` `_pr_rng` Mulberry32 → **MT19937 (CPython 3.14
+  birebir)** — C kaynaktan: `init_by_array` **iki geçiş + taşıma hilesi +
+  mt[0]=0x80000000** (tek-geçiş klasik portu 6 seed'te farklı çıktı — dikkat!),
+  `random()`/`getrandbits`/`_randbelow` ret-çekme; 32-bit karma `Math.imul`.
+  **Kapı:** py `generate`+`generate_boss_arena` (py'de `_maybe_ramp` no-op —
+  BİLİNÇLİ SAPMA #4) vs JS → **6 seviye + 6 arena BİREBİR** (geçici temp\m7gate).
+  Aynı sabit seed artık py ile aynı seviyeyi verir. **Dikkat: seed'li eski
+  prosedürel seviyeler YENİ çıktı** (Mulberry32 devri kapandı). Test düzeltmeleri:
+  `test_game.js` TEST7 sayaç komşu-coin kümesi + spawn-yolu toplamasını kaçıyordu
+  (aktif-coin azalmasından sayar); `test_audio.js` stereo `length===3`→`===2`
+  (py min). Regresyon: **13/13 JS 0 FAIL, browser 51, tools 36, py ALL OK,
+  parity TAM**. *Etkilenen: MOTOR (procedural.js) — kalıcı KALAN yok; silme
+  öncesi son ORTA: M10 sürüm + M11 emoji.*
+
+- **[OYUN + MOTOR] Konsol/komut metinleri düz İngilizce + gizli köprü nesnesi
+  kusurları (08.10.2026, `03_game.md` "KONSOL METİNLERİ İNGİLİZCE").** Konsol ve
+  konsol komutu mesajları artık literal İngilizce (i18n değil → `T` dil değişimi
+  etkilemez; Python çıktıları Türkçe kalır — parite davranışta aranır). Doğrulama
+  sırasında iki GERÇEK kusur bulundu: (1) `game/scenes.js` `import_scene_tilemap`
+  mükerrer Tilemap köprüsü yığıyordu — köprü `active=false` olduğundan
+  `find_by_tag` (active filtreli, Python paritesi) bulamıyordu → `find_all_by_tag`
+  ile arama; (2) `game/climber.js` `ClimbGame.start` skill pop-up'ını `find_by_tag`
+  ile arıyordu ama popup inactive oluşturulduğundan `game.popup` hep null → **oyunda
+  çift zıplama pop-up'ı hiç görünmüyordu** → `find_all_by_tag` ile düzeltildi.
+  **Yeni kural: gizli/inactive yardımcı nesneleri bulmak için `find_all_by_tag`
+  kullanılır** (kök `core.js` `find_all_by_tag` active filtrelemez, bilinçli).
+  Testler: game **209 OK / 0 FAIL**, systems **73 OK**, core 50 / input 72 / ui 33 /
+  audio 33 yeşil, smoke 0 HATA. *Etkilenen: MOTOR (console.js metinleri) + OYUN
+  (climber popup, tilemap import) — devralınacak KALAN yok.*
+
+- **[OYUN + MOTOR] Konsol UX + kampanya rozetleri düzeltildi (08.10.2026,
+  `03_game.md` "KONSOL + KAMPANYA ROZETLERİ DÜZELTMELERİ").** Kullanıcı: "konsol
+  açılınca yazının üstüne bişi biniyor; konsol panelinde mouse kaydırma olsun;
+  kampanya ikonlarının altındaki yazılar iç içe geçiyor." *Konsol çakışması
+  (`engine/console.js` — motor dosyası):* ipucu en yeni çıktının üstüne çiziliyordu
+  → çıktı alanı yeniden yerleştirildi. *Fare kaydırma — gerçek kök neden
+  `engine/input.js`'teydi:* `get_mouse_scroll` **örnek** metodu vardı ama oyun
+  kodunun kullandığı **statik köprü hiç tanımlanmamıştı** → tarayıcıda her zaman
+  0 dönüyordu; statik passthrough eklendi (JS uzantısı — Python'da yok;
+  `ScrollContainer` da böylece tarayıcıda ilk kez gerçekten çalıştı). *Rozetler
+  (`game/ui.js` `BiomeProgress.draw`):* font KÜÇÜLTMEK yerine yapıcı çözüm —
+  etiketler hep 18px, taşmayı **boşluğun içeriğe göre genişlemesi** çözer
+  (`dyn_gap = max(gap, en_geniş_etiket+8)`; satır merkezi korunur, her dilde
+  otomatik). Doğrulama: core 50, game 0 FAIL, input 72, ui 33; tarayıcı-yolu
+  probe (fake window + wheel eventi) kanıt. *Etkilenen: MOTOR (console.js +
+  input.js) ve OYUN — devralınacak KALAN yok.*
+
+- **[OYUN] TÜM ekran metinleri merkez semantiğine alındı — "kayma" sorunu bitti
+  (07.10.2026, `03_game.md` "TÜM EKRAN METİNLERİ MERKEZLENDİ").** Kullanıcı: "yaptığın
+  her şeyde yazılar kayıyor, bunu bir kez daha tekrarlama; game over'da da kaymış;
+  hepsini direkt ortala." **Kök neden (tekrarlanmamalı):** `DE.TextRenderer(text,
+  font_size, color, is_ui, shadow, center_x, center_y)` — **4. parametre `is_ui`,
+  center_x/center_y 6./7. parametre.** center verilmezse metin position'dan SAĞA/ÜSTE
+  akar. **Kural: tam ekran sahnelerde her TextRenderer `center_x=true, center_y=true`
+  ve `yeni_y = eski_y + font_size/2`** (görsel konum aynı kalır). Düzelenler:
+  game over t1/t2/hint (center hiç yoktu), victory t1–t4 (x=180/240/290/250 → 450
+  hepsi merkezli), pause title/hint (center_y false → true), settings title + dil/
+  efekt/müzik etiketleri + `%NN` val buton merkezine (292→308, 402→418) + dil butonu
+  metni (168→180, click rect ortası), ana menü version satırı (15,575 → 450,582),
+  climber HUD 4 satır (center_y false → true, y'ler fs/2 çekildi). **Bilinçli
+  hariç:** builders.js sol-üst HUD (ScoreUI/HealthUI/GoalUI/InfoUI/PowerUpLabelUI/
+  StreakUI — center=false korunur, köşeye hizalıdır) + oyun içi çizim metinleri.
+  **Denetim testi `test_game.js` TEST13d:** 6 ekran sahnesinde (menü/ayarlar/game
+  over/victory/pause/climber) her TextRenderer `center_x && center_y` zorunlu; live-bg
+  HUD istisna set ile — yeni metin ekleyen bu testi geçemez. Doğrulama: **13/13 JS
+  testi 0 FAIL**, Python core+climber ALL OK, parity **0 WARN/0 BUG/0 ERR**, tools/
+  browser 0 FAIL. *Etkilenen: OYUN (game/ui.js, game/climber.js) — motor, builders,
+  parite dokunulmadı.*
+
+- **[OYUN] Game over ekranı butonlu menüye çevrildi (07.10.2026).**
+  Kullanıcı: "game over menüyü de butonlu yapalım." Önceden sadece metin vardı
+  (tıklanamıyordu, R/SPACE/M tuşlarıyla). Şimdi `build_game_over_scene` pause
+  düzeninde: başlıklar merkez 450'ye hizalı (eski 280/310 kayıklığı düzeltildi),
+  iki `DE.Button` — **Yeniden Dene** (350,290,200,46) + **Ana Menü** (350,350,200,46),
+  altta kısayol ipucu satırı. `GameOverController` genişletildi: buton odak
+  (↑/↓/S/W + ENTER/SPACE), klasik kısayollar (**R/M açık kaldı**), T ile dil
+  değişimi (`set_text(..., null, false)` — buton boyutu sabit), buton click'i
+  `click` sesi çalar. i18n: `game_over_retry` / `game_over_menu_btn` / `game_over_hint`
+  (tr+en); eski `game_over_restart`/`game_over_menu` anahtarları duruyor (kullanım
+  kalmadı, sonra temizlenir). Test: test_game'e **5 yeni kontrol** (2 buton, i18n
+  metni, 350..550 simetri, on_click → restart fabrikası, dil değişiminde boyut sabit).
+  Doğrulama: game 0 FAIL, smoke 0 HATA, core 50, input 72, ui 33, audio 33,
+  tools 36, browser 50, parity 0/0/0. *Etkilenen: OYUN (game/ui.js).*
+
+- **[OYUN+MOTOR] Dil değişiminde buton boyutu sabitlendi (07.10.2026).**
+  Kullanıcı: "T ile dil değiştirmeyi kapatmayalım ama ana menü/ayarlarda T basınca
+  butonlar metnin sığacağı kadar küçülüyor — butonlar sabit dursun." Kök neden:
+  `DE.Button.set_text` metni yazarken `game_object.size`'i de metne göre yeniden
+  yazıyordu (motor davranışı, Python'la aynı) → `KitLabelSync` her karede set_text
+  çağırınca dil değişiminde butonlar (Play 280x54, Settings 280x46, geri, pause
+  200x46) küçülüyordu. Çözüm: `set_text(text, ctx, auto_size = true)` — üçüncü
+  opsiyonel parametre; `auto_size=false` metni günceller ama boyutu bozmaz (varsayılan
+  true → eski davranış + test_ui "set_text boyut" kontrolü değişmedi). Oyun tarafı:
+  `KitLabelSync.update` ve `PauseController` T bloğu `set_text(..., null, false)`
+  çağırıyor. T tuşu (core.js global + pause içinde) **açık kaldı**. Dil butonları
+  zaten TextRenderer (boyutsuz). Yeni test: `test_ui.js` "auto_size=false metin
+  günceller / boyut sabit" (31→33). Doğrulama: ui 33, game 0 HATA, smoke 34/34,
+  core 50, input 72, systems 73, audio 33, browser 50, tools 36, parity 0/0/0.
+  *Etkilenen: MOTOR (engine/ui.js set_text imzası, JS fazladan opsiyonel parametre,
+  Python'daki çağrılar 1 argümanla etkilenmez — bilinçli sapma #6 kapsamı, kayıt
+  gerekmez çünkü Python'daki davranış `auto_size=true` ile birebir aynı).*
+
+- **[OYUN+MOTOR] Ayar simetrisi + rozet taşması + MOBİL (dokunmatik) kontroller
+  (07.10.2026, `03_game.md` "AYAR SİMETRİSİ + ROZET + MOBİL").** Kullanıcı: "ayarlar
+  menüsünde butonlar ve bazı yüzdeler kaymış onları simetrik yap; kampanya ilerleme
+  ikonları çerçeveye sığmıyor altından taşıyor; itchio'da telefon/tablette oynanabilsin
+  mobil kontroller gerek, nasıl yapcaz?" (a) **Ayarlar simetri:** dil butonları merkez
+  360/540'a (450'ye göre simetrik) + click rect metinle merkezli; [-]/[+] satırları
+  378/450/478'e (merkez 450); Geri butonu 340'a kaydırıldı (x=450 iken merkez 560'dı).
+  (b) **Rozet taşması:** `BiomeProgress` 300,556,24,62 → **245,524,22,52** (etiket
+  satırı 602 → 568, ekran 600'ün içine girdi); üst bilgi bloğu 442/474/504'e tırmandı.
+  (c) **Mobil 2 katman:** 1) **Sanal tuş API** (`engine/input.js`):
+  `set_virtual_key_down/up/clear_virtual_keys` + `_virtual_held/down/up` setleri;
+  `get_key/get_key_down/get_key_up` sanal setleri de okur (klavye gibi; end_frame'de
+  down/up sıfırlanır); statik passthrough'lar eklendi. 2) **TouchControls bileşeni**
+  (`game/ui.js`): touch cihazda etkin — sol altta analog joystick (A/D + yukarı itme
+  SPACE), sağ altta 3 daire buton (Zıpla-A, Ateş-X, Dash-B, label latin);
+  multi-touch pointer→buton map; `touch-action:none` + `preventDefault` (kaydırma/zoom
+  yemeden); `_attach_touch(scene)` ile tüm oyun sahnelerine (scenes.js `_register_pause`
+  ortak bağlaması + climber) eklenir; masaüstünde `_active=false` → no-op çizim/dinleme yok.
+  (d) **index.html:** mobil `@media` ile 900x600 oranı korunarak pencereye sığdır
+  (`width:min(100vw, 100dvh*1.5)`) + `touch-action:none`. itchio iframe'i inherit eder.
+  **BİLİNÇLİ SAPMA #6 (JS birincil):** sanal tuş + TouchControls Python'da yok (dokunma
+  yok); parity bozulmadı. Test: input 62→**72 kontrol (yeni sanal tuş bloğu)**, game 0 FAIL,
+  core 50, smoke 34/34, audio 33, ui 31, systems 73, procedural 31, components 27, tween 33,
+  math2d 38, tilemap 32, visual 16, browser 50, tools 36, parity **0 WARN/0 BUG**,
+  Python core+climber ALL OK. *Etkilenen: OYUN (ui.js TouchControls, scenes.js,
+  climber.js, index.html) + MOTOR (engine/input.js sanal tuş).*
+
+- **[OYUN+MOTOR] Ana menü yeniden tasarımı + Ayarlar ekranı + ses seviyeleri
+  (07.10.2026, `03_game.md` "MENÜ: PLAY/SETTINGS + SAĞ ALTA İKİ KUTU").** Kullanıcı:
+  "sonsuz modu kilitli gösteren tam gri botun hoşuma gitmedi; sağ alta iki kutucuk
+  ekle biri climber öbürü sonsuz mod olsun; üst kısımda sadece play, settings
+  dursun." + "dili butonlu yapalım, ayrıca ses düzeyi ayarı ekleyelim — efekt ve
+  müzik ayrı". Yeni ana menü: **üst-orta başlık + üst-sağda Play (`M_PLAY`) ve
+  Settings (`M_SETTINGS`) motor kit butonları; sağ-altta Sonsuz Mod (`M_RND`) ve
+  Star Climber (`M_CLIMB`) kutucukları** (Panel + merkez metin; kilitli Sonsuz gri
+  "bot" DEĞİL — canlı mor panel + altın kilit ikonu + "Kampanyayı bitirince açılır");
+  dil satırı menüden kalktı → Settings'e taşındı. Alt-orta bilgiler (kontroller,
+  yüksek skor, kampanya rozetleri) solda, kutucuklarla çakışmaz. **Yeni Ayarlar
+  sahnesi** (`build_settings_scene` + `SettingsController`): butonlu dil (TR/EN,
+  aktif sarı vurgulu) + **efekt ve müzik ayrı ses seviyesi** ([−] %NN [+], adım 0.1,
+  SaveGame'e `sfx_volume`/`music_volume` yazılır; main.js açılışta uygular). ESC/Geri
+  ana menüye döner. **Motor uzantısı (`audio.js`):** `SoundFX.set_volume/get_volume`
+  + `set_sfx_volume/set_music_volume` (efektler ortak `_sfx_gain`, müzik `_music_vol-
+  ume` gain'e). **BİLİNÇLİ SAPMA #5 (JS birincil):** Python'da karşılığı yok, donmuş
+  referans korunur; parity bozulmadı (JS'in fazladan API'si zorunlu değil).
+  Testler: test_game **(TEST10/TEST17 menü kuralları korundu: M_CLIMB isimli kutu +
+  "Climber" metni + klik zonları; 0 FAIL)**,
+  core 50/50, audio 33/33, ui 31/31, smoke **34 tur 0 HATA** (mouse/menu-clicks
+  turu yeni Play/Settings/iki kutu zonlarını sorunsuz geçti), browser 50, tools 36,
+  tilemap 32, parity **0 WARN/0 BUG**, Python core+climber ALL OK.
+  *Etkilenen: OYUN (ui.js menü+settings, main.js ses yüklemeleri) + MOTOR
+  (engine/audio.js volume).*
+
+- **[OYUN] Star Climber zorluk + görsel yenileme (07.10.2026, `03_game.md` "STAR
+  CLIMBER: ZORLUK + GÖRSEL").** Kullanıcı: "play store minigameleri gibi zorlayıcı
+  olsun; sadece space basarak yükseliyorum bu zor değil. player ana player olsun
+  (gözler olmasın); arka plan mario/minecraft yeşili çevre, yükseldikçe astro."
+  Kullanıcı zorluk mekaniği olarak **HAREKETLİ/ENGELLİ PLATFORMLAR** seçti:
+  (a) **9. kattan itibaren** katmanlar ya **hareketli** (yatay sinüs sarkaç, %30),
+      ya **dar** (56-78px, %22), ya **dikenli** (%16, temas = ölüm); kırılabilir
+      oranı düşürüldü (%28→%18). (b) **Kamera hızlanır**: taban 52→66 px/sn +
+      max_floor başına %1.2 (tavan ×1.8). (c) Dar katmanda ulaşılabilirlik örtüşme
+      isteği dinamik (REACH_OVERLAP 70 → dar katmanda 36). Görsel: player
+      **ana oyundaki gibi mavi yuvarlak gövde** (`ClimbPlayerVisual`, göz yok);
+      arka plan **yeşil çevre → astro** (0-1 t, `BG_TRANSITION_H=2400px`);
+      diken üçgenleri + hareket oku çizilir. Bilinçli sapma (JS birincil): Python'a
+      eklenmedi. Doğrulama: test_game **(1 FAIL→düzeltildi, yeni 5 kontrol ekli,
+      tümü OK)**, core 50, smoke 50/50, browser 50, tools 36, parity TAM.
+      *Etkilenen: OYUN (climber.js zorluk/görsel + test_game.js TEST17).*
+
+- **[OYUN] Üçgen rampalar üretimden kaldırıldı — kullanıcı kararı (07.10.2026,
+  `03_game.md` "ÜÇGEN RAMPALAR KALDIRILDI").** Kullanıcı: "bu üçgen platformları
+  kaldır demiştim? hala varlar". `procedural.js` üretim döngüsündeki
+  `_pr_maybe_ramp` çağrısı kaldırıldı (fonksiyon tanımlı kalır → motor API/parite
+  bozulmadı). **BİLİNÇLİ SAPMA #? #4:** Python `procedural.py` `_maybe_ramp` ile hálá
+  üretir (donmuş referans), JS üretmez. RampVisual/PolygonCollider fiziği motorun
+  parçası olarak DURUYOR (test_core eğim testleri 50/50, rampa editor'un özel
+  seviyelerinde hálá kullanılabilir) — sadece prosedürel üretimde çıkmıyor.
+  Doğrulama: test_game 194 (0 HATA), core 50/50, smoke 50/50, parity TAM.
+  *Etkilenen: OYUN (procedural.js üretim döngüsü).*
+
+- **[OYUN] Boss gövdelerinin köşeleri yumuşatıldı — Python ile parite fix'i (07.10.2026,
+  `03_game.md` "BOSS KÖŞELERİ").** Kullanıcı: "bazı bosslar gene düz kare, onlar da
+  diğer her şey gibi köşeleri yontulmuş dursun". Kök tespit: **Python `game/bosses.py`
+  TÜM boss gövde/detaylarını `border_radius` ile çiziyor** (FlyingBoss gövde 8, gözler 4;
+  SniperBoss gövde 8; ShieldBoss gövde 10; göz/ağız 2; kanatlar 2; sağlık barı 3) — **JS
+  portu `bosses.js` bunu `_fill_rect` (keskin `fillRect`) ile çizerek port sırasında
+  KAYBETMİŞ**. Düzeltme: `bosses.js` `_fill_rect`/`_stroke_rect`'e `radius` parametresi +
+  `_round_rect_path` (roundRect/arcTo fallback) eklendi; beş boss sınıfının gövde/göz/ağız/
+  kanat/bar çizimleri Python değerleriyle eşleştirildi (BossController gövde 8 + gözler 2 +
+  bar 3; FlyingBoss gövde 8 + kanatlar 2 + gözler 4; SniperBoss gövde 8 + göz 2; CosmicBoss
+  FlyingBoss'dan miras; ShieldBoss gövde 10 + göz/ağız 2 + bar 3). Bu BİR PARITE FİX'i
+  (Python görünümüne dönüş), Python'a dokunulmadı. Doğrulama: test_game 194 (0 HATA),
+  core 50/50, smoke 50/50, browser 50/50, tools 36/36, tilemap 32/32, parity **PARITE TAM**.
+  *Etkilenen: OYUN (bosses.js boss çizimi).*
+
+- **[MOTOR+OYUN] Zemin görseli: kare grid TAMAMEN KALKTI — eski yumuşak köşeli
+  sprite tasarımı GERİ (07.10.2026, `02_engine.md` "Tilemap doku" + `03_game.md`
+  "ZEMİN GÖRÜNÜMÜ").** Kullanıcı: "ben eski köşeleri yontulmuş yumuşak tasarımı
+  istiyorum, bu kare grid değil; platformlar ince ama kareli görünüyor, görsel
+  hatalı". Dün yalnız `textured=false` yapılmıştı (ızgara içi doku) — **yetersizdi,
+  ızgara görünümü duruyordu**. Yeni karar: **tilemap sahnede SADECE veri köprüsü
+  olarak durur, hiç çizilmez** (`scenes.js` `_attach_ground_tilemap`: `tm_obj.active =
+  false`; aynısı `import_scene_tilemap` yeni-nesne dalında da). Eski düz zemin
+  sprite'ları **artık gizlenmez** (`border_radius=4` yumuşak köşeler tekrar görünür;
+  collider'lar fizik için zaten duruyor). `_tilemap_ground`/`_tilemap_segments`/
+  `to_data` → web panel editör köprüsü AYNEN çalışır (yalnız görsel kapalı).
+  **BİLİNÇLİ SAPMA:** Python donmuş referansı tilemap çizimi + sprite gizlemesini
+  korur (görsel fark bilinçli JS kararı). Dokunulan: `game/scenes.js`,
+  `test_game.js` ("katı zemin sprite'ları gizlendi" → "görünür (düz tasarım)"),
+  `test_smoke.js` (kapı: "tilemap gorsel kapali + veri yine dolu + zemin sprite'lari
+  gorunur"). Doğrulama: test_game **194**/194, core 50/50, smoke **50/50** (görsel
+  kapılar), browser 50/50, tools 36/36, tilemap 32/32, parity **PARITE TAM**,
+  Python testleri ALL OK. *Etkilenen: MOTOR (tilemap.js render kullanımı), OYUN
+  (zemin görünümü), ARAÇ (test_smoke kapısı).*
+
+- **[OYUN] Dash izi + biyom fiziği minimum + pencere taşması TAMAM (07.10.2026,
+  `03_game.md` "DASH İZİ + BİYOM FİZİĞİ MİNİMUM + PENCERE TAŞMASI").** (1) Dash
+  afterimage yaşlandırması her update'e taşındı → izler artık KALICI OLMUYOR
+  (önceden yalnız dash bloğunda yaşlanıp donup kalıyordu). (2) `apply_biome` minimuma
+  çekildi: `biome_gravity/jump=1.0`, `biome_wind=0.0` TÜM biyomlarda aynı (çift
+  zıplama tutarlı); yalnız ice `grip=0.55` (kaygan) + çöl squash + **dash'te kum
+  sıçraması**. (3) `index.html` canvas taşması: `calc()` içi çarpma `*1.5` eski tarayıcılarda
+  geçersiz olup width'i iptal ediyordu → kullanıcının asıl isteği açığa çıktı:
+  canvas pencereye ölçeklenip BÜYÜTÜLMESİN, **ham çözünürlükte (900×600, 1:1)
+  sabit kalsın** → kesin çözüm: `width:900px; height:600px` (büyütme yok, taşma yok).
+  4) **MOTOR render parite fix'i (engine/render.js TextRenderer.draw):** Python
+  `blit` sol-üst köşe tabanlı iken JS `fillText` baseline tabanlıydı → üstteki
+  yazılar (örn. y=18 42px "Star Collector Hero") ekran dışına taşıyordu. Top-left
+  semantiği + ascent eklendi. Etkilenen: OYUN görünümü (03 oturumu) — motor
+  kaydı için `02_engine.md`'ye de düşüldü. 5) **OYUN UI sapması:** Pause menüsü
+  900x600 canvas'ta merkezlendi (önceden Python'dan sol-yaslı 800 panel + x=300/400
+  değerleri; tarayıcıda sola kayık görünüyordu). Python `ui.py` donmuş referans
+  güncellenmez — JS birincil, bilinçli sapma. **BİLİNÇLİ PYTHON
+  SAPMASI:** Python donmuş referans özellikleri güncellenmedi (afterimage bug'ı +
+  agresif biyom fiziği orada duruyor; yeni davranış JS birincil). Doğrulama:
+  test_game **194**/194 (TEST18 yeni) · core 50/50 · smoke 0 HATA · tools 36/36 ·
+  browser 50/50 · parity **PARITE TAM**. *Etkilenen: OYUN (entities/index.html),
+  ARAÇ (test sayma).*
+
+- **[OYUN] Star Climber v2 oynanış revizyonu TAMAM (06.10.2026, `03_game.md` 48).**
+  Kullanıcı kararları: otomatik sekiş kalktı → **manuel SPACE zıplama** (coyote+buffer);
+  kamera **sürekli 52px/sn yükselir** (asla inmez, üst kelepçe 96px); **checkpoint
+  kaldırıldı**, her düşüş 0. katmana + rekor/best_floor korunur; **8. katmanda double-jump
+  skill pop-up ile açılır**. **JS BİRİNCİL — Python `climber.py` donmuş referans** (parity
+  şimdanları `add_level`/`on_platform_bounce`/`_camera_anchor_y` eklendi, `parity_check.py`
+  → **PARITE TAM**). Doğrulama: test_game 190/190, test_browser 50/50 (4b DOM yolu yeniden
+  yazıldı: girişsiz zıplama YOK + SPACE bot press+release), core/smoke/tools hepsi yeşil.
+
+- **[MOTOR+OYUN] 5 OYUNU BOZAR parite fix'leri TAMAM + smoke stabil (06.10.2026,
+  03.10 analizindeki A1-A5 kapandı).** Düzeltilenler: **(A1)** `audio.js` tembel
+  `_ensure_initialized()` + `main.js` `SoundFX.initialize()`+`play_music("menu")`
+  (Python main.py:78/86 paritesi) — **21 SFX + menü müziği artık çalıyor**; **(A2)**
+  `input.js` fare `getBoundingClientRect` ile canvas uzayına çevrildi (tıklama/hover
+  kayması durdu); **(A3)** `core.js` ESC işleme `scene.update()` ÖNCESİNE taşındı
+  (core.py:113-123) + `game/ui.js` `PauseController.update`'ten ESC kolu KALDIRILDI
+  (ui.py:698-718'de yok) → pause açılıp aynı karede kapanıp açılma bug'ı yok;
+  **(A4)** `physics.js` zemin probuna AABB kapısı (py:293) + `_resolve_solid_collision`
+  eğim dalı (py:334-348) → rampaya havada ışınlanma durdu; **(A5)** `core.js`
+  `_ensure_lighting()` + `_render_frame`'de `render_lights` çağrısı + muaf sahne
+  listesi → ışıklar canlı. **Smoke flaky'liği:** pause fix'i gerçek pause davranışını
+  açığa çıkarınca `campaign/play`'in 40 karelik "a" sürüklenmesi oyuncuyu sol kenar
+  boşluğuna düşürüp öldürüyordu (HEAD'de pause kapanmadığı için maskeliydi);
+  `test_smoke.js` turu `a 12+d 12` denge adımına çevrildi → **10/10 arka arkaya
+  temiz**. Regresyon: smoke 0 HATA · test_core 50/50 · test_game 185/185 ·
+  test_input 62/62 · test_audio 33/33 · tools 36/36 · browser 47/47 · parite kapısı
+  0 WARN/0 BUG/0 ERR. *Etkilenen: MOTOR (core/physics/input/audio), OYUN
+  (main/scenes/ui), ARAÇ (browser testi).* Detay: `02_engine.md` + `03_game.md`.
+  **Python'a dokunulmadı (dondurulmuş referans).**
+  - Kullanıcı önceliği (ayni görüşmede): **HTML motor standalone öncelik** — Python
+    silinmeyecek ama artık JS/HTML hattı asıl; sonra motif raporları fix + game feel.
+
+- **[OYUN] PYTHON ↔ JS OYUN KATMANI PARİTE DENETİMİ BİTTİ (05.10.2026) — 10 betik,
+  3 GERÇEK HATA + 1 GERÇEK FARK.** Kullanıcı: "her bir betiğe bak hem Python'da hem
+  HTML motorda, her scriptin birebir aynı işleve yaradığını tespit et; sadece oyun
+  dosyalarını incele." Kapsam: `game/*.py` ↔ `deep_engine_html/game/*.js` +
+  `main.py`↔`main.js` + `__init__.py`↔`DE_GAME`. **Motor dosyalarına dokunulmadı**,
+  hiçbir kod değiştirilmedi. Tamamlanan kayıt: `03_game.md` son bölüm.
+  - **BİREBİR:** `state`, `entities`, `bosses`, `builders`, `ui`, `climber` (oynanış),
+    `commands` (11 komut), `__init__` (işlevsel eksik yok).
+  - **GERÇEK HATA 1 (kritik) — tüm SFX sessiz:** `game/main.js`
+    `DE.SoundFX.initialize()` çağırmıyor (`main.py:78` çağırıyor) → `_sounds` boş →
+    `SoundFX.play(...)` 21 sesin hiçbiri çalmıyor (click/win/jump/shoot/coin/hit).
+    Müzik çalıyor (`play_music` kendi buffer'ını kuruyor). Çağrı yeri **oyun
+    dosyası**, motor `audio.js` değil.
+  - **GERÇEK HATA 2 — açılışta menü müziği yok:** `main.py:86` `play_music("menu")`
+    çağırıyor, `main.js` hiç `play_music` çağırmıyor.
+  - **GERÇEK HATA 3 — `import_scene_tilemap` "yeni nesne" yolu bozuk:**
+    `scenes.js:143-147` `new DE.GameObject({...})` object literal kullanıyor; JS
+    constructor konumsal (`core.js:103`) → `tag="Default"` (Python `scenes.py:152-154`
+    → `"Tilemap"`), konum `(0,0)`, boyut `32x32`. Köprü `fresh`'ten kurulduğu için
+    fizik doğru kalır (**sessiz hata**) ama `find_by_tag("Tilemap")` bulamaz →
+    **her import mükerrer nesne ekler**. Mevcut test kapsamıyor (`test_game.js:501`
+    yalnız tilemap'i olan sahneyi kontrol ediyor). `_attach_ground_tilemap`
+    (`scenes.js:96`) doğru formu kullanıyor → hata tek dala yalıtılmış.
+  - **GERÇEK FARK 4:** `next:"campaign_boss"` portalı — JS kayıtlı (`scenes.js:416`)
+    → boss arenası; Python kayıtsız (`scenes.py:32-35`) → Zafer. Kampanya/sonsuz
+    yolları etkilenmiyor (portal sonradan override ediliyor).
+  - **Platform farkı (bilinen, kabul edilmiş):** RNG (`random.Random` ↔ `mulberry32`),
+    tilemap deposu (dosya ↔ `localStorage`), pencere başlığı, boot logu yok.
+  - *Etkilenen: OYUN (3 hata düzeltilmeyi bekliyor — kullanıcı kararı).*
+    Motor denetimindeki "initialize() hiç çağrılmıyor → SFX yok" maddesi böylece
+    kesin konuma bağlandı. `entities.js`'teki `CoinVisual` **hata değil** —
+    03.10.2026 coin görünmüyor hatası için bilinçli eklenmiş görsel düzeltme.
+  **Rapor yeri:** `deep_engine_html/PARITE_RAPORU.md` → **§7** (05.10.2026).
+  Aynı dosyada bozuk+çift yapıştırılmış §6 kopyası ayıklandı (21 CR/TAB karakteri,
+  128 satır) — içerik §1-6 ile aynıydı, kayıp yok.
+
+- **[MOTOR] DAVRANIŞSAL PARİTE ANALİZİ BİTTİ (03.10.2026) — API paritesi "TAM" ama
+  davranış paritesi TAM DEĞİL.** 20 motor dosyası çifti satır satır karşılaştırıldı
+  (detay `02_engine.md` son bölüm). **5 OYUNU BOZAR:** (1) `audio.js`
+  `initialize()` hiç çağrılmıyor → oyunda SFX yok; (2) `input.js` fare
+  `clientX/Y` → tüm tıklama/hover kaymış; (3) `core.js` ESC update sonrası →
+  pause aynı karede kapanıp açılıyor; (4) `physics.js` eğim zemin testinde AABB
+  kapısı + `_resolve_solid_collision` eğim dalı yok → havada rampanya ışınlanma;
+  (5) `lighting.js` `render_lights` hiç çağrılmıyor → ışıklar ölü. **ORTA:** pause
+  `transparent` yok, `find_by_tag` active filtresi yok, hasar flaşı/ölüm sarsıntısı
+  yok, parallax negatif modulo, RNG/lcg/stereo loop farkları, gamepad-A statik yok,
+  sürüm 1.0.0 vs 0.1.19. Testlerin yakalamama nedenleri de raporlandı (testler
+  initialize/coordinat instance tuzaklarıyla geçiyor, `parity_check` `_` metotları
+  atlıyor). *Etkilenen: MOTOR (düzeltmeler JS'e), OYUN/ARAÇ bilgilendirme.*
+  **Python'a dokunulmadı (dondurulmuş referans).**
+
 - **[MOTOR+OYUN] 3 GÖRSEL HATA DÜZELTİLDİ + 40 KALICI GÖRSEL KAPI (03.10.2026,
   kullanıcı bildirimi: "paralaks yok, coin görünmüyor, platformlar keskin ve
   büyük").** Hepsi **gerçek tarayıcı** (Edge headless) ekran görüntüsü +
@@ -670,6 +1039,11 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
   extractorsız tag (Coin/Player/Spikes) ve Modül 6 O(n²) incelemeleri bekliyor.
   Dağıtım: deep_engine/ tarafı → `02_engine.md` "DEVİR GÖREVİ"; game/+main.py tarafı →
   `03_game.md` "DEVİR GÖREVİ". Koda dokunulmadı.
+
+- **[ARAÇ oturumu] webpanel portu doğrulandı (07.10.2026).** Python `tools/webpanel.py`
+  PAGE bloğu `tools_html/webpanel.html`'e dışa aktarıldı (HEAD sürümü korundu), route'lar
+  (13/13) birebir, `webpanel.js` 8766'da çalışıyor. `test_tools.js` 36/36, `test_browser.js`
+  50/50, Modül 14 parite kapısı 0/0/0. JS araç seti Python ile eşit durumda.
 
 - **[OYUN oturumu] Spikes trigger+zıplama, Turret agresifliği, gömülme yönlendirmesi
   (23.09.2026).** `_build_spikes` artık `BoxCollider(is_trigger=True)`; oyuncu dikene

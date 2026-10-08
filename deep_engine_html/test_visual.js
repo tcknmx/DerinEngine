@@ -48,6 +48,7 @@ load("core.js");
 load("math2d.js");
 load("parallax.js");
 load("components.js");
+load("render.js");
 load("lighting.js");
 
 let pass = 0, fail = 0;
@@ -131,6 +132,75 @@ console.log("L3 ambient_darkness<=0 ise hicbir sey yok:");
     const ctx = make_ctx();
     eng.render_lights(ctx, 100, 100, scene, new DE.Vector2(0, 0));
     check("karanlik yok (ok)", !eng._darkness_canvas || true);
+}
+
+console.log("T1 TextRenderer M10+M11 (surum koklu degil / emoji segmentasyonu):");
+{
+    function rec_ctx() {
+        const texts = [];
+        return {
+            texts, font: "", fillStyle: "",
+            fillText(t, x, y) { texts.push({ t, x, y, font: this.font }); },
+            measureText(s) {
+                return { width: s.length * 10, actualBoundingBoxAscent: 12, actualBoundingBoxDescent: 3 };
+            },
+        };
+    }
+    // M11: emoji tanima (py _is_emoji_char birebir)
+    check("is_emoji: ⚡ evet", DE.TextRenderer._is_emoji_char("⚡"));
+    check("is_emoji: ❤️ U+FE0F evet", DE.TextRenderer._is_emoji_char("\u{FE0F}"));
+    check("is_emoji: ş hayir (Latin)", !DE.TextRenderer._is_emoji_char("ş"));
+    check("is_emoji: A hayir", !DE.TextRenderer._is_emoji_char("A"));
+
+    const obj = new DE.GameObject("t", 450, 100, 0, 0, "UI");
+    const tr = new DE.TextRenderer("⚡ x3 (Zincir!)", 20, [255, 255, 0], true, null, true, false);
+    obj.add_component(tr);
+    tr.start();
+    const ctx = rec_ctx();
+    tr.draw(ctx, null);
+    check("emoji metin 2 segmente bolundu", ctx.texts.length === 2, "n=" + ctx.texts.length);
+    check("emoji segment emoji fontunda", ctx.texts.length === 2 && ctx.texts[0].font.indexOf("Segoe UI Emoji") >= 0, ctx.texts[0] && ctx.texts[0].font);
+    check("normal segment Arial", ctx.texts.length === 2 && ctx.texts[1].font.indexOf("Arial") >= 0 && ctx.texts[1].font.indexOf("bold") >= 0, ctx.texts[1] && ctx.texts[1].font);
+    // center_x: tx = x - toplam/2 (toplam = tum segment genislikleri)
+    const totalW = ("⚡".length + " x3 (Zincir!)".length) * 10;
+    check("center_x segment toplamiyla", Math.abs(ctx.texts[0].x - (450 - totalW / 2)) < 1e-9,
+        "x=" + ctx.texts[0].x + " beklenen=" + (450 - totalW / 2));
+    check("segment x akisi bitisik", Math.abs(ctx.texts[1].x - (ctx.texts[0].x + "⚡".length * 10)) < 1e-9,
+        "x2=" + ctx.texts[1].x);
+    check("baseline: y = konum + ascent", Math.abs(ctx.texts[0].y - (100 + 12)) < 1e-9, "y=" + ctx.texts[0].y);
+
+    // EmojiYOK metin: tek parça, eski yol (regresyon korumasi)
+    const ctx2 = rec_ctx();
+    const tr2 = new DE.TextRenderer("Çöl Fırtınası", 20, [255, 255, 255], true, null, false, false);
+    obj.add_component(tr2);
+    tr2.start();
+    tr2.draw(ctx2, null);
+    check("emoji yok -> tek fillText", ctx2.texts.length === 1, "n=" + ctx2.texts.length);
+    check("emoji yok -> Arial bold", ctx2.texts.length === 1 && ctx2.texts[0].font.indexOf("bold") >= 0 && ctx2.texts[0].font.indexOf("Arial") >= 0, ctx2.texts[0] && ctx2.texts[0].font);
+
+    // Gölge: her segment 2 kez (gölge + metin), gölge +2,+2
+    const ctx3 = rec_ctx();
+    const tr3 = new DE.TextRenderer("🛡️ ENERJİ", 20, [255, 255, 255], true, [0, 0, 0], false, false);
+    obj.add_component(tr3);
+    tr3.start();
+    tr3.draw(ctx3, null);
+    const segCount = 2; // "🛡️" + " ENERJİ"
+    check("golge 2 gecis x segment", ctx3.texts.length === segCount * 2, "n=" + ctx3.texts.length);
+    if (ctx3.texts.length === segCount * 2) {
+        check("golge +2 kaydirildi", Math.abs(ctx3.texts[0].x - (ctx3.texts[segCount].x + 2)) < 1e-9
+            && Math.abs(ctx3.texts[0].y - (ctx3.texts[segCount].y + 2)) < 1e-9,
+            "gx=" + ctx3.texts[0].x + " mx=" + ctx3.texts[segCount].x);
+    } else {
+        check("golge +2 kaydirildi", false, "segment sayisi yanlis");
+    }
+
+    // Kalp HUD: "❤️ ❤️ ❤️" -> emoji/aralik ALTERNANSI = 5 segment (py ile ayni)
+    const ctx4 = rec_ctx();
+    const tr4 = new DE.TextRenderer("❤️ ❤️ ❤️", 22, [255, 80, 80], true, null, false, false);
+    obj.add_component(tr4);
+    tr4.start();
+    tr4.draw(ctx4, null);
+    check("kalp HUD 5 segment (py parite)", ctx4.texts.length === 5, "n=" + ctx4.texts.length);
 }
 
 console.log("\nSONUC: " + pass + " gecti, " + fail + " kaldi" + (fail === 0 ? " -> ALL OK" : ""));

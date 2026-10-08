@@ -17,6 +17,11 @@ DE.Input = class Input {
         this._keys = {};           // basılı (get_key) — klavye
         this._down = {};           // bu kare basıldı (get_key_down)
         this._up = {};             // bu kare bırakıldı (get_key_up)
+        // Sanal tuşlar (dokunmatik/oyun bağlantısı): oyun kodu PNG'den fark etmez,
+        // get_key* bu setleri de okur. end_frame'de down/up sıfırlanır (klavye gibi).
+        this._virtual_held = new Set();
+        this._virtual_down = new Set();
+        this._virtual_up = new Set();
         this._mouse_pos = { x: 0, y: 0 };
         this._mouse_buttons = [false, false, false];   // sol / orta / sağ
         this._mouse_down = [false, false, false];
@@ -48,6 +53,32 @@ DE.Input = class Input {
 
         this.init();
     }
+    /* Fare olayını canvas OYUN koordinatına çevirir.
+     * Python: pygame.mouse.get_pos() yüzey koordinatını 1:1 döndürür.
+     * Tarayıcı: clientX/Y PENCERE koordinatıdır; index.html canvas'ı ortalar,
+     * CSS ile ölçekler (aspect-ratio + max-*) ve 2px border taşır →
+     * getBoundingClientRect ile konum+ölçek çıkarılmazsa tüm tıklama/hover
+     * (menü, fare atış, seviye seçimi) kayar. canvas.width/height = mantıksal
+     * 900x600 çizim uzayıdır. */
+    _mouse_to_canvas(e) {
+        let cv = null;
+        if (typeof DE !== "undefined" && DE.Engine && DE.Engine.instance) cv = DE.Engine.instance.canvas;
+        if (!cv && typeof document !== "undefined" && document.getElementById) cv = document.getElementById("game");
+        const cx = (e.clientX !== undefined) ? e.clientX : 0;
+        const cy = (e.clientY !== undefined) ? e.clientY : 0;
+        if (!cv || typeof cv.getBoundingClientRect !== "function") return { x: cx, y: cy };
+        const r = cv.getBoundingClientRect();
+        // getBoundingClientRect sınır (border) kutusudur; index.html'de canvas
+        // 2px border + CSS ölçek taşır. İçerik kutusu: clientLeft/clientTop
+        // (border) sonrası clientWidth/clientHeight (CSS px, bordersuz).
+        const bl = cv.clientLeft || 0, bt = cv.clientTop || 0;
+        const cw = cv.clientWidth || (r.width - 2 * bl), ch = cv.clientHeight || (r.height - 2 * bt);
+        const ox = r.left + bl, oy = r.top + bt;
+        const sx = (cw && cv.width) ? (cv.width / cw) : 1;
+        const sy = (ch && cv.height) ? (cv.height / ch) : 1;
+        return { x: (cx - ox) * sx, y: (cy - oy) * sy };
+    }
+
     init() {
         window.addEventListener("keydown", (e) => this._on_keydown(e));
         window.addEventListener("keyup", (e) => this._on_keyup(e));
@@ -55,15 +86,20 @@ DE.Input = class Input {
             this._keys = {}; this._down = {}; this._up = {};
         });
         window.addEventListener("mousemove", (e) => {
-            this._mouse_pos.x = e.clientX; this._mouse_pos.y = e.clientY;
+            const p = this._mouse_to_canvas(e);
+            this._mouse_pos.x = p.x; this._mouse_pos.y = p.y;
         });
         window.addEventListener("mousedown", (e) => {
+            const p = this._mouse_to_canvas(e);
+            this._mouse_pos.x = p.x; this._mouse_pos.y = p.y;
             if (e.button >= 0 && e.button < 3) {
                 this._mouse_down[e.button] = true;
                 this._mouse_buttons[e.button] = true;
             }
         });
         window.addEventListener("mouseup", (e) => {
+            const p = this._mouse_to_canvas(e);
+            this._mouse_pos.x = p.x; this._mouse_pos.y = p.y;
             if (e.button >= 0 && e.button < 3) this._mouse_buttons[e.button] = false;
         });
         window.addEventListener("wheel", (e) => {
@@ -148,18 +184,21 @@ DE.Input = class Input {
     get_key_down(name) {
         const k = this._normalizeKeyArg(name);
         if (this._down[k]) return true;
+        if (this._virtual_down.has(k)) return true;
         const btn = this._BUTTON_MAP[k];
         return btn !== undefined && this._joy_buttons_down.has(btn);
     }
     get_key(name) {
         const k = this._normalizeKeyArg(name);
         if (this._keys[k]) return true;
+        if (this._virtual_held.has(k)) return true;
         const btn = this._BUTTON_MAP[k];
         return btn !== undefined && this._joy_buttons_held.has(btn);
     }
     get_key_up(name) {
         const k = this._normalizeKeyArg(name);
         if (this._up[k]) return true;
+        if (this._virtual_up.has(k)) return true;
         const btn = this._BUTTON_MAP[k];
         return btn !== undefined && this._joy_buttons_up.has(btn);
     }
@@ -196,7 +235,9 @@ DE.Input = class Input {
         return (Array.isArray(pads) ? pads : []).some(p => p && p.connected);
     }
     _gamepad_a_down() {
-        return this._joy_buttons_down.has(this._BUTTON_MAP["SPACE"]);
+        // Python ui.py Button._gamepad_a_down: range(32) döngüsü — hangi kumanda
+        // butonuna basılırsa basılsın (A/B/X/Y...) menü onayı sayılır.
+        return this._joy_buttons_down.size > 0;
     }
 
     /* --- fare --- */
@@ -219,12 +260,30 @@ DE.Input = class Input {
     }
     clear_typed() { this._typed_chars = []; }
 
+    set_virtual_key_down(name) {
+        const k = this._normalizeKeyArg(name);
+        this._virtual_down.add(k);
+        this._virtual_held.add(k);
+    }
+    set_virtual_key_up(name) {
+        const k = this._normalizeKeyArg(name);
+        this._virtual_up.add(k);
+        this._virtual_held.delete(k);
+    }
+    /* Tüm sanal tuşları bırakır (dokunma koptu / sahne değişti). */
+    clear_virtual_keys() {
+        for (const k of this._virtual_held) this._virtual_up.add(k);
+        this._virtual_held.clear();
+    }
+
     /* --- kare sonu: one-shot durumları sıfırla --- */
     end_frame() {
         this._down = {};
         this._up = {};
         this._mouse_down = [false, false, false];
         this._mouse_scroll = 0;
+        this._virtual_down = new Set();
+        this._virtual_up = new Set();
         // Kumanda kenar durumları da kareye özeldir: bir sonraki begin_frame'de
         // yeniden hesaplanana kadar _joy_buttons_down/up görünmez (Python'da
         // _update_events sonraki kare başında tazeler — görünürlük eşdeğer).
@@ -264,6 +323,12 @@ DE.Input.get_mouse_button = function (b) {
 DE.Input.get_mouse_button_down = function (b) {
     const i = DE.Input.instance; return i ? i.get_mouse_button_down(b) : false;
 };
+/* Fare tekerleği birikimi (JS uzantısı; Python input.py'de yok). Statik köprü
+ * olmadan tarayıcıda oyun kodu (konsol kaydırma, ScrollContainer) `_mouse_scroll`a
+ * erişemez — instance üzerinden döner, end_frame() sıfırlar. */
+DE.Input.get_mouse_scroll = function () {
+    const i = DE.Input.instance; return i ? i.get_mouse_scroll() : 0;
+};
 /* Python'da @classmethod; JS'te statik sarmalayici olmazsa konsol
  * (DevConsole.update) her kare TypeError atip oyun dongusunu dusuruyordu. */
 DE.Input.get_typed_text = function () {
@@ -274,4 +339,19 @@ DE.Input.clear_typed = function () {
 };
 DE.Input.is_controller_active = function () {
     const i = DE.Input.instance; return i ? i.is_controller_active() : false;
+};
+DE.Input.set_virtual_key_down = function (k) {
+    const i = DE.Input.instance; if (i) i.set_virtual_key_down(k);
+};
+DE.Input.set_virtual_key_up = function (k) {
+    const i = DE.Input.instance; if (i) i.set_virtual_key_up(k);
+};
+DE.Input.clear_virtual_keys = function () {
+    const i = DE.Input.instance; if (i) i.clear_virtual_keys();
+};
+/* ORTA-8: ui.js buton onayı `DE.Input._gamepad_a_down` ister; köprü yoksa
+ * tanım `undefined` kalır ve kumanda ile menü onayı hiç çalışmaz (py ui.py'de
+ * bu metod Button sınıfında @staticmethod). */
+DE.Input._gamepad_a_down = function () {
+    const i = DE.Input.instance; return i ? i._gamepad_a_down() : false;
 };

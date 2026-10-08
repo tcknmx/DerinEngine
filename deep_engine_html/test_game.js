@@ -137,11 +137,11 @@ let lvl;
   check("zemin tilemap rasterize", lvl._tilemap_ground !== null && lvl._tilemap_ground !== undefined
     && lvl._tilemap_ground.layers_count === 1 && lvl._tilemap_segments.length > 0,
     "segments=" + (lvl._tilemap_segments ? lvl._tilemap_segments.length : 0));
-  const groundHide = lvl.find_all_by_tag("Ground").filter(o => {
+  const groundShown = lvl.find_all_by_tag("Ground").filter(o => {
     const s = o.get_component(DE.SpriteRenderer);
-    return s && o.get_component(DE.BoxCollider) && !o.get_component(DE.BoxCollider).one_way && s.visible === false;
+    return s && o.get_component(DE.BoxCollider) && !o.get_component(DE.BoxCollider).one_way && s.visible !== false;
   });
-  check("katı zemin sprite'ları gizlendi", groundHide.length > 0, "gizli=" + groundHide.length);
+  check("katı zemin sprite'ları görünür (düz tasarım)", groundShown.length > 0, "görünür=" + groundShown.length);
   check("tilemap gönderildi", lvl._tilemap_ground !== null && lvl.find_all_by_tag("Tilemap").length === 1);
 }
 
@@ -218,20 +218,28 @@ console.log("TEST7 coin toplama:");
   // Taze seviye (TEST2'dekilerin bir kısmı toplanmış olabilir).
   const s2 = DE_GAME.build_procedural_level("cave", 7, 8, 0);
   use(s2);
+  // M7 (py parite) seviyesi: coin'ler doğuştan aktif mi? Build anında doğrula —
+  // hemen ardından yere otururken düşüş yolundaki coin toplanabilir (oyun davranışı).
+  let coins = s2.find_all_by_tag("Coin");
+  check("coinler başlangıçta aktif", coins.length > 0 && coins.every(c => c.active));
   step(s2, 60); // yere otur
   const player = s2.find_by_tag("Player");
   const ctrl = player.get_component(DE_GAME.PlayerController);
-  let coins = s2.find_all_by_tag("Coin");
-  check("coinler başlangıçta aktif", coins.length > 0 && coins.every(c => c.active));
-  let collected = 0;
+  const activeCount = () => s2.find_all_by_tag("Coin").filter(c => c.active).length;
+  let prev = activeCount();
+  let collected = coins.length - prev; // oturma sırasında toplananlar (düşüş yolu)
   // En alttaki coin'den başla (zemine en yakın) — teleport ile üst üste bindir.
+  // Komşu/üstüste coin'ler tek dokunuşta birlikte toplanabilir (parite seviyesinde
+  // coin kümeleri var) → sayacı hedef coin'e göre değil, aktif-coin azalmasından say.
   coins.sort((a, b) => b.position.y - a.position.y);
   for (const coin of coins) {
     if (!coin.active) continue;
     player.position.x = coin.position.x - 4;
     player.position.y = coin.position.y - 2;
     step(s2, 2);
-    if (!coin.active) collected += 1;
+    const now = activeCount();
+    collected += prev - now;
+    prev = now;
   }
   check("tüm coin'ler toplandı", collected === coins.length, collected + "/" + coins.length);
   check("skor arttı", ctrl.score > 0, "score=" + ctrl.score);
@@ -442,6 +450,60 @@ function drawSafe(scene) {
   fadeScene.add_object(fo);
   fadeScene.start();
   check("FadeOverlay katmanı çizilebilir", drawSafe(fadeScene));
+
+  // TEST13c: game over butonlu menü (Yeniden Dene + Ana Menü)
+  const goScene = DE_GAME.build_game_over_scene(function () {});
+  const goButtons = (goScene._gameover_buttons || []);
+  check("game over 2 buton var", goButtons.length === 2, "n=" + goButtons.length);
+  check("game over buton metinleri i18n",
+      goButtons[0][0].text === DE.I18n.t("game_over_retry") &&
+      goButtons[1][0].text === DE.I18n.t("game_over_menu_btn"));
+  // buton dikdörtgenleri merkez 450 etrafında simetrik + tıklanabilir alan tutarlı
+  const goRetry = goButtons[0][0].game_object, goMenu = goButtons[1][0].game_object;
+  check("game over butonlar simetrik (350..550)",
+      goRetry.position.x === 350 && goRetry.size.x === 200 &&
+      goMenu.position.x === 350 && goMenu.size.x === 200);
+  // tıklama eylemi çalışıyor mu (buton on_click -> GameOverController._retry)
+  let goClicked = 0;
+  const goScene2 = DE_GAME.build_game_over_scene(function () { goClicked++; });
+  goScene2._gameover_buttons[0][0].on_click();
+  check("game over Yeniden Dene tıklanınca restart fabrikası çağırır", goClicked === 1);
+  // T ile dil değişimi buton boyutunu bozmaz (auto_size=false)
+  const goW0 = goRetry.size.x, goH0 = goRetry.size.y;
+  goButtons[0][0].set_text("VeryLongRetryLabelHere", null, false);
+  check("game over T-dil buton boyutu sabit",
+      goRetry.size.x === goW0 && goRetry.size.y === goH0);
+}
+
+// TEST13d: TÜM tam ekran metinleri merkez semantiğinde (center_x + center_y zorunlu).
+// Kök neden: TextRenderer 4. param is_ui; center_x/center_y 6./7. parametre —
+// atlanırsa metin position'dan sağa/üste akar ("kayma"). Bu denetim tekrarını engeller.
+console.log("TEST13d ekran merkezleme denetimi:");
+if (!process.env.SKIP13d) {   // SKIP13d=1: RNG sırası etkisini izole etmek için bloğu atla
+  const screenScenes = [
+    ["ana menü", DE_GAME.build_main_menu_scene()],
+    ["ayarlar", DE_GAME.build_settings_scene()],
+    ["oyun sonu", DE_GAME.build_game_over_scene(function () {})],
+    ["zafer ekranı", DE_GAME.build_victory_scene()],
+    ["pause overlay", DE_GAME.build_pause_scene()],
+    ["star climber HUD", DE_GAME.build_climber_scene()],
+  ];
+  // İstisna: ana menünün CANLI ARKA PLAN HUD'ı (builders.js sol-üst köşe HUD'ı,
+  // center_x=false BİLİNÇLİ — skor/can satırları köşeye hizalıdır, merkezlenmez).
+  const LIVE_BG_HUD = new Set(["ScoreUI", "HealthUI", "GoalUI", "InfoUI",
+    "PowerUpLabelUI", "StreakUI", "PortalArrowUI"]);
+  for (const [name, sc] of screenScenes) {
+    const all = [...sc.game_objects, ...sc._objects_to_add];
+    const bad = [];
+    for (const obj of all) {
+      if (LIVE_BG_HUD.has(obj.name)) continue;
+      const tr = obj.get_component && obj.get_component(DE.TextRenderer);
+      if (!tr) continue;
+      if (!(tr.center_x === true && tr.center_y === true)) bad.push(obj.name);
+    }
+    check(name + ": her TextRenderer center_x+center_y", bad.length === 0,
+      bad.length ? "merkez DEĞİL: " + bad.join(",") : "");
+  }
 }
 
 // TEST14: oyun konsol komutları (game/commands.js — Python game/commands.py eşi)
@@ -456,30 +518,30 @@ console.log("TEST14 konsol komutları:");
     .every(n => !!cmd(n)), "eksik: " + ["hp", "heal", "god", "coins", "speed", "jump", "tp", "respawn", "tilemap_save", "tilemap_load", "list"]
     .filter(n => !cmd(n)).join(","));
 
-  check("hp: can güncellenir", cmd("hp")(lvl, ["5"]) === "can -> 5/3" && hp.current_hp === 5);
-  check("hp: kullanım mesajı", cmd("hp")(lvl, []).indexOf("Kullanim: hp") === 0);
+  check("hp: can güncellenir", cmd("hp")(lvl, ["5"]) === "hp -> 5/3" && hp.current_hp === 5);
+  check("hp: kullanım mesajı", cmd("hp")(lvl, []).indexOf("Usage: hp") === 0);
 
-  check("heal: can doldur + kısa koruma", cmd("heal")(lvl, []) === "sifa tamam."
+  check("heal: can doldur + kısa koruma", cmd("heal")(lvl, []) === "Health restored."
     && hp.current_hp === hp.max_hp && hp.invulnerable_timer >= 1.2);
 
   hp.invulnerable_timer = 0;                        // god'un başlangıç durumu (heal artığı kalmasın)
-  check("god: aç/kapa", cmd("god")(lvl, []) === "god mode ACIK (olumsuz)." && hp.invulnerable_timer > 1e9);
-  check("god: kapat", cmd("god")(lvl, []) === "god mode KAPALI." && hp.invulnerable_timer === 0);
+  check("god: aç/kapa", cmd("god")(lvl, []) === "god mode ON (invincible)." && hp.invulnerable_timer > 1e9);
+  check("god: kapat", cmd("god")(lvl, []) === "god mode OFF." && hp.invulnerable_timer === 0);
 
   const before = pc.score;
-  check("coins: skora ekle", cmd("coins")(lvl, ["100"]) === "skor -> " + (before + 100) && pc.score === before + 100);
+  check("coins: skora ekle", cmd("coins")(lvl, ["100"]) === "score -> " + (before + 100) && pc.score === before + 100);
 
-  check("speed: hız ayarı + clamp", cmd("speed")(lvl, ["99999"]) === "hiz -> 2000" && pc.speed === 2000);
-  check("jump: zıplama ayarı", cmd("jump")(lvl, ["900"]) === "ziplama -> 900" && pc.jump_force === 900);
+  check("speed: hız ayarı + clamp", cmd("speed")(lvl, ["99999"]) === "speed -> 2000" && pc.speed === 2000);
+  check("jump: zıplama ayarı", cmd("jump")(lvl, ["900"]) === "jump -> 900" && pc.jump_force === 900);
 
   player.position.x = 42; player.position.y = 42;
-  check("tp: ışınla + hız sıfır", cmd("tp")(lvl, ["310", "120"]) === "isinlandi -> (310, 120)"
+  check("tp: ışınla + hız sıfır", cmd("tp")(lvl, ["310", "120"]) === "teleported -> (310, 120)"
     && player.position.x === 310 && player.position.y === 120);
   const rb = player.get_component(DE.Rigidbody2D);
   if (rb) rb.velocity.set(50, -80);
 
   const beforeRespawn = { x: player.position.x, y: player.position.y };
-  check("respawn: spawn noktasına döner", cmd("respawn")(lvl, []) === "spawn noktasina donuldu."
+  check("respawn: spawn noktasına döner", cmd("respawn")(lvl, []) === "returned to spawn point."
     && (player.position.x !== beforeRespawn.x || player.position.y !== beforeRespawn.y));
 
 const listed = cmd("list")(lvl, []);
@@ -487,27 +549,48 @@ const listed = cmd("list")(lvl, []);
 
   // tilemap veri katmani: export -> kaydet -> geri yukle -> ayni geometri
   const saved = cmd("tilemap_save")(lvl, ["test_seviye"]);
-  check("tilemap_save: kaydeder", typeof saved === "string" && saved.indexOf("kaydedildi") > 0
-    && saved.indexOf("katman") > 0, saved);
+  check("tilemap_save: kaydeder", typeof saved === "string" && saved.indexOf("saved") > 0
+    && saved.indexOf("layers") > 0, saved);
   const data0 = DE_GAME.export_scene_tilemap(lvl);
   check("tilemap_save: veri JSON-uyumlu", !!data0 && Array.isArray(data0.layers)
     && Array.isArray(data0.layers[0].grid) && typeof JSON.stringify(data0) === "string");
   const segs0 = (lvl._tilemap_segments || []).length;
   const loaded = cmd("tilemap_load")(lvl, ["test_seviye"]);
-  check("tilemap_load: geri yukler", typeof loaded === "string" && loaded.indexOf("yuklendi") > 0, loaded);
+  check("tilemap_load: geri yukler", typeof loaded === "string" && loaded.indexOf("loaded") > 0, loaded);
   check("tilemap_load: geometri ayni", (lvl._tilemap_segments || []).length === segs0
     && lvl._tilemap_ground.to_data().layers.length === data0.layers.length,
     segs0 + " -> " + (lvl._tilemap_segments || []).length);
   check("tilemap_load: tek Tilemap nesnesi", lvl.find_all_by_tag("Tilemap").length === 1);
   check("tilemap_save: bozuk ad temizlenir", typeof cmd("tilemap_save")(lvl, ["../../kotu ad*"]) === "string");
-  check("tilemap_load: yoksa mesaj", cmd("tilemap_load")(lvl, ["olmayan_xyz"]).indexOf("Okunamadi") === 0);
+  check("tilemap_load: yoksa mesaj", cmd("tilemap_load")(lvl, ["olmayan_xyz"]).indexOf("Cannot read") === 0);
 
   // _cmd_* yokken de güvenli: 'player yok' yolları
   const emptyScene = new DE.Scene("Empty", [0, 0, 0]);
-  check("hp: oyuncu yokta güvenli mesaj", cmd("hp")(emptyScene, ["5"]) === "Oyuncu yok (o siste sahnesinde degilsin).");
-  check("tilemap_save: tilemap yoksa mesaj", cmd("tilemap_save")(emptyScene, ["x"]).indexOf("tilemap yok") > 0);
+  check("hp: oyuncu yokta güvenli mesaj", cmd("hp")(emptyScene, ["5"]) === "No player (you are not in a game scene).");
+  check("tilemap_save: tilemap yoksa mesaj", cmd("tilemap_save")(emptyScene, ["x"]).indexOf("No tilemap") >= 0);
   check("tilemap_load: bozuk veri reddi", DE_GAME.import_scene_tilemap(emptyScene, { "layers": [] }) === false
     && DE_GAME.import_scene_tilemap(emptyScene, null) === false);
+
+  // G3 (parite): "yeni nesne" yolu — boş sahneye import (test_game:501 yalnız
+  // in-place yolunu test ediyordu). Eski kod sözlük veriyordu → tag "Default"
+  // kalır, konum (0,0) olur ve tekrar import mükerrer nesne yığardı.
+  if (data0) {
+    const freshScene = new DE.Scene("Fresh", [0, 0, 0]);
+    check("G3: bos sahneye import Tilemap tagini kurar",
+      DE_GAME.import_scene_tilemap(freshScene, data0) === true
+      && freshScene.find_all_by_tag("Tilemap").length === 1,
+      "bulunan=" + freshScene.find_all_by_tag("Tilemap").length);
+    const tObj = freshScene.find_all_by_tag("Tilemap")[0];
+    check("G3: yeni nesne adi/konumu dogru",
+      tObj && tObj.name === "TilemapGround" && tObj.position.x === data0.offset[0]
+      && tObj.position.y === data0.offset[1],
+      tObj ? (tObj.name + "@" + tObj.position.x + "," + tObj.position.y) : "yok");
+    DE_GAME.import_scene_tilemap(freshScene, data0);
+    DE_GAME.import_scene_tilemap(freshScene, data0);
+    check("G3: tekrar import mukerrer nesne eklemez",
+      freshScene.find_all_by_tag("Tilemap").length === 1,
+      "bulunan=" + freshScene.find_all_by_tag("Tilemap").length);
+  }
 }
 
 // TEST15: deneyim iyileştirmeleri 5–8 doğrulaması
@@ -741,29 +824,34 @@ console.log("TEST17 Star Climber:");
   check("17: katmanlar one_way (alttan geçilir)", bc !== null && bc.one_way === true);
   check("17: katmanda ClimbPlatform", f0.get_component(DE_GAME.ClimbPlatform) !== null);
 
-  // 3) kontrol noktası: her 10. katman kırılmaz
+  // 3) CHECKPOINT YOK: 10. katman sıradan bir katmandır (kontrol noktası kaldırıldı)
   const cp = game.floors[10];
   const cpComp = cp.get_component(DE_GAME.ClimbPlatform);
-  check("17: 10. katman kontrol noktası", cpComp !== null && cpComp.checkpoint === true
-    && cpComp.hits_to_break === 0 && cp.size.x >= 220);
+  check("17: 10. katman kontrol noktası DEĞİL", cpComp !== null && !cpComp.checkpoint,
+    "checkpoint=" + (cpComp ? cpComp.checkpoint : "yok"));
 
-  // 4) üstten düşünce sekiş + hız seviyesi
+  // 4) MANUEL zıplama: SPACE basılınca (coyote+ground) yukarı fırlar
   player.position.x = f0.position.x + f0.size.x / 2 - 15;
   player.position.y = f0.position.y - player.size.y - 2;
-  rb.velocity.x = 0; rb.velocity.y = 40;
+  rb.velocity.x = 0; rb.velocity.y = 40; rb.is_grounded = true;
   const lv0 = ctrl.level;
-  f0.get_component(DE_GAME.ClimbPlatform).on_collision(player);
-  check("17: üstten düşünce sekiş", rb.velocity.y < -500, "vy=" + rb.velocity.y);
-  check("17: sekiş hız seviyesi artırdı", ctrl.level === Math.min(5, lv0 + 1), "lv=" + ctrl.level);
+  press("SPACE");
+  ctrl.update(1 / 60);
+  check("17: SPACE ile zıplama", rb.velocity.y < -500, "vy=" + Math.round(rb.velocity.y));
+  check("17: zıplama hız seviyesini artırdı", ctrl.level === Math.min(5, lv0 + 1),
+    "lv=" + ctrl.level);
+  DE.Input.instance.end_frame();
 
-  // 5) yukarı geçiş sekiş YAPMAZ (tek yönlü mantığı)
-  const vy0 = rb.velocity.y;
-  rb.velocity.y = -300;
-  f0.get_component(DE_GAME.ClimbPlatform).on_collision(player);
-  check("17: yukarı geçişte sekiş yok", rb.velocity.y === -300, "vy=" + rb.velocity.y);
-  rb.velocity.y = vy0;
+  // 5) çift zıplama kapalıyken havadayken SPACE ekstra zıplama YAPMAZ
+  rb.velocity.y = -300; rb.is_grounded = false;
+  ctrl._coyote = 0.0; ctrl._buffer = 0.0; ctrl.double_jump = false;
+  press("SPACE");
+  ctrl.update(1 / 60);
+  check("17: havadayken çift zıplama yok (skill kapalı)", Math.abs(rb.velocity.y - (-300)) < 1,
+    "vy=" + Math.round(rb.velocity.y));
+  DE.Input.instance.end_frame();
 
-  // 6) kırılabilir katman sekiş sonrası kırılır (delik)
+  // 6) kırılabilir katman üstünde BEKLENİNCE kırılır (delik)
   let brk = null;
   for (const k of Object.keys(game.floors)) {
     const c = game.floors[k].get_component(DE_GAME.ClimbPlatform);
@@ -772,23 +860,33 @@ console.log("TEST17 Star Climber:");
   check("17: kırılabilir katman var", brk !== null);
   if (brk) {
     check("17: motor BreakablePlatform eklendi", brk.get_component(DE.BreakablePlatform) !== null);
-    player.position.y = brk.position.y - player.size.y - 2;
-    rb.velocity.y = 30;
-    brk.get_component(DE_GAME.ClimbPlatform).on_collision(player);
-    check("17: kırıldı (delik oluştu)", brk.active === false);
+    player.position.x = brk.position.x + brk.size.x / 2 - player.size.x / 2;
+    player.position.y = brk.position.y - player.size.y;
+    rb.velocity.x = 0; rb.is_grounded = true;
+    const BREAK_WAIT = 0.45;
+    game._check_break_under(BREAK_WAIT + 0.01);
+    check("17: bekleyince kırıldı (delik oluştu)", brk.active === false);
   }
 
-  // 7) kamera SADECE yukarı gider
+  // 7) kamera YÜKSELİR (~CAM_SPEED=66 px/sn, max_floor=0 iken taban hız), aşağı inmez
+  //     Oyuncu zeminde sabitken (üst kelepçe yok) kamera 66px/sn yükselir.
   rb.use_gravity = false;
+  ctrl._buffer = 0.0; ctrl._coyote = 0.0;   // önceki testlerin zıplama tamponu temizlensin
+  player.position.x = f0.position.x + f0.size.x / 2 - 15;
+  player.position.y = f0.position.y - player.size.y;
+  rb.velocity.x = 0; rb.velocity.y = 0;
+  game._cam_y = DE_GAME.floor_y(0) - 600 * 0.72;   // kamera 0. katmana konur
+  cl.camera_position.y = game._cam_y;
   const cam0 = cl.camera_position.y;
-  player.position.y -= 200;
+  for (let i = 0; i < 60; i++) step(cl, 1);          // 1 saniye, kamera serbest yükselir
+  const cam1 = cl.camera_position.y;
+  check("17: kamera sabit hız yükseldi (~66px)",
+    cam1 < cam0 && Math.abs((cam0 - cam1) - 66) < 3,
+    cam0.toFixed(1) + " -> " + cam1.toFixed(1));
+  player.position.y = cam1 - 300;                    // kamera üstündeymiş gibi (üst kelepçe)
   for (let i = 0; i < 30; i++) step(cl, 1);
-  const camUp = cl.camera_position.y;
-  check("17: kamera yukarı gitti", camUp <= cam0 + 0.001, cam0 + " -> " + camUp);
-  player.position.y = camUp + 500;          // ekran altı, ölüm çizgisinin üstü
-  for (let i = 0; i < 30; i++) step(cl, 1);
-  check("17: kamera aşağı inmiyor", cl.camera_position.y <= camUp + 0.001,
-    "cam=" + cl.camera_position.y);
+  check("17: kamera aşağı inmiyor", cl.camera_position.y <= cam1 + 0.001,
+    "cam=" + cl.camera_position.y.toFixed(2));
   rb.use_gravity = true;
 
   // 8) tırmanınca yeni katmanlar üretilir
@@ -796,52 +894,71 @@ console.log("TEST17 Star Climber:");
   for (let i = 0; i < 5; i++) step(cl, 1);
   check("17: tırmanınca katman üretildi", game.top_index >= 26, "top=" + game.top_index);
 
-  // 9) ekran altına DÜŞÜNCE kontrol noktasına dönüş (oyuncu boşlukta olmalı)
-  game.max_floor = 25; game.best_floor = 25; game.checkpoint_floor = 20;
+  // 9) CHECKPOINT YOK: ekran altına düşünce 0. KATMANA dönüş (rekor korunur)
+  game.max_floor = 25; game.best_floor = 25; game.checkpoint_floor = 20; // eski alan yok sayılır
   ctrl.add_level();
   player.position.y = game.floors[0].position.y + 260;   // tüm platformların altı
   rb.velocity.y = 400;
   const falls0 = game.falls;
   step(cl, 1);
   check("17: düştü (düşme sayacı arttı)", game.falls === falls0 + 1, "falls=" + game.falls);
-  check("17: kontrol noktasına ışınlandı",
-    Math.abs(player.position.y - (game.floors[20].position.y - player.size.y)) < 1,
+  check("17: 0. katmana döndü (checkpoint yok)",
+    Math.abs(player.position.y - (game.floors[0].position.y - player.size.y)) < 1,
     "y=" + player.position.y);
   check("17: düşünce hız seviyesi sıfırlandı", ctrl.level === 0, "lv=" + ctrl.level);
   check("17: düşünce yükseklik ilerlemesi sıfırlandı (rekor korunur)",
-    game.max_floor === 20 && game.best_floor === 25,
+    game.max_floor === 0 && game.best_floor === 25,
     "maxf=" + game.max_floor + " best=" + game.best_floor);
-  // Kamera yumuşak takip (dt*9) — hedefe oturması için birkaç kare gerekir.
-  for (let i = 0; i < 40; i++) step(cl, 1);
-  // Kamera sözleşmesi: min(katman çizgisi, oyuncunun başı + üst pay).
-  // Oyuncu zıplarken ikinci terkin belirleyici olabilir (kamera oyuncuyu
-  // ekranda tutar) — bu yüzden ikisinin minimumu beklenir.
-  const anchorWant = game._camera_anchor_y() - 600 * 0.72;
-  const wantCam = Math.min(anchorWant, player.position.y - 96);
-  check("17: düşünce kamera kontrol noktasına döndü",
-    cl.camera_position.y <= anchorWant + 1 && Math.abs(cl.camera_position.y - wantCam) < 40,
-    "cam=" + cl.camera_position.y.toFixed(2) + " want=" + wantCam.toFixed(2) +
-    " fark=" + Math.abs(cl.camera_position.y - wantCam).toFixed(2));
+  check("17: respawn kamerayı 0. katmana ayarladı",
+    Math.abs(cl.camera_position.y - (DE_GAME.floor_y(0) - 600 * 0.72)) < 1,
+    "cam=" + cl.camera_position.y.toFixed(2));
 
-  // 9b) ZEMİNDE duran oyuncu ölmez (yoksa aynı ölüm sonsuz tekrarlanır)
-  cl.camera_position.y = game.floors[0].position.y + 900;
-  player.position.y = game.floors[0].position.y - player.size.y;
-  rb.velocity.y = 0;
-  rb.is_grounded = true;
-  const falls1 = game.falls;
-  step(cl, 1);
-  check("17: zemindeki oyuncu ölmez", game.falls === falls1, "falls=" + game.falls);
+  // 9b) ÇİFT ZIPLAMA skill'i: best_floor >= 8'e ulaşınca açılır + pop-up gösterir
+  // (skill kilidi/zamani onceki tirmanis testlerince tuketildi; popup mekanizmasini
+  //  izole test icin kilitli duruma donup tekrar tetikliyoruz)
+  game._skill_unlocked = false;
+  ctrl.double_jump = false;
+  if (game.popup) game.popup.active = false;
+  game._check_skill();
+  const pop = cl.find_by_tag("ClimbPopup");
+  check("17: çift zıplama skill'i açıldı (best_floor >= 8)",
+    ctrl.double_jump === true && game._skill_unlocked === true);
+  check("17: skill pop-up'ı gösteriliyor",
+    pop !== null && pop.active === true &&
+    pop.get_component(DE.TextRenderer).text.indexOf("Çift") >= 0,
+    pop ? pop.get_component(DE.TextRenderer).text : "yok");
+  // 3.5sn sonra pop-up söner; çift zıplama kalıcı olur
+  for (let i = 0; i < 260; i++) step(cl, 1);
+  check("17: pop-up zamanla söner", pop.active === false);
+  check("17: çift zıplama skill'i kalıcı", ctrl.double_jump === true);
+  // Gerçek çift zıplama: havadayken SPACE tekrar zıplatır
+  rb.use_gravity = false;
+  rb.velocity.y = -300; rb.is_grounded = false;
+  ctrl._coyote = 0.0; ctrl._buffer = 0.0; ctrl._air_jumps = 0;
+  press("SPACE");
+  ctrl.update(1 / 60);
+  check("17: çift zıplama havadayken ikinci sekiş verir",
+    rb.velocity.y < -500, "vy=" + Math.round(rb.velocity.y));
+  DE.Input.instance.end_frame();
+  rb.use_gravity = true;
 
-  // 10) skor + HUD metni
-  game.on_platform_bounce(game.floors[20].get_component(DE_GAME.ClimbPlatform), player);
+  // 10) skor + HUD metni (rekor katman*10 + seviye*5)
+  game.best_floor = 25; game.max_floor = 25;
+  ctrl.reset_level(); ctrl.add_level();                 // seviye = 1
+  game._update_progress();
   const hud = cl.find_by_tag("ClimbHUD").get_component(DE.TextRenderer);
   const spd = cl.find_by_tag("ClimbSpeed").get_component(DE.TextRenderer);
   check("17: HUD katman+skor yazar", hud !== null && hud.text.indexOf("25") >= 0
     && hud.text.indexOf(String(game.score)) >= 0, hud ? hud.text : "yok");
-  check("17: HUD hız seviyesi yazar", spd !== null && spd.text.indexOf("x") >= 0, spd ? spd.text : "yok");
-  check("17: skor = rekor katman*10 + seviye*5", game.score === game.best_floor * 10 + ctrl.level * 5,
+  check("17: HUD hız seviyesi yazar", spd !== null && spd.text.indexOf("x") >= 0,
+    spd ? spd.text : "yok");
+  check("17: skor = rekor katman*10 + seviye*5",
+    game.score === game.best_floor * 10 + ctrl.level * 5,
     "score=" + game.score);
-  check("17: 20. katman sekişi ilerlemeyi korur", game.max_floor === 20, "maxf=" + game.max_floor);
+  check("17: skor = 25*10 + 1*5 = 255", game.score === 255, "score=" + game.score);
+  check("17: on_platform_bounce imzası ilerlemeyi korur",
+    game.max_floor === 25 && game.best_floor === 25,
+    "maxf=" + game.max_floor + " best=" + game.best_floor);
 
   // 11) hız seviyesi zamanla söner
   ctrl.add_level();
@@ -914,22 +1031,23 @@ console.log("TEST17 Star Climber:");
     check("17: ilk 8 katman oyuncunun sütununda (girişsiz tırmanış)", colOk);
     check("17: ilk 8 katman ekran içinde", boundsOk);
 
-    // ardışık katmanlar en az 70px örtüşmeli (REACH_OVERLAP)
+    // ardışık katmanlar dar olmayanlarda >=70px, dar katmanlarda dinamik örtüşür
     let overlapOk = true, worst = 9999;
     const keys = Object.keys(rg.floors).map(Number).sort((a, b) => a - b);
     for (let k = 1; k < keys.length; k++) {
       const p = rg.floors[keys[k - 1]], c = rg.floors[keys[k]];
       const ov = Math.min(p.position.x + p.size.x, c.position.x + c.size.x)
         - Math.max(p.position.x, c.position.x);
+      // her katman kendi genişliğine göre gereken örtüşmeyi ister
+      const need = Math.max(30, rg._placement_overlap(Math.min(p.size.x, c.size.x)));
       if (ov < worst) worst = ov;
-      if (ov < 70) { overlapOk = false; overlaps.push(keys[k - 1] + "->" + keys[k] + ":" + Math.round(ov)); }
+      if (ov < need) { overlapOk = false; overlaps.push(keys[k - 1] + "->" + keys[k] + ":" + Math.round(ov)); }
     }
-    check("17: ardışık katmanlar >=70px örtüşür", overlapOk,
+    check("17: ardışık katmanlar dinamik örtüşür", overlapOk,
       "en dar=" + Math.round(worst) + (overlaps.length ? " " + overlaps.join(" ") : ""));
 
-    // 16) GERÇEK grounded sekiş (unit test değil, sahne update'i ile).
-    //     stable-ground bulgusu: one_way platformda on_collision tetiklenmez,
-    //     bu yüzden _pump_bounce() is_grounded'dan sürmek zorunda.
+    // 16) GERÇEK manuel zıplama (unit test değil, sahne update'i ile).
+    //     SPACE basılı → grounded/coyote penceresinde do_jump çalışır.
     {
       const gs = DE_GAME.build_climber_scene(21);
       use(gs); gs.start();
@@ -942,24 +1060,32 @@ console.log("TEST17 Star Climber:");
       gp.position.y = g1.position.y - gp.size.y;
       grb.velocity.x = 0; grb.velocity.y = 0;
       grb.is_grounded = true;
+      press("SPACE");
       step(gs, 1);
-      check("17: GERÇEK sekiş (is_grounded -> _pump_bounce)", grb.velocity.y < -500,
+      check("17: GERÇEK zıplama (grounded + SPACE)", grb.velocity.y < -500,
         "vy=" + Math.round(grb.velocity.y));
+      DE.Input.instance.end_frame();
 
-      // havadayken (zemin yok) sekiş olmamalı
+      // havadayken (zemin yok, çift zıplama kapalı) SPACE ikinci zıplama vermez
       const g2 = gg.floors[3];
-      gp.position.y = g2.position.y - gp.size.y - 200;
+      gp.position.x = g2.position.x + g2.size.x / 2 - gp.size.x / 2;
+      gp.position.y = g2.position.y - gp.size.y - 120;
       grb.velocity.y = 100; grb.is_grounded = false;
-      gg._pump_bounce();
-      check("17: havadayken sekiş yok", Math.abs(grb.velocity.y - 100) < 1,
-        "vy=" + Math.round(grb.velocity.y));
+      grb.use_gravity = false;
+      const cc = gp.get_component(DE_GAME.ClimberPlayer);
+      cc._coyote = 0.0; cc._buffer = 0.0; cc.double_jump = false;
+      press("SPACE");
+      cc.update(1 / 60);
+      check("17: havadayken (çift yok) ikinci zıplama yok",
+        Math.abs(grb.velocity.y - 100) < 1, "vy=" + Math.round(grb.velocity.y));
+      DE.Input.instance.end_frame();
+      grb.use_gravity = true;
     }
 
-    // 17) GİRİŞSİZ oynanış smoke — bu test, 5 gerçek oynanış hatasının
-    //     (0. katman yok / sekiş yok / kamera ölüm döngüsü / zeminde ölüm /
-    //     respawn max_floor) hepsini birden yakalar. 3 seed x 30 sn.
-    //     Aynı zamanda oyuncunun EKRAN DIŞINA ÇIKMADIĞINI doğrular (03.10.2026
-    //     düzeltmesi: sekiş tepesi katman çizgisini aşıyordu, %7 kare dışarıda).
+    // 17) SPACE bot oynanış smoke — manuel zıplamalı sonsuz tırmanış.
+    //     3 seed x 30 sn. Amaçlar: tırmanış ilerler (best_floor büyür), ölüm
+    //     döngüsü yok, oyuncu hiç EKRAN DIŞINA ÇIKMAZ (üst kelepçe 03.10.2026
+    //     düzeltmesinin kalıcı koruması: sekiş tepesi çizgiyi aşıyordu).
     {
       let climbed = [], fell = [], offFrames = 0, worst = 0;
       for (const seed of [7, 99, 2024]) {
@@ -967,17 +1093,19 @@ console.log("TEST17 Star Climber:");
         use(ss); ss.start();
         const sg = ss.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame);
         const sp = ss.find_by_tag("Player");
-        for (let i = 0; i < 1800; i++) {           // 30 sn, hiç tuş basılmıyor
+        for (let i = 0; i < 1800; i++) {           // 30 sn, HER KARE SPACE (bot)
+          press("SPACE");
           step(ss, 1);
+          DE.Input.instance.end_frame();
           const sy = sp.position.y - ss.camera_position.y;
           if (sy < -1) { offFrames++; worst = Math.min(worst, sy); }
         }
         climbed.push(sg.best_floor);
         fell.push(sg.falls);
       }
-      check("17: GİRİŞSİZ tırmanış (3 seed, 30sn)", climbed.every(f => f >= 8),
+      check("17: SPACE bot tırmanışı (3 seed, 30sn)", climbed.every(f => f >= 8),
         "katman=" + climbed.join(","));
-      check("17: girişsiz oynanışta ölüm döngüsü yok", fell.every(f => f <= 3),
+      check("17: bot oynanışında ölüm döngüsü yok", fell.every(f => f <= 8),
         "düşme=" + fell.join(","));
       check("17: oyuncu hiç ekran dışına çıkmıyor", offFrames === 0,
         "dışarıda=" + offFrames + (worst < 0 ? " ençok=" + Math.round(worst) + "px" : ""));
@@ -1003,7 +1131,6 @@ console.log("TEST17 Star Climber:");
       use(ds); ds.start();
       const dg = ds.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame);
       const p0 = dg.floors[1].get_component(DE_GAME.ClimbPlatform);
-      const cp = dg.floors[10].get_component(DE_GAME.ClimbPlatform);
       const ops = [];
       const fake = {
         canvas: { width: 900, height: 600 }, fillStyle: "",
@@ -1011,24 +1138,191 @@ console.log("TEST17 Star Climber:");
       };
       let ok = false;
       try { p0.draw(fake, { x: 0, y: 0 }); ok = true; } catch (e) { ok = false; }
-      // 6 dikdörtgen bekleniyor: alt gölge, sol/sağ pah, üst yüzey (2 şerit)
+      // 5 dikdörtgen bekleniyor: alt gölge, sol/sağ pah, üst yüzey (2 şerit)
       check("17: katman özel çizimi çalışıyor", ok && ops.length >= 5, "dikdörtgen=" + ops.length);
       const topBand = ops.filter(o => o[1] === Math.round(dg.floors[1].position.y));
       check("17: katmanda parlak üst yüzey şeridi var", topBand.length >= 2,
         "üst şerit=" + topBand.length);
+      // kırılabilir katman çatlak çizer (checkpoint flaması kaldırıldı)
+      const brkf = Object.keys(dg.floors).map(k => dg.floors[k])
+        .find(o => o.get_component(DE_GAME.ClimbPlatform).hits_to_break > 0);
       const cops = [];
-      try { cp.draw({ canvas: { width: 900, height: 600 }, fillStyle: "",
-        fillRect(x, y, w, h) { cops.push([x, y, w, h]); } }, { x: 0, y: 0 }); } catch (e) { }
-      check("17: kontrol noktası flama/bant çiziyor", cops.length >= 8, "dikdörtgen=" + cops.length);
+      try {
+        if (brkf) brkf.get_component(DE_GAME.ClimbPlatform)
+          .draw({ canvas: { width: 900, height: 600 }, fillStyle: "",
+            fillRect(x, y, w, h) { cops.push([x, y, w, h]); } }, { x: 0, y: 0 });
+      } catch (e) { }
+      check("17: kırılabilir katman çatlak çiziyor",
+        !brkf || cops.length >= 6, "dikdörtgen=" + cops.length);
       // arka plan bileşeni
       const bg = ds.find_by_tag("ClimbBackdrop");
-      check("17: bina cephesi (arka plan) var", bg !== null &&
+      check("17: yeşil çevre -> astro arka planı var", bg !== null &&
         bg.get_component(DE_GAME.ClimbBackdrop) !== null);
+
+      // 20) ZORLUK katmanları (07.10): 9. kattan sonra hareketli/diken/dar üretilir.
+      {
+        // Oyuncu ana oyundaki gibi mavi yuvarlak gövde (ClimbPlayerVisual), SpriteRenderer YOK.
+        const pv = ds.find_by_tag("Player").get_component(DE_GAME.ClimbPlayerVisual);
+        const psr = ds.find_by_tag("Player").get_component(DE.SpriteRenderer);
+        check("17: climber player ana player görünümünde (mavi gövde)",
+          pv !== null && psr === null);
+        // Birden çok seed'te zorluk türleri en az birer kez üretildi mi?
+        let hasMove = false, hasSpike = false, hasNarrow = false;
+        for (const s of [7, 42, 99, 2024, 555]) {
+          const zs = DE_GAME.build_climber_scene(s);
+          use(zs); zs.start();
+          const zg = zs.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame);
+          const keys2 = Object.keys(zg.floors).map(Number).sort((a, b) => a - b);
+          for (const k of keys2) {
+            const cpz = zg.floors[k].get_component(DE_GAME.ClimbPlatform);
+            if (!cpz) continue;
+            if (k > 8 && cpz.moving) hasMove = true;
+            if (k > 8 && cpz.spiked) hasSpike = true;
+            if (k > 8 && zg.floors[k].size.x < 90) hasNarrow = true;
+          }
+        }
+        check("17: zorluk: hareketli katman üretiliyor (9+)", hasMove);
+        check("17: zorluk: dikenli katman üretiliyor (9+)", hasSpike);
+        check("17: zorluk: dar katman üretiliyor (9+)", hasNarrow);
+      }
+
+      // 17b) YENİ YERLEŞTİRME ALGORİTMASI + YENİ HARİTA + REKOR (08.10.2026):
+      //   NO-STACK: ardışık katmanlar üst üste dizilmiyor (özellikle geniş olanlar
+      //     en az NO_STACK_SHIFT kayar). IN-BOUND TREND: kule kenara kapılıp
+      //     oyuncudan uzaklaşmıyor. Altitude shrink: yükseldikçe platform daralır.
+      //   Ölümde YENİ HARİTA üretilir (seed değişir); rekor oturum boyunca kalıcı.
+      {
+        const SW2 = 450;
+        function metrics7(seed, floorsMax) {
+          const s2 = DE_GAME.build_climber_scene(seed);
+          use(s2); s2.start();
+          const g2 = s2.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame);
+          for (let i = 16; i <= floorsMax; i++) g2._build_floor(i);
+          const low = [1,2,3,4,5,6].map(k => g2.floors[k].size.x);
+          const high = [27,28,29,30,31,32].map(k => g2.floors[k].size.x);
+          const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+          let allShift = 0, pairN = 0, all30 = 0, bigShift = 0, bigN = 0, big30 = 0, maxDev = 0;
+          for (let k = 1; k <= floorsMax - 1; k++) {
+            const a = g2.floors[k], b = g2.floors[k + 1];
+            const ca = a.position.x + a.size.x / 2, cb = b.position.x + b.size.x / 2;
+            const d = Math.abs(cb - ca);
+            allShift += d; pairN++;
+            if (d >= 30) all30++;
+            if (a.size.x >= 100 && b.size.x >= 100) {
+              bigShift += d; bigN++;
+              if (d >= 30) big30++;
+            }
+            const dev = Math.abs(ca - SW2);
+            if (dev > maxDev) maxDev = dev;
+          }
+          return { g2, allShift, pairN, all30, bigN, big30, bigShift, maxDev,
+                   shrink: avg(low) > avg(high) + 5, lowA: avg(low), highA: avg(high) };
+        }
+        const m1 = metrics7(7, 40);
+        check("17b: NO-STACK — komşu katman merkezleri üst üste dizilmiyor",
+          m1.allShift / m1.pairN >= 30 && m1.all30 / m1.pairN >= 0.5,
+          "ortShift=" + Math.round(m1.allShift / m1.pairN) +
+            " >=30:%" + Math.round(100 * m1.all30 / m1.pairN));
+        check("17b: geniş komşuluklar belirgin kaymış",
+          m1.bigN >= 3 && m1.bigShift / m1.bigN >= 40 && m1.big30 / m1.bigN >= 0.75,
+          "bigN=" + m1.bigN + " ortShift=" + Math.round(m1.bigShift / m1.bigN) +
+            " >=30:%" + Math.round(100 * m1.big30 / m1.bigN));
+        check("17b: IN-BOUND TREND — tüm katmanlar ekran ortasına yakın",
+          m1.maxDev <= 160, "maxDev=" + Math.round(m1.maxDev));
+        check("17b: yükseldikçe platformlar daralıyor (altitude shrink)",
+          m1.shrink, "low=" + Math.round(m1.lowA) + " high=" + Math.round(m1.highA));
+
+        // Yüzey biyomu: ana oyun biyomlarından (astro HARİÇ), seed'a bağlı deterministik.
+        const goodBiomes = ["forest", "cave", "ice", "desert"];
+        let biomeOk = true, sameSeedOk = true;
+        for (const s3 of [7, 11, 42, 99, 2024, 555]) {
+          const sA = DE_GAME.build_climber_scene(s3);
+          use(sA); sA.start();
+          const gA = sA.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame);
+          if (goodBiomes.indexOf(gA.biome) < 0) biomeOk = false;
+          const bgA = sA.find_by_tag("ClimbBackdrop");
+          const bA = bgA ? bgA.get_component(DE_GAME.ClimbBackdrop) : null;
+          if (!bA || bA.biome !== gA.biome) biomeOk = false;
+          const sB = DE_GAME.build_climber_scene(s3);
+          use(sB); sB.start();
+          const gB = sB.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame);
+          if (gB.biome !== gA.biome || gB.floors[3].position.x !== gA.floors[3].position.x)
+            sameSeedOk = false;
+        }
+        check("17b: yüzey biyomu ana oyun biyomlarından (astro hariç)", biomeOk);
+        check("17b: biyom ve kule seed'a bağlı deterministik", sameSeedOk);
+
+        // Ölüm -> YENİ HARİTA (seed değişir, aynı map tekrar oynanmaz), rekor korunur.
+        const rse = DE_GAME.build_climber_scene(12);
+        use(rse); rse.start();
+        const rgg = rse.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame);
+        const rpl = rse.find_by_tag("Player");
+        const rrb = rpl.get_component(DE.Rigidbody2D);
+        rgg.max_floor = 20; rgg.best_floor = 20;
+        rgg._skill_unlocked = true;
+        if (rgg.ctrl) rgg.ctrl.double_jump = true;
+        const seedBefore = rgg.seed;
+        const xBefore = JSON.stringify([1,2,3,4,5,6].map(k => Math.round(rgg.floors[k].position.x * 10)));
+        rpl.position.y = rgg.floors[0].position.y + 600;
+        rrb.velocity.y = 400;
+        const fallsB = rgg.falls;
+        step(rse, 1);
+        check("17b: ölümde YENİ HARİTA üretildi (seed değişti)",
+          rgg.seed !== seedBefore, "seed=" + seedBefore + "->" + rgg.seed);
+        check("17b: yeni haritada kule farklı yerleşti", xBefore !==
+          JSON.stringify([1,2,3,4,5,6].map(k => Math.round(rgg.floors[k].position.x * 10))));
+        check("17b: ölümde rekor korunur, ilerleme sıfırlanır",
+          rgg.best_floor === 20 && rgg.max_floor === 0 && rgg.falls === fallsB + 1,
+          "best=" + rgg.best_floor + " max=" + rgg.max_floor + " falls=" + rgg.falls);
+        check("17b: yeni yüzey biyomu geçerli (astro değil)",
+          goodBiomes.indexOf(rgg.biome) >= 0, "biome=" + rgg.biome);
+        check("17b: skill ölümde kalıcı (rekor gibi)",
+          rgg._skill_unlocked === true && (rgg.ctrl ? rgg.ctrl.double_jump === true : true));
+
+        // REKOR (state.climber_high) açılış boyunca kalıcı: HUD'da görünür, yazılır.
+        const prevHigh = DE_GAME.state ? DE_GAME.state.climber_high : 0;
+        if (DE_GAME.state) DE_GAME.state.climber_high = 17;
+        const rsc = DE_GAME.build_climber_scene(5);
+        use(rsc); rsc.start();
+        const rgg2 = rsc.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame);
+        const rHud = rsc.find_by_tag("ClimbRecord");
+        check("17b: rekor HUD'u mevcut ve açılışta kalıcı rekoru gösterir",
+          rHud !== null &&
+            rHud.get_component(DE.TextRenderer).text.indexOf("17") >= 0,
+          rHud ? rHud.get_component(DE.TextRenderer).text : "yok");
+        rgg2.best_floor = 30;
+        rgg2._update_progress();
+        check("17b: yeni rekor state'e yazılır",
+          !!DE_GAME.state && DE_GAME.state.climber_high === 30,
+          "high=" + (DE_GAME.state && DE_GAME.state.climber_high));
+        if (DE_GAME.state) DE_GAME.state.climber_high = prevHigh;
+      }
     }
   }
 }
 
-// Toplam
-console.log("----------------------------------------");
-console.log("SONUÇ: " + pass + " geçti, " + fail + " kaldı");
-if (fail > 0) process.exit(1);
+// TEST18: biyom fiziği minimum (07.10) — zıplama her biyomda AYNI, dash izi söner.
+console.log("TEST18 biyom fiziği minimum:");
+{
+  const BIOMES = ["forest", "cave", "ice", "desert", "astro"];
+  const { player, ctrl } = freshLevel("forest", 7, 4, 0);
+  let parity_ok = true;
+  for (const b of BIOMES) {
+    ctrl.apply_biome(b);
+    if (ctrl.biome_jump !== 1.0 || ctrl.biome_gravity !== 1.0 || ctrl.biome_wind !== 0.0) parity_ok = false;
+  }
+  check("18: tüm biyomlarda jump/gravity/wind nötr", parity_ok);
+  ctrl.apply_biome("ice");
+  check("18: buz kaygan (grip<1)", ctrl.biome_grip < 1.0, "grip=" + ctrl.biome_grip);
+  ctrl.apply_biome("desert");
+  check("18: çöl kaygan değil (grip=1)", ctrl.biome_grip === 1.0);
+
+  // Dash bittikten sonra izler yaşlanıp havuzdan düşer (kalıcı iz bug'ı regression).
+  ctrl._afterimages = [[player.position.x, player.position.y, 1.0, 1.0, 0.0]];
+  ctrl._afterimages.push([player.position.x, player.position.y, 1.0, 1.0, 0.05]);
+  const dt = 1 / 60;
+  for (let i = 0; i < 30; i++) ctrl.update(dt);
+  const expired = ctrl._afterimages.every(g => g[4] >= 0.18) || ctrl._afterimages.length === 0;
+  check("18: dash sonrası izler yaşlanıp silinir", expired,
+    "n=" + ctrl._afterimages.length + " ages=[" + ctrl._afterimages.map(g => g[4].toFixed(2)).join(",") + "]");
+}

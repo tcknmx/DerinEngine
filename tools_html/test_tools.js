@@ -89,7 +89,9 @@ async function main() {
   console.log("=== 3) api_find + api_modules ===");
   const fm = dt.api_dispatch("modules", []);
   check("modules 13 maddeli", fm.ok && fm.modules.length === 13);
-  const ff = dt.api_dispatch("find", ["GameObject", "deep_engine"]);
+  // Python motor klasoru (deep_engine/) 08.10.2026'da silindi -> arama
+  // birincil JS motor klasorunde yapilir.
+  const ff = dt.api_dispatch("find", ["GameObject", "deep_engine_html"]);
   check("find eşleşme buldu", ff.ok && ff.total > 0, "total=" + (ff && ff.total));
 
   console.log("=== 4) webpanel.js HTTP round-trip ===");

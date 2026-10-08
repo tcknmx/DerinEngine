@@ -238,9 +238,19 @@ DE_GAME.PlayerController = class PlayerController extends DE.Component {
             }
         }
 
-        // Prosedürel Squash & Stretch Pürüzsüzleştirme (Lerp)
-        this.scale_x += (1.0 - this.scale_x) * Math.min(dt * 14.0, 1.0);
-        this.scale_y += (1.0 - this.scale_y) * Math.min(dt * 14.0, 1.0);
+        // Prosedürel Squash & Stretch Pürüzsüzleştirme (Lerp).
+        // Çöl kumu: yerdeyken hafif basık kalır (görsel mini-biyom efekti).
+        const squash_home_x = (this.biome === "desert" && this.rb.is_grounded) ? 1.05 : 1.0;
+        const squash_home_y = (this.biome === "desert" && this.rb.is_grounded) ? 0.93 : 1.0;
+        this.scale_x += (squash_home_x - this.scale_x) * Math.min(dt * 14.0, 1.0);
+        this.scale_y += (squash_home_y - this.scale_y) * Math.min(dt * 14.0, 1.0);
+
+        // Dash after-image ömür: dash sırasında da, bittikten sonra da yaşlanır;
+        // age>=0.18 (alpha<=0 sınırı) üstü havuzdan düşer (kalıcı iz bug'ı fix).
+        for (let i = this._afterimages.length - 1; i >= 0; i--) {
+            this._afterimages[i][4] += dt;
+            if (this._afterimages[i][4] >= 0.18) this._afterimages.splice(i, 1);
+        }
 
         // Havada geçen süre + doğru iniş algılama
         if (!this.rb.is_grounded) {
@@ -260,8 +270,13 @@ DE_GAME.PlayerController = class PlayerController extends DE.Component {
             this.rb.velocity.y = 0;
             this.dash_speed = Math.min(3.2, this.dash_speed + 8.0 * dt);
             this.rb.velocity.x = this.direction_dash * this.speed * this.dash_speed;
-            if (this.particles && DE._rng.rand() < 0.5) {
-                this.particles.burst(2, [100, 220, 255], [10, 30], [3, 5], [0.2, 0.4], 0);
+            const sand_dash = this.biome === "desert";
+            if (this.particles && DE._rng.rand() < (sand_dash ? 0.9 : 0.5)) {
+                // Çöl kumu: dash'te ayak hizasından kum sıçrar (mini-biyom efekti).
+                this.particles.burst(sand_dash ? 4 : 2,
+                    sand_dash ? [220, 180, 110] : [100, 220, 255],
+                    [10, 40], [3, 5], [0.2, 0.4], 0,
+                    sand_dash ? [0, this.game_object.size.y - 4] : [0, 0]);
             }
             // After-image: dash sırasında ~0.03s'de bir anlık görüntü
             this._afterimage_timer -= dt;
@@ -272,7 +287,6 @@ DE_GAME.PlayerController = class PlayerController extends DE.Component {
                     this.scale_x, this.scale_y, 0.0]);
                 if (this._afterimages.length > 6) this._afterimages.shift();
             }
-            for (const g of this._afterimages) g[4] += dt;
             if (this.dash_timer <= 0) {
                 this.dash_momentum = this.direction_dash * this.speed * 1.6;
             }
@@ -697,13 +711,16 @@ DE_GAME.PlayerController = class PlayerController extends DE.Component {
 
     apply_biome(biome) {
         this.biome = biome || "forest";
-        if (biome === "ice") { this.biome_gravity = 1.0; this.biome_jump = 1.12; this.biome_grip = 0.55; this.biome_wind = 0.0; }
-        else if (biome === "cave") { this.biome_gravity = 1.25; this.biome_jump = 0.9; this.biome_grip = 0.85; this.biome_wind = 0.0; }
-        else if (biome === "desert") { this.biome_gravity = 1.0; this.biome_jump = 1.0; this.biome_grip = 0.8; this.biome_wind = 1.15; }
-        else if (biome === "astro") { this.biome_gravity = 0.6; this.biome_jump = 1.15; this.biome_grip = 0.9; this.biome_wind = 0.0; }
-        else { this.biome_gravity = 1.0; this.biome_jump = 1.0; this.biome_grip = 1.0; this.biome_wind = 0.0; }
+        // Biyoma özel fizikler MINIMUM tutulur: zıplama/yayçekimi/rüzgar her biyomda
+        // AYNI kalsın (normal + çift zıplama tutarlı). Yalnız yüzey hissi değişir:
+        //   - ice: kaygan zemin (grip 0.55)
+        //   - desert: kuma hafif gömülme (squash üstte) + dash'te kum sıçraması
+        this.biome_gravity = 1.0;
+        this.biome_jump = 1.0;
+        this.biome_wind = 0.0;
+        this.biome_grip = (biome === "ice") ? 0.55 : 1.0;
         const rb = this.game_object.get_component(DE.Rigidbody2D);
-        // Oyuncu taban yerçekimi 1400 (bkz. _build_player); biyomlar yalnız ölçekler.
+        // Oyuncu taban yerçekimi 1400 (bkz. _build_player); biyomlar artık ölçüsünde.
         if (rb !== null) rb.gravity = 1400.0 * this.biome_gravity;
     }
 
@@ -1324,7 +1341,7 @@ DE_GAME.CoinVisual = class CoinVisual extends DE.Component {
 
     draw(ctx, camera_offset) {
         const o = this.game_object;
-        if (!o) return;
+        if (!o || !o.active) return;
         const sx = o.position.x - camera_offset.x;
         const sy = o.position.y - camera_offset.y;
         const r = o.size.x / 2;

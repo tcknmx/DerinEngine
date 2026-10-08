@@ -113,7 +113,13 @@ class El {
   appendChild(c) { this.children.push(c); return c; }
   removeChild(c) { const i = this.children.indexOf(c); if (i >= 0) this.children.splice(i, 1); return c; }
   remove() {} focus() {} blur() {} closest() { return null; }
-  getContext(kind) { if (kind !== "2d") return null; return this._ctx || (this._ctx = makeCtx(this, this._stats)); }
+  getContext(kind) {
+    if (kind !== "2d") return null;
+    // document.createElement("canvas") ile doğan ek canvasların (lighting
+    // karartma maskesi vb.) kendi sayaçları yoktur → varsayılan kur.
+    if (!this._stats) this._stats = { calls: 0 };
+    return this._ctx || (this._ctx = makeCtx(this, this._stats));
+  }
   getBoundingClientRect() { return { left: 0, top: 0, right: 900, bottom: 600, width: 900, height: 600, x: 0, y: 0 }; }
   get innerHTML() { return this._inner; }
   set innerHTML(v) { this._inner = String(v); if (String(v) === "") this.children.length = 0; }
@@ -241,7 +247,13 @@ function boot(opts) {
       dt = dt || 1000 / 60;
       for (let i = 0; i < n; i++) {
         const cb = raf[0];
-        if (!cb) { fail("dongu", "requestAnimationFrame geri cagirmadi (dongu durdu?)"); return; }
+        if (!cb) {
+          const eng = sandbox.DE && sandbox.DE.Engine && sandbox.DE.Engine.instance;
+          fail("dongu", "requestAnimationFrame geri cagirmadi (dongu durdu?)"
+            + " | is_running=" + (eng ? eng.is_running : "?")
+            + " | sahne=" + (eng && eng.active_scene ? eng.active_scene.name : "yok"));
+          return;
+        }
         raf.length = 0;
         now += dt;
         TOTAL_FRAMES++;
@@ -279,6 +291,13 @@ function tour(name, fn) {
   try { fn(); } catch (e) { fail("tur", name + " -> " + e.message + "\n      " + String(e.stack || "").split("\n")[1]); }
   const added = ERRORS.length - before;
   console.log((added ? "  HATA " : "  OK   ") + name + (added ? "  (" + added + " hata)" : ""));
+  const sc = h.engine && h.engine.active_scene;
+  const pl = sc ? sc.find_by_tag("Player") : null;
+  const hpObj = pl ? pl.get_component(DE.Health) : null;
+  console.log("      [teşhis] " + name + ": scene=" + (sc ? sc.name : "yok")
+    + " hp=" + (hpObj ? hpObj.current_hp : "-")
+    + " pos=" + (pl ? Math.round(pl.position.x) + "," + Math.round(pl.position.y) : "-")
+    + " run=" + (h.engine ? h.engine.is_running : "?"));
 }
 
 // 1) Ana menü: açılış + 120 kare boşta
@@ -294,7 +313,12 @@ tour("campaign/play", function () {
   h.hold("d"); h.frames(45); h.release("d");
   h.tap(" "); h.frames(20);
   h.tap(" "); h.frames(30);
-  h.hold("a"); h.frames(40); h.release("a");
+  // Sola kısa adım + denge: 40 karelik "a" sürüklenmesi prosedürel seviyenin
+  // sol kenarından (x<0) boşluğa düşürüp oyuncuyu öldürüyordu (pause fix'inden
+  // sonra gerçek pause oyunu durdurup kaldırdığı için ölüm ilerliyordu).
+  // Hareket yeteneği hâlâ ölçülüyor; oyuncu güvenli bölgede kalıyor.
+  h.hold("a"); h.frames(12); h.release("a");
+  h.hold("d"); h.frames(12); h.release("d");
   h.tap("f"); h.frames(15);
   h.hold("Shift"); h.frames(12); h.release("Shift");
   h.frames(120);
@@ -335,10 +359,24 @@ tour("debug/F3", function () {
 
 // 4) Duraklat (ESC) -> devam
 tour("pause", function () {
+  const sc0 = h.engine.active_scene;
+  const pl0 = sc0 ? sc0.find_by_tag("Player") : null;
+  const h0 = pl0 ? pl0.get_component(DE.Health) : null;
+  const rb0 = pl0 ? pl0.get_component(DE.Rigidbody2D) : null;
   h.tap("Escape");
   h.frames(60);
   h.tap("Escape");
   h.frames(30);
+  const sc1 = h.engine.active_scene;
+  const pl1 = sc1 ? sc1.find_by_tag("Player") : null;
+  const h1 = pl1 ? pl1.get_component(DE.Health) : null;
+  const rb1 = pl1 ? pl1.get_component(DE.Rigidbody2D) : null;
+  console.log("      [teşhis] pause: once=" + sc0.name + " hp=" + (h0 ? h0.current_hp + "/" + h0.max_hp : "?")
+    + " pos=" + (pl0 ? Math.round(pl0.position.x) + "," + Math.round(pl0.position.y) : "yok")
+    + " | sonra=" + sc1.name + " hp=" + (h1 ? h1.current_hp + "/" + h1.max_hp : "?")
+    + " pos=" + (pl1 ? Math.round(pl1.position.x) + "," + Math.round(pl1.position.y) : "yok")
+    + " grounded=" + (rb1 ? rb1.is_grounded : "?")
+    + " vy=" + (rb1 ? rb1.velocity.y.toFixed(1) : "?"));
 });
 
 // 5) Dil degistirme (T)
@@ -535,18 +573,27 @@ BIOMES.forEach(function (b) {
     gate(b + ": paralaks temasi metin", px && typeof px.theme === "string", px ? "tip=" + typeof px.theme : "yok");
     gate(b + ": paralaks katmani > 0", px && px.layers.length > 0, px ? "katman=" + px.layers.length : "yok");
 
-    // 2) zemin arkada mi?
+    // 2) zemin (kullanici karari 07.10): kare grid cizilmez; tilemap sadece
+    // veri koprusu olarak sahnede durur (aktif degil), gorsel eski düz yumuşak
+    // sprite'lardir.
     const tm = sc.game_objects.filter(function (o) { return o.name === "TilemapGround"; })[0];
     if (tm) {
-      gate(b + ": zemin en arkada", tm.z_index < 0, "z_index=" + tm.z_index);
+      gate(b + ": tilemap gorsel kapali (sadece veri)", tm.active === false, "active=" + tm.active);
       const tmc = tm.get_component(DE.Tilemap);
-      gate(b + ": zemin dokusu acik", tmc && tmc.textured === true);
       let filled = 0;
       tmc.layers.forEach(function (L) {
         L.grid.forEach(function (r) { r.forEach(function (c) { if (c !== null && c !== undefined) filled++; }); });
       });
-      gate(b + ": zeminde karo var", filled > 0, "karo=" + filled);
+      gate(b + ": tilemap veri yine dolu", filled > 0, "karo=" + filled);
     }
+    const groundShown = sc.game_objects.filter(function (o) {
+      if (o.tag !== "Ground") return false;
+      const col = o.get_component(DE.BoxCollider);
+      if (col && col.one_way) return false;
+      const s = o.get_component(DE.SpriteRenderer);
+      return s && s.visible !== false;
+    });
+    gate(b + ": zemin sprite'lari gorunur (duz tasarim)", groundShown.length > 0, "gorsel=" + groundShown.length);
 
     // 3) coinler gorunur mu?
     const coins = sc.game_objects.filter(function (o) { return o.tag === "Coin"; });

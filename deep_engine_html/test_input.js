@@ -194,4 +194,67 @@ const I = DE.Input.instance;
     check("A birakildi -> analog 0.9", Math.abs(I.get_horizontal_axis() - 0.9) < 0.001);
 }
 
+// ================= M2: fare koordinat uzayı (canvas rect + CSS ölçek) =================
+// Eski tuzak: test_input.js sahte olaylara canvas-uzayı koordinat veriyor ve
+// getBoundingClientRect={left:0,top:0} stub'lıyordu → input.js:58'deki ham
+// clientX/Y hatası görünmez kalıyordu (menü hover/tık, fare atış, seviye
+// seçimi hep kaymıştı). Gerçekçi rect: 2px border + ortalama + CSS ölçek.
+{
+    const savedEngine = DE.Engine.instance;
+    // Gerçek index.html düzeni: 2px border + CSS ölçek (960x640 dış, 900x600 mantıksal)
+    const rect = { left: 508, top: 40, width: 960, height: 640, right: 1468, bottom: 680 };
+    DE.Engine.instance = {
+        canvas: {
+            width: 900, height: 600,
+            clientLeft: 2, clientTop: 2, clientWidth: 956, clientHeight: 636,
+            getBoundingClientRect: () => rect,
+        },
+    };
+    // içerik merkezi (510+478, 42+318) = (988,360) -> mantıksal canvas (450,300)
+    (handlers["mousemove"] || []).forEach(f => f({ clientX: 988, clientY: 360 }));
+    let p = I.get_mouse_position();
+    check("fare: pencere (988,360) -> canvas (450,300)",
+        Math.abs(p.x - 450) < 0.01 && Math.abs(p.y - 300) < 0.01,
+        "x=" + p.x + " y=" + p.y);
+    // sol üst köşe: 2px border payı çıkarılır → pencere (510,42) -> canvas (0,0)
+    (handlers["mousemove"] || []).forEach(f => f({ clientX: 510, clientY: 42 }));
+    p = I.get_mouse_position();
+    check("fare: border ofseti çıkarıldı (0,0)", p.x === 0 && p.y === 0,
+        "x=" + p.x + " y=" + p.y);
+    // mousedown da aynı uzaya çevirir (hareket etmeden tıklama)
+    (handlers["mousedown"] || []).forEach(f => f({ button: 0, clientX: 988, clientY: 360 }));
+    p = I.get_mouse_position();
+    check("fare: mousedown da canvas uzayında", Math.abs(p.x - 450) < 0.01 && Math.abs(p.y - 300) < 0.01,
+        "x=" + p.x + " y=" + p.y);
+    I.end_frame();
+    DE.Engine.instance = savedEngine;
+    // rectsiz ortam (stub) → ham koordinat korunur (geriye uyumluluk)
+    (handlers["mousemove"] || []).forEach(f => f({ clientX: 7, clientY: 9 }));
+    p = I.get_mouse_position();
+    check("fare: rect yoksa ham koordinat", p.x === 7 && p.y === 9, "x=" + p.x + " y=" + p.y);
+}
+
+// ---- Sanal (dokunmatik) tuşlar: DE.Input.set_virtual_key_down/up ----
+{
+    I.set_virtual_key_down("SPACE");
+    check("virtual: set_virtual_key_down -> get_key_down true", I.get_key_down("SPACE") === true);
+    check("virtual: get_key held true", I.get_key("SPACE") === true);
+    I.end_frame();
+    check("virtual: end_frame sonrasi down false", I.get_key_down("SPACE") === false);
+    check("virtual: end_frame sonrasi held korunur", I.get_key("SPACE") === true);
+    I.set_virtual_key_up("SPACE");
+    check("virtual: set_virtual_key_up -> get_key false", I.get_key("SPACE") === false);
+    check("virtual: up kenari gorunur", I.get_key_up("SPACE") === true);
+    I.end_frame();
+    check("virtual: up end_frame'de temizlenir", I.get_key_up("SPACE") === false);
+    // A + D ayni anda (sagd oyun: sol-sag tutus) — held set birlikte calisir
+    I.set_virtual_key_down("A");
+    I.set_virtual_key_down("D");
+    check("virtual: iki tuş aynı anda held", I.get_key("A") === true && I.get_key("D") === true);
+    check("virtual: horizontal eksen solda kalir (A|-D)", I.get_horizontal_axis() >= -1 && I.get_horizontal_axis() <= 1);
+    I.clear_virtual_keys();
+    check("virtual: clear tümünü bırakır", I.get_key("A") === false && I.get_key("D") === false);
+    I.end_frame();
+}
+
 done();

@@ -151,7 +151,26 @@ barındırılsın.
 
 ---
 
+## MASTER SIRADAKİ Kuyruğu (hangi oturumda ne sırada)
+
 ## KARAR LOGU (kullanıcı kararları, kronolojik özet)
+
+### 08.10.2026 — **PYTHON MOTOR SİLDİ + parite kapısı kaldırıldı (ORTA kapandı)**
+Kullanıcı kararları (aynı gün, aşama aşama): *"Önce ORTA farkları kapat, sil"* +
+*"Parite kapısı (Modül 14/parity_check.py) kaldırılsın"* + *"py motora veda edecez"*.
+- **Ön koşul tamam:** ORTA parite farkları **M1–M11 tamamı** JS'te kapatıldı
+  (M10 sürüm rozeti/konsol, M11 TextRenderer emoji segmentasyonu dahil);
+  M7 MT19937 kapısı "6+6 BİREBİR" geçti; tam regresyon yeşil.
+- **Silinen:** `deep_engine/` (21 py), `game/*.py` (9), `main.py`, `tests/*.py` (3),
+  `tools/parity_check.py`, `deep_engine_html/PARITE_RAPORU.md`.
+  Hepsi git track'li → `git checkout e6bf3e8 -- <yol>` ile geri getirilebilir.
+- **Kaldırılan:** deep-tool **Modül 14** (parite denetimi) + py-motor bağımlı
+  kontroller (Modül 1 `run_smoke`, Modül 9 `_reg_seed`) — `deep-tool.py --lang tr all`
+  = **0 WARN/BUG/ERR**. `deep-tool.py`/`webpanel.py` **kaldı** (JS/HTML motorunun
+  hizmetinde).
+- **Yeni referans:** "Python'da nasıldı?" → git geçmişi (`git show e6bf3e8:...`)
+  + session kayıtları (`_shared.md`, `02_engine.md`). **AGENTS.md** MOTOR KARARI
+  kutusu "JS TEK KAYNAK" olarak yenilendi.
 
 ### 03.10.2026 — **MOTOR YOLU DEĞİŞTİ: JS birincil, Python donduruldu**
 Kullanıcı kararı: *"tüm py motoru tamamen js motora transfer et, artık html motordan
@@ -193,6 +212,16 @@ devam edecez, py motor back geliştirme kalcsk"*.
 ---
 
 ## MASTER SIRADAKİ Kuyruğu (hangi oturumda ne sırada)
+
+> **06.10.2026 YOL NOTU (kullanıcı kararı):** Öncelik = **HTML motoru standalone
+> yapmak** ve artık **yalnız JS/HTML hattından devam etmek.** Python **silinmiyor**
+> ama geri planda donmuş referans olarak kalıyor; bundan sonra yeni geliştirme JS
+> tarafındadır. Sıra: (1) HTML standalone tamam → (2) motif/parite raporu fix'leri
+> → (3) game feel'in usulüne uygun yapılandırılması. *Aynı görüşmede A1-A5
+> (5 OYUNU BOZAR parite fix'leri) + smoke stabilizasyonu tamamlandı (06.10).*
+> **⚠️ 08.10.2026 GÜNCELLEME:** "Python silinmiyor" kararı **değişti** — ORTA
+> farkları (M1-M11) kapatıldıktan sonra py motor **silindi** (yukarıda 08.10
+> kararına bak).
 
 Adaylar, sahibi olan oturumla birlikte. Sırayı kullanıcı belirler.
 

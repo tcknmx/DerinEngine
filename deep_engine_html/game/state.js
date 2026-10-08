@@ -5,6 +5,12 @@
  */
 var DE_GAME = DE_GAME || {};
 
+// Oyun sürümü (Star Collector Hero). Motor sürümü DE.__version__ (core.js) ile
+// AYRI sayılır — tek sürüm satırı fikri iptal (AGENTS.md "SÜRÜM MODELİ").
+// Python tarafındaki tek satır (deep_engine/__init__.py = 0.1.19) burada oyun
+// sürümü olarak taşınır; menü rozeti + konsol `version` bu değeri gösterir.
+DE_GAME.__version__ = "0.1.19";
+
 // Global kampanya durumu: chain (biyom listesi) + başlangıç bilgisi.
 DE_GAME.state = {
     campaign_state: {

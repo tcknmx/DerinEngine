@@ -23,16 +23,42 @@ function _now() {
     return (typeof performance !== "undefined") ? performance.now() : Date.now();
 }
 
-function _fill_rect(ctx, color, x, y, w, h) {
-    if (w <= 0 || h <= 0) return;
-    ctx.fillStyle = "rgb(" + color[0] + "," + color[1] + "," + color[2] + ")";
-    ctx.fillRect(Math.trunc(x), Math.trunc(y), Math.trunc(w), Math.trunc(h));
+function _round_rect_path(ctx, x, y, w, h, r) {
+    // Python pygame.draw.rect(border_radius) eşi: yumuşak köşeli dikdörtgen yolu.
+    if (ctx.roundRect) {
+        ctx.roundRect(x, y, w, h, r);
+        return;
+    }
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
 }
 
-function _stroke_rect(ctx, color, x, y, w, h, width) {
+function _fill_rect(ctx, color, x, y, w, h, radius = 0) {
+    if (w <= 0 || h <= 0) return;
+    ctx.fillStyle = "rgb(" + color[0] + "," + color[1] + "," + color[2] + ")";
+    if (radius > 0) {
+        ctx.beginPath();
+        _round_rect_path(ctx, Math.trunc(x), Math.trunc(y), Math.trunc(w), Math.trunc(h), radius);
+        ctx.fill();
+    } else {
+        ctx.fillRect(Math.trunc(x), Math.trunc(y), Math.trunc(w), Math.trunc(h));
+    }
+}
+
+function _stroke_rect(ctx, color, x, y, w, h, width, radius = 0) {
     ctx.strokeStyle = "rgb(" + color[0] + "," + color[1] + "," + color[2] + ")";
     ctx.lineWidth = width;
-    ctx.strokeRect(Math.trunc(x), Math.trunc(y), Math.trunc(w), Math.trunc(h));
+    if (radius > 0) {
+        ctx.beginPath();
+        _round_rect_path(ctx, Math.trunc(x), Math.trunc(y), Math.trunc(w), Math.trunc(h), radius);
+        ctx.stroke();
+    } else {
+        ctx.strokeRect(Math.trunc(x), Math.trunc(y), Math.trunc(w), Math.trunc(h));
+    }
 }
 
 function _arc_stroke(ctx, cx, cy, r, color, width) {
@@ -63,11 +89,11 @@ function _draw_boss_bar(ctx, obj, health, boss_key, camera_offset, bar_w = 80) {
     const bar_h = 10;
     const bar_x = sx - Math.trunc((bar_w - w) / 2);
     const bar_y = sy - 24;
-    _fill_rect(ctx, [30, 30, 30], bar_x, bar_y, bar_w, bar_h);
+    _fill_rect(ctx, [30, 30, 30], bar_x, bar_y, bar_w, bar_h, 3);
     const pct = Math.max(0.0, health.current_hp / health.max_hp);
     const fill_w = Math.trunc(bar_w * pct);
-    if (fill_w > 0) _fill_rect(ctx, [255, 80, 60], bar_x, bar_y, fill_w, bar_h);
-    _stroke_rect(ctx, [255, 255, 255], bar_x, bar_y, bar_w, bar_h, 1);
+    if (fill_w > 0) _fill_rect(ctx, [255, 80, 60], bar_x, bar_y, fill_w, bar_h, 3);
+    _stroke_rect(ctx, [255, 255, 255], bar_x, bar_y, bar_w, bar_h, 1, 3);
     if (typeof ctx.fillText === "function") {
         const name_key = _boss_bar_name(boss_key);
         ctx.fillStyle = "rgb(255,210,180)";
@@ -233,19 +259,21 @@ class BossController extends DE.Component {
         const sx = Math.trunc(this.game_object.position.x - camera_offset.x);
         const sy = Math.trunc(this.game_object.position.y - camera_offset.y);
         const w = Math.trunc(this.game_object.size.x);
-        // Gözler (accent) + ağız
-        _fill_rect(ctx, this.accent_color, sx + 12, sy + 16, 12, 8);
-        _fill_rect(ctx, this.accent_color, sx + 36, sy + 16, 12, 8);
-        _fill_rect(ctx, [20, 10, 10], sx + 16, sy + 36, 28, 6);
+        const h = Math.trunc(this.game_object.size.y);
+        // Gövde (border_radius=8, Python bosses.py:gövde) + gözler (accent) + ağız
+        _fill_rect(ctx, this.body_color, sx, sy, w, h, 8);
+        _fill_rect(ctx, this.accent_color, sx + 12, sy + 16, 12, 8, 2);
+        _fill_rect(ctx, this.accent_color, sx + 36, sy + 16, 12, 8, 2);
+        _fill_rect(ctx, [20, 10, 10], sx + 16, sy + 36, 28, 6, 2);
         if (this.health) {
             const bar_w = 80, bar_h = 10;
             const bar_x = sx - Math.trunc((bar_w - w) / 2);
             const bar_y = sy - 24;
-            _fill_rect(ctx, [30, 30, 30], bar_x, bar_y, bar_w, bar_h);
+            _fill_rect(ctx, [30, 30, 30], bar_x, bar_y, bar_w, bar_h, 3);
             const pct = Math.max(0.0, this.health.current_hp / this.health.max_hp);
             const fill_w = Math.trunc(bar_w * pct);
-            if (fill_w > 0) _fill_rect(ctx, [255, 80, 60], bar_x, bar_y, fill_w, bar_h);
-            _stroke_rect(ctx, [255, 255, 255], bar_x, bar_y, bar_w, bar_h, 1);
+            if (fill_w > 0) _fill_rect(ctx, [255, 80, 60], bar_x, bar_y, fill_w, bar_h, 3);
+            _stroke_rect(ctx, [255, 255, 255], bar_x, bar_y, bar_w, bar_h, 1, 3);
             if (typeof ctx.fillText === "function") {
                 ctx.fillStyle = "rgb(255,210,180)";
                 ctx.font = "bold 14px monospace";
@@ -373,11 +401,11 @@ class FlyingBoss extends DE.Component {
         const w = Math.trunc(this.game_object.size.x);
         // Kanatlar (salınıma göre çırpma hissi)
         const flap = Math.sin(this._t * 10.0);
-        _fill_rect(ctx, this.accent_color, sx - 14, sy + 14 + Math.trunc(flap * 6), 10, 5);
-        _fill_rect(ctx, this.accent_color, sx + w + 4, sy + 14 + Math.trunc(-flap * 6), 10, 5);
-        _fill_rect(ctx, this.body_color, sx, sy, w, Math.trunc(this.game_object.size.y));
-        _fill_rect(ctx, [220, 40, 40], sx + 10, sy + 14, 8, 8);
-        _fill_rect(ctx, [220, 40, 40], sx + w - 18, sy + 14, 8, 8);
+        _fill_rect(ctx, this.accent_color, sx - 14, sy + 14 + Math.trunc(flap * 6), 10, 5, 2);
+        _fill_rect(ctx, this.accent_color, sx + w + 4, sy + 14 + Math.trunc(-flap * 6), 10, 5, 2);
+        _fill_rect(ctx, this.body_color, sx, sy, w, Math.trunc(this.game_object.size.y), 8);
+        _fill_rect(ctx, [220, 40, 40], sx + 10, sy + 14, 8, 8, 4);
+        _fill_rect(ctx, [220, 40, 40], sx + w - 18, sy + 14, 8, 8, 4);
         if (this.health) {
             _draw_boss_bar(ctx, this.game_object, this.health, this.boss_key, camera_offset);
         }
@@ -497,8 +525,8 @@ class SniperBoss extends DE.Component {
         const sy = Math.trunc(this.game_object.position.y - camera_offset.y);
         const w = Math.trunc(this.game_object.size.x);
         const h = Math.trunc(this.game_object.size.y);
-        _fill_rect(ctx, this.body_color, sx, sy, w, h);
-        _fill_rect(ctx, this.accent_color, sx + Math.trunc(w / 2) - 6, sy + Math.trunc(h / 2) - 3, 12, 6);
+        _fill_rect(ctx, this.body_color, sx, sy, w, h, 8);
+        _fill_rect(ctx, this.accent_color, sx + Math.trunc(w / 2) - 6, sy + Math.trunc(h / 2) - 3, 12, 6, 2);
 
         const cx = sx + w / 2;
         const cy = sy + h / 2;
@@ -741,10 +769,10 @@ class ShieldBoss extends DE.Component {
         const sy = Math.trunc(this.game_object.position.y - camera_offset.y);
         const w = Math.trunc(this.game_object.size.x);
         const h = Math.trunc(this.game_object.size.y);
-        _fill_rect(ctx, this.body_color, sx, sy, w, h);
-        _fill_rect(ctx, this.accent_color, sx + 14, sy + 16, 12, 8);
-        _fill_rect(ctx, this.accent_color, sx + w - 26, sy + 16, 12, 8);
-        _fill_rect(ctx, [20, 10, 10], sx + 16, sy + 36, w - 32, 6);
+        _fill_rect(ctx, this.body_color, sx, sy, w, h, 10);
+        _fill_rect(ctx, this.accent_color, sx + 14, sy + 16, 12, 8, 2);
+        _fill_rect(ctx, this.accent_color, sx + w - 26, sy + 16, 12, 8, 2);
+        _fill_rect(ctx, [20, 10, 10], sx + 16, sy + 36, w - 32, 6, 2);
         if (this.health) {
             _draw_boss_bar(ctx, this.game_object, this.health, this.boss_key, camera_offset);
             this._draw_shield_bar(ctx, camera_offset);

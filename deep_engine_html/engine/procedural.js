@@ -68,20 +68,99 @@ DE.PR_BIOMES = {
 };
 DE.PR_BIOME_NAMES = Object.keys(DE.PR_BIOMES);
 
-/* Mulberry32 — Python random.Random'ın RNG karmasını tam sağlamaz; deterministik
- * üretim için sabit tohumlu LC tabanlı bir RNG kullanılır (aynı seed = aynı sonuç). */
+/* MT19937 — CPython 3.14 random.Random ile birebir (M7 parite):
+ * init_by_array iki geçiş + taşıma hilesi + mt[0]=0x80000000 (3.14 kaynak),
+ * random() = (genrand>>5)*2^26+(genrand>>6))/2^53, getrandbits k<=32 = genrand>>(32-k),
+ * _randbelow = bit_length + ret ederek çekme. Aynı sabit seed = Python ile aynı seviye.
+ * 32-bit karma Math.imul ile (float64 tam sayı tuzağı yok). */
 DE._pr_rng = function (seed) {
-    let a = Math.floor(seed) >>> 0;
-    const next = function () {
-        a |= 0; a = (a + 0x6D2B79F5) | 0;
-        let t = Math.imul(a ^ (a >>> 15), 1 | a);
-        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    const N = 624, M = 397;
+    const MATRIX_A = 0x9908B0DF;
+    const UPPER = 0x80000000, LOWER = 0x7FFFFFFF;
+    const mt = new Array(N).fill(0);
+    let idx = N;
+
+    const initGenrand = function (s) {
+        mt[0] = s >>> 0;
+        for (let i = 1; i < N; i++) {
+            const t = mt[i - 1] ^ (mt[i - 1] >>> 30);
+            mt[i] = (Math.imul(t, 1812433253) + i) >>> 0;
+        }
+        idx = N;
     };
+    const initByKey = function (key) {
+        initGenrand(19650218);
+        let i = 1, j = 0;
+        let k = Math.max(N, key.length);
+        for (; k; k--) {
+            mt[i] = ((mt[i] ^ Math.imul(mt[i - 1] ^ (mt[i - 1] >>> 30), 1664525)) + key[j] + j) >>> 0;
+            i++; j++;
+            if (i >= N) { mt[0] = mt[N - 1]; i = 1; }
+            if (j >= key.length) j = 0;
+        }
+        for (k = N - 1; k; k--) {
+            mt[i] = ((mt[i] ^ Math.imul(mt[i - 1] ^ (mt[i - 1] >>> 30), 1566083941)) - i) >>> 0;
+            i++;
+            if (i >= N) { mt[0] = mt[N - 1]; i = 1; }
+        }
+        mt[0] = 0x80000000;
+        idx = N;
+    };
+    const genrand = function () {
+        if (idx >= N) {
+            for (let kk = 0; kk < N - M; kk++) {
+                const y = (mt[kk] & UPPER) | (mt[kk + 1] & LOWER);
+                mt[kk] = (mt[kk + M] ^ (y >>> 1) ^ ((y & 1) ? MATRIX_A : 0)) >>> 0;
+            }
+            for (let kk = N - M; kk < N - 1; kk++) {
+                const y = (mt[kk] & UPPER) | (mt[kk + 1] & LOWER);
+                mt[kk] = (mt[kk + (M - N)] ^ (y >>> 1) ^ ((y & 1) ? MATRIX_A : 0)) >>> 0;
+            }
+            const y = (mt[N - 1] & UPPER) | (mt[0] & LOWER);
+            mt[N - 1] = (mt[M - 1] ^ (y >>> 1) ^ ((y & 1) ? MATRIX_A : 0)) >>> 0;
+            idx = 0;
+        }
+        let y = mt[idx++];
+        y = y ^ (y >>> 11);
+        y = (y ^ ((y << 7) & 0x9D2C5680)) >>> 0;
+        y = (y ^ ((y << 15) & 0xEFC60000)) >>> 0;
+        y = (y ^ (y >>> 18)) >>> 0;
+        return y >>> 0;
+    };
+    const getrandbits = function (k) {
+        if (k <= 0) return 0;
+        if (k <= 32) return genrand() >>> (32 - k);
+        let r = 0, shift = 0, rem = k;
+        while (rem > 0) {
+            let word = genrand();
+            if (rem < 32) word = word >>> (32 - rem);
+            r += word * Math.pow(2, shift);
+            shift += 32;
+            rem -= 32;
+        }
+        return r;
+    };
+    const randbelow = function (n) {
+        const k = 32 - Math.clz32(n);
+        let r = getrandbits(k);
+        while (r >= n) r = getrandbits(k);
+        return r;
+    };
+
+    // Python: abs(n) → küçük-sondan 32-bit kelimeler; 0 → tek kelime [0].
+    let n = Math.floor(Math.abs(seed));
+    const key = [];
+    if (n === 0) key.push(0);
+    else while (n > 0) { key.push(n % 4294967296); n = Math.floor(n / 4294967296); }
+    initByKey(key);
+
     return {
-        random: next,
-        randint(a0, b0) { return Math.floor(next() * (b0 - a0 + 1)) + a0; },
-        choice(arr) { return arr[Math.floor(next() * arr.length)]; },
+        random() {
+            const a = genrand() >>> 5, b = genrand() >>> 6;
+            return (a * 67108864 + b) / 9007199254740992;
+        },
+        randint(a0, b0) { return a0 + randbelow(b0 - a0 + 1); },
+        choice(arr) { return arr[randbelow(arr.length)]; },
     };
 };
 
@@ -245,7 +324,7 @@ DE.procedural_generate = function (biome = null, seed = null, chunks = 8, diffic
         const cx0 = c * DE.CHUNK_W;
         const cx1 = (c + 1) * DE.CHUNK_W;
         DE._pr_maybe_island(objects, rng, cx0, cx1, seg_heights[c], b, difficulty, safe_max_x);
-        DE._pr_maybe_ramp(objects, rng, cx0, cx1, seg_heights[c], b, safe_max_x);
+        // Not: üçgen rampalar kullanıcı kararıyla üretilmiyor (bkz. 03_game.md "ÜÇGEN RAMPALAR").
         DE._pr_maybe_breakable(objects, rng, cx0, cx1, seg_heights[c], safe_max_x, c === chunks - 1);
     }
 
