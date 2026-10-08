@@ -428,6 +428,14 @@ DE_GAME.ClimberPlayer = class ClimberPlayer extends DE.Component {
         this._coyote = 0.0;
         this._buffer = 0.0;
         this._air_jumps = 0;
+        // Ana oyunla aynı dash: krvarma, bekleme, hayalet izleri, squash.
+        this._afterimages = [];
+        this._afterimage_t = 0.0;
+        this.dash_timer = 0.0;
+        this.dash_cooldown = 0.0;
+        this.dash_speed = 2.8;
+        this.dash_dir = 1;
+        this._squash = 0.0;
     }
     start() {
         this.rb = this.game_object.get_component(DE.Rigidbody2D);
@@ -446,8 +454,38 @@ DE_GAME.ClimberPlayer = class ClimberPlayer extends DE.Component {
             if (g) this.game = g.get_component(DE_GAME.ClimbGame);
         }
         const move_x = DE.Input.get_horizontal_axis();
-        if (move_x !== 0) this.facing = move_x > 0 ? 1 : -1;
-        this.rb.velocity.x = move_x * this.speed * this.speed_mult;
+        // -- Dash (ana oyunla aynı his: LSHIFT, 0.16s, 2.3 -> 3.2, hayalet izleri) --
+        if (this.dash_timer > 0.0) {
+            this.dash_timer -= dt;
+            this.dash_speed = Math.min(3.2, this.dash_speed + 8.0 * dt);
+            this.rb.velocity.x = this.dash_dir * this.speed * this.speed_mult * this.dash_speed;
+            this.rb.velocity.y = 0.0;
+        } else {
+            if (this.dash_cooldown > 0.0) this.dash_cooldown -= dt;
+            if (DE.Input.get_key_down("LSHIFT") && this.dash_cooldown <= 0.0) {
+                this.dash_timer = 0.16;
+                this.dash_cooldown = 0.6;
+                this.dash_speed = 2.3;
+                this.dash_dir = this.facing;
+                this._afterimage_t = 0.0;
+            }
+            if (move_x !== 0) this.facing = move_x > 0 ? 1 : -1;
+            this.rb.velocity.x = move_x * this.speed * this.speed_mult;
+        }
+        if (this.dash_timer > 0.0) {
+            this._afterimage_t -= dt;
+            if (this._afterimage_t <= 0.0) {
+                this._afterimage_t = 0.03;
+                const o = this.game_object;
+                this._afterimages.push([o.position.x, o.position.y, 0.0]);
+                if (this._afterimages.length > 6) this._afterimages.shift();
+            }
+        }
+        for (let i = this._afterimages.length - 1; i >= 0; i--) {
+            this._afterimages[i][2] += dt;
+            if (this._afterimages[i][2] >= 0.18) this._afterimages.splice(i, 1);
+        }
+        if (this._squash > 0.0) this._squash = Math.max(0.0, this._squash - 8.0 * dt);
         // Kenar kelepçesi: kule dışına çıkma (düşey hareket serbest)
         if (this.game_object.position.x < 0.0) {
             this.game_object.position.x = 0.0;
@@ -496,6 +534,7 @@ DE_GAME.ClimberPlayer = class ClimberPlayer extends DE.Component {
         const pe = this.game_object.get_component(DE.ParticleEmitter);
         if (pe) pe.burst(10, COL_PLAYER, [60, 170], [2, 5], [0.2, 0.4], 120);
         if (this.game && this.game.on_jump) this.game.on_jump(this, air);
+        this._squash = 1.0;
     }
     add_level() {
         // Her zıplama bir hız seviyesi ekler (tavan MAX_LEVEL).
@@ -977,32 +1016,96 @@ DE_GAME.ClimbGame = class ClimbGame extends DE.Component {
     }
 };
 
-/* Ana oyundaki player'ın (entities.js draw) climber karşılığı:
- * mavi yuvarlak köşeli gövde, GÖZLER çizilmez (kullanıcı isteği). */
+/* Ana oyundaki player'ın (entities.js draw) climber karşılığı: BİREBİR —
+ * mavi yuvarlak köşeli gövde + yön hissi veren gözler + dash hayaletleri
+ * + zıplama squash'ı. (GÖZLER ana oyundakiyle aynı çizilir.) */
+function _climb_round_rect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    if (ctx.roundRect) {
+        ctx.roundRect(x, y, w, h, r);
+    } else {
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+    }
+}
 DE_GAME.ClimbPlayerVisual = class ClimbPlayerVisual extends DE.Component {
     draw(ctx, camera_offset) {
         const o = this.game_object;
-        const sx = Math.trunc(o.position.x - (camera_offset ? camera_offset.x : 0));
-        const sy = Math.trunc(o.position.y - (camera_offset ? camera_offset.y : 0));
-        const w = Math.trunc(o.size.x), h = Math.trunc(o.size.y);
-        if (!ctx || w <= 0 || h <= 0) return;
+        const cp = o.get_component ? o.get_component(DE_GAME.ClimberPlayer) : null;
+        const facing = (cp && cp.facing) || 1;
+        const squ = (cp && cp._squash) || 0.0;
+        const cam = camera_offset || { x: 0, y: 0 };
+        const base_w = o.size.x, base_h = o.size.y;
+        const anim_w = base_w * (1.0 - squ * 0.18);
+        const anim_h = base_h * (1.0 + squ * 0.35);
+        const sx = Math.trunc(o.position.x - cam.x - (anim_w - base_w) / 2);
+        const sy = Math.trunc(o.position.y - cam.y - anim_h);
+        const aw = Math.trunc(anim_w), ah = Math.trunc(anim_h);
+        if (!ctx || aw <= 0 || ah <= 0) return;
         const prev = ctx.fillStyle;
-        const r = 6;
+        // Dash hayaletleri (ana oyundaki afterimage'lerin eşi).
+        if (cp && cp._afterimages && cp._afterimages.length > 0) {
+            for (const [gx, gy, age] of cp._afterimages) {
+                const alpha = Math.max(0, Math.trunc(110 * (1.0 - age / 0.18)));
+                if (alpha <= 0) continue;
+                ctx.globalAlpha = alpha / 255;
+                ctx.fillStyle = "rgb(80,190,245)";
+                ctx.fillRect(Math.trunc(gx - cam.x),
+                    Math.trunc(gy - cam.y - base_h),
+                    Math.trunc(base_w), Math.trunc(base_h));
+                ctx.globalAlpha = 1;
+            }
+        }
         // Gövde (ana oyundaki gibi).
         ctx.fillStyle = "rgb(60,200,245)";
-        ctx.beginPath();
-        if (ctx.roundRect) ctx.roundRect(sx, sy, w, h, r);
-        else {
-            ctx.moveTo(sx + r, sy);
-            ctx.arcTo(sx + w, sy, sx + w, sy + h, r);
-            ctx.arcTo(sx + w, sy + h, sx, sy + h, r);
-            ctx.arcTo(sx, sy + h, sx, sy, r);
-            ctx.arcTo(sx, sy, sx + w, sy, r);
-            ctx.closePath();
-        }
+        _climb_round_rect(ctx, sx, sy, aw, ah, 6);
         ctx.fill();
-        // Gözlensiz: gövdeye hafif "yüz" çizgisi (dash izlenimi) — istenmedi, atlandı.
+        // Gözler (ana oyundaki gibi yön hissi ile).
+        const eo = facing > 0 ? 3 : -3;
+        ctx.fillStyle = "rgb(15,20,35)";
+        ctx.beginPath(); ctx.arc(sx + Math.trunc(aw * 0.3) + eo, sy + Math.trunc(ah * 0.35), 3, 0, 6.283185307); ctx.fill();
+        ctx.beginPath(); ctx.arc(sx + Math.trunc(aw * 0.7) + eo, sy + Math.trunc(ah * 0.35), 3, 0, 6.283185307); ctx.fill();
+        ctx.fillStyle = "rgb(255,255,255)";
+        ctx.beginPath(); ctx.arc(sx + Math.trunc(aw * 0.3) + eo + 1, sy + Math.trunc(ah * 0.35) - 1, 1, 0, 6.283185307); ctx.fill();
+        ctx.beginPath(); ctx.arc(sx + Math.trunc(aw * 0.7) + eo + 1, sy + Math.trunc(ah * 0.35) - 1, 1, 0, 6.283185307); ctx.fill();
         ctx.fillStyle = prev;
+    }
+};
+
+/* Açılış banner'ı: "Portallar kapandı — koleksiyonerler Astro'ya kule diktiler."
+ * 5 saniye sürer, son 2 saniyede söner. Başlangıçta hızlıca belirir. */
+DE_GAME.ClimbIntro = class ClimbIntro extends DE.Component {
+    constructor() {
+        super();
+        this.t = 5.0;
+    }
+    update(dt) {
+        this.t -= dt;
+        if (this.t <= 0.0 && this.game_object) this.game_object.active = false;
+    }
+    draw(ctx, camera_offset) {
+        if (!ctx || this.game_object === null) return;
+        const w = ctx.canvas ? ctx.canvas.width : SCREEN_W;
+        const h = ctx.canvas ? ctx.canvas.height : SCREEN_H;
+        const fade_in = Math.max(0.0, Math.min(1.0, (5.0 - this.t) / 0.6));
+        const fade_out = Math.max(0.0, Math.min(1.0, this.t - 2.0));
+        const al = Math.min(fade_in, fade_out);
+        if (al <= 0.0) return;
+        ctx.save();
+        ctx.globalAlpha = al;
+        ctx.font = "bold 30px Arial, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "rgb(255,240,170)";
+        ctx.fillText(DE.I18n.t("climber_banner1"), Math.round(w / 2), Math.round(h * 0.34));
+        ctx.font = "17px Arial, sans-serif";
+        ctx.fillStyle = "rgb(120,255,180)";
+        ctx.fillText(DE.I18n.t("climber_banner2"), Math.round(w / 2), Math.round(h * 0.34 + 34));
+        ctx.restore();
     }
 };
 
@@ -1030,6 +1133,9 @@ DE_GAME.build_climber_scene = function (seed = null) {
     const bg = new DE.GameObject("ClimbBackdrop", 0, 0, 0, 0, "ClimbBackdrop");
     bg.add_component(new DE_GAME.ClimbBackdrop());
     scene.add_object(bg);
+    const intro = new DE.GameObject("ClimbIntro", 0, 0, 0, 0, "ClimbIntro");
+    intro.add_component(new DE_GAME.ClimbIntro());
+    scene.add_object(intro);
     _climber_make_player(scene);
     // Merkez semantiği: center_x + center_y true, y = metnin görsel merkezi.
     const hud = new DE.GameObject("ClimbHUD", SCREEN_W / 2, 35, 0, 0, "ClimbHUD");
@@ -1048,6 +1154,11 @@ DE_GAME.build_climber_scene = function (seed = null) {
             { floor: (DE_GAME.state && DE_GAME.state.climber_high) || 0 }), 14,
         [205, 185, 255], true, [0, 0, 0], true, true));
     scene.add_object(record);
+    const goal = new DE.GameObject("ClimbGoal", SCREEN_W / 2, 112, 0, 0, "ClimbGoal");
+    goal.add_component(new DE.TextRenderer(
+        DE.I18n.localize("climber_goal", {}), 13,
+        [110, 255, 170], true, [0, 0, 0], true, true));
+    scene.add_object(goal);
     const hint = new DE.GameObject("ClimbHint", SCREEN_W / 2, SCREEN_H - 8, 0, 0, "ClimbHint");
     hint.add_component(new DE.TextRenderer(
         DE.I18n.localize("climber_hint", {}), 15,

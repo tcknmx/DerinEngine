@@ -10,6 +10,25 @@
 
 ---
 
+> **HEDEF (08.10.2026, Star Climber v3):** Kullanıcı Star Climber'ı hâlâ beğenmiyor;
+> gerçek vizyonunu verdi: Star Climber, Star Collector Hero'nun **alternatif evreni**
+> olacak — bu evrende portallar KAPANDI; koleksiyonerler Astro boyutuna uzanan bir
+> **kule** diktiler; oyuncu o kuleye tırmanıyor. Oynanış, platformlar, assetler ve
+> player modeli **ana oyunla birebir** olmalı; map tırmanışça üretilir (zaten böyle).
+> v3 adımları: 1) Player = ana oyun karakterinin aynısı (gövde + gözler + dash +
+> squash), 2) HUD hedefi "Astro Kulesi" + açılış banner'ı "Portallar kapandı",
+> 3) testler (dash, görsel çizim, HUD) + 13 test + deep-tool 14. Not: v1'deki
+> "GÖZLER çizilmez" isteği geri alındı — kullanıcı artık ana oyunla AYNI istiyor.
+>
+> **SONUÇ — TAMAMLANDI (08.10.2026):** yukarıdaki 3 adım bitti ve yeşiller:
+> 13/13 JS test 0 FAIL (test_game v3 ile yeşil), tools 36/0,
+> `deep-tool.py --lang tr 14` 0 WARN/0 BUG/0 ERR. Tek dokunulan motor dosyası
+> `engine/i18n.js` (yeni key'ler: climber_goal, climber_banner1/2, hint'e dash).
+> Ek (önceden var olan kırıcı): `tools_html/test_tools.js` api/script girdisi
+> `print(1+1)` → `console.log(1+1)` — webpanel komutu node ile çalıştırır.
+
+---
+
 ## TAMAMLANAN OYUN ÇALIŞMALARI (kronolojik; orijinal "madde N" referanslı)
 
 40. **Oyun içi konsol komutları (25.09.2026):** `game/commands.py` — " (BACKQUOTE)

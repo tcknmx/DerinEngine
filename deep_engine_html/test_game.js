@@ -1235,6 +1235,48 @@ console.log("TEST17 Star Climber:");
         check("17: zorluk: dar katman üretiliyor (9+)", hasNarrow);
       }
 
+      // 20-v3) PLAYER + EVREN (08.10.2026): oyuncu artık ana oyun karakterinin
+      //        BİREBİR'i (gözler + dash + squash); açılış banner'ı "portallar
+      //        kapandı"; HUD hedefi "Astro Kulesi" (alternatif evren: portal yok).
+      {
+        const sV = DE_GAME.build_climber_scene(21);
+        use(sV); sV.start();
+        const vpc = sV.find_by_tag("Player").get_component(DE_GAME.ClimberPlayer);
+        const vpv = sV.find_by_tag("Player").get_component(DE_GAME.ClimbPlayerVisual);
+        vpc.dash_cooldown = 0.0;
+        press("LSHIFT");
+        step(sV, 1);
+        check("17: LSHIFT dash başlıyor (ana oyunla aynı)", vpc.dash_timer > 0.0,
+          "timer=" + vpc.dash_timer.toFixed(3));
+        check("17: dash sırasında hayalet izi eklenir",
+          vpc._afterimages.length > 0, "n=" + vpc._afterimages.length);
+        step(sV, 12);
+        check("17: dash 0.16s civarı sürer ve bekleme başlar",
+          vpc.dash_timer <= 0.0 && vpc.dash_cooldown > 0.0,
+          "timer=" + vpc.dash_timer.toFixed(3) + " cd=" + vpc.dash_cooldown.toFixed(3));
+        // Görsel çizim hatasız çalışmalı (gövde + gözler + squash).
+        const ops = [];
+        let drawOk = false;
+        try {
+          vpv.draw({ canvas: { width: 900, height: 600 }, fillStyle: "",
+            fillRect(x, y, w, h) { ops.push([x, y, w, h]); }, globalAlpha: 1,
+            save() {}, restore() {}, beginPath() {}, arc() {}, closePath() {}, fill() {},
+            moveTo() {}, arcTo() {}, fillText() {}, stroke() {} }, { x: 0, y: 0 });
+          drawOk = true;
+        } catch (e) { drawOk = false; }
+        check("17: climber player görseli (gövde+iz) hatasız çizilir", drawOk,
+          "fill=" + ops.length);
+        const sG = sV.find_by_tag("ClimbGoal");
+        check("17: HUD hedefi 'Astro Kulesi' gösteriliyor", sG !== null &&
+          sG.get_component(DE.TextRenderer).text.indexOf("Astro") >= 0,
+          sG ? sG.get_component(DE.TextRenderer).text : "yok");
+        const sI = sV.find_by_tag("ClimbIntro");
+        const introC = sI ? sI.get_component(DE_GAME.ClimbIntro) : null;
+        check("17: açılış banner'ı (portallar kapandı) açık", introC !== null &&
+          introC.t > 2.0 && introC.t <= 5.0,
+          introC ? "t=" + introC.t.toFixed(1) : "yok");
+      }
+
       // 17b) YENİ YERLEŞTİRME ALGORİTMASI + YENİ HARİTA + REKOR (08.10.2026):
       //   NO-STACK: ardışık katmanlar üst üste dizilmiyor (özellikle geniş olanlar
       //     en az NO_STACK_SHIFT kayar). IN-BOUND TREND: kule kenara kapılıp

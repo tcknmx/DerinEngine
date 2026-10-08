@@ -137,7 +137,7 @@ async function main() {
   const dirExists = fs2.existsSync(path.join(ROOT, "js_tool_parity_dir"));
   check("dizin diske yazildi", dirExists);
   if (dirExists) fs2.rmdirSync(path.join(ROOT, "js_tool_parity_dir"));
-  const dup = await callApi(port, "POST", "http://127.0.0.1:" + port + "/api/script", { src: "print(1+1)" });
+  const dup = await callApi(port, "POST", "http://127.0.0.1:" + port + "/api/script", { src: "console.log(1+1)" });
   check("api/script", dup.body.ok === true && (dup.body.stdout || "").includes("2"));
   const lg = await callApi(port, "GET", "http://127.0.0.1:" + port + "/api/log");
   check("api/log", typeof lg.body.log === "string");
