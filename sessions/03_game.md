@@ -1287,6 +1287,56 @@ kullanıcı "evren kuralları + hafif mekanik" kapsamını seçti).
 
 ---
 
+## STAR CLIMBER OYNANABİLİRLİK DÜZELTİMİ (v2) — TAMAMLANDI (08.10.2026)
+
+Kullanıcı şikayetleri: "(1) hâlâ spike trap var, hiç hoş değil; (2) dümdüz sağa sola
+gitmeden zıplayabiliyorum; (3) daha yükseğe zıplayamayınca direkt ölüyorum (kısır
+döngü); (4) arka plan hâlâ grid tabanlı." Kullanıcı ayrıca "hep hata yapıyorsunuz"
+diyordu → bu tur KÜÇÜK, hedefli, doğrulanabilir değişiklikler yapıldı. Python
+dondurulmuş; tümü `deep_engine_html/game/climber.js` + `test_game.js`.
+
+**Yapılanlar (4 şikayet → 4 çözüm):**
+1. **DİKENLER KALDIRILDI:** `SPIKE_CHANCE = 0.0`, dikenli dal `_build_floor`'dan
+   çıkarıldı (spiked her katmanda `false`). Test "zorluk: diken YOK" oldu.
+2. **YATAY HAREKET ZORUNLU:** kule artık dümdüz zıplamaya aldırış etmez:
+   - `FREE_CLIMB` 8 → **3** (ilk 3 katman oyuncunun sütununda; sonrası özgür).
+   - **Orta-sütun yasağı**: FREE_CLIMB sonrası katman MERKEZİ ekran ortasından
+     (yaklaşık `CLEAR=72px`) geçemez → "sadece SPACE" botu artık 3-18 kat ile
+     SINIRLI tırmanır (ölçülen: 7,9,10) ve ölüm döngüsüne girmez.
+   - `NO_STACK_SHIFT` 44 → **110**, `REACH_OVERLAP` 70 → **46** (pencere genişler,
+     zig-zag belirginleşir). Far-edge dalı AYNA kuralına çevrildi: `side===1`
+     sağ uca, `side===-1` sol uca (`reachR>=reachL` simetrisinde hep sağa giden
+     eski far-edge hatası düzeltildi — kule artık gerçekten zig yapar).
+   - Doğru oynanış (örüşme şeridini hedefleyen bot) artık 30-60 kata çıkıyor →
+     "yatay oynarsan kule yükselir" kanıtı teste eklendi.
+3. **ÖLÜM DÖNGÜSÜ YUMUŞATILDI:** `DEATH_MARGIN` 80 → **140** (alt çizgi geç
+   yükselir), `CAM_BOOST_CAP` 1.8 → **1.5**, `CAM_BOOST_PER` 0.012 → **0.008**,
+   `DOUBLE_GAP_CAP` 60 → **52** (çift zıplama boşlukları adil). Dikenler zaten
+   en büyük "ölüm tuzağı"ydı — kaldırıldı.
+4. **GRID'SIZ ARKA PLAN:** `ClimbBackdrop.draw` — blok `strokeRect` ızgarası
+   yerine **pürüzsüz tepelik arazi**: biyom toprak dikey gradyanı + iki sinüsün
+   harmanlandığı yuvarlanışlı çim/kar/kum üst kenarı + ince parlak vurgu. Astro
+   geçişinde yükseklikte azalma + renk karışımı korunur.
+
+**Ayar yolu:** `NO_STACK_SHIFT`, `CLEAR`, `REACH_OVERLAP`, `FREE_CLIMB`, `ZIG_WINDOW`,
+`SPIKE_CHANCE`, kamera ve ölüm sabitleri — hepsi `climber.js` üstündeki landa yorumlu.
+
+**Doğrulama (hepsi yeşil):**
+- `test_game.js`: **244 satır, 0 FAIL**. Yeni/güncellenen testler:
+  - "ilk 3 katman oyuncunun sütununda" (FREE_CLIMB 3),
+  - "orta sütunda katman yok (dümdüz zıplama engellenir)" — seed7'de en yakın 72px,
+  - "dümdüz SPACE bot SINIRLI tırmanır" (3..18; ölçülen 7,9,10) + ölüm döngüsü yok,
+  - "örüşme şeridi botu 20+ kata çıkar" (yatay oynanış kazanır; ölçülen 59,32,60),
+  - "zorluk: diken YOK", NO-STACK eşikleri (bigOrt>=35, %50 >=30, maxDev<=170).
+- 13 test dosyası: **0 FAIL** (test_game 244 OK dilimi).
+- `python tools\deep-tool.py --lang tr 14`: **0 WARN, 0 BUG, 0 ERR.**
+- `node --check` climber.js/test_game.js temiz.
+
+> Bot metrikleri deterministik (mulberry32 seed'li): NO-STEER seed7/99/2024 = 10/7/9;
+> STEER (örüşme şeridi) = 59/32/60. "SPACE-only" ölçümü ve "örekli bot" g/1 kayıt.
+
+---
+
 ## STAR CLIMBER YÜKSELTME — TAMAMLANDI (08.10.2026)
 
 Kullanıcı: "platformlar çok üst üste biniyor ve aşırı kolay oluyor; daha farklı
@@ -1341,3 +1391,34 @@ commands, entities, scenes, state, ui, __init__), `main.py`, `tests/`
   **tarihsel** olarak kalır; yeni bulgular JS playtest defterine yazılır.
 - py webpanel/pydeep-tool çalıştırmaya devam eder ama py oyunu başlatamaz
   (bilinçli — webpanel'in "main.py başlat" butonu hata verir, 04_tools.md'de not).
+
+---
+
+## DENETİM + SADELEŞTİRME — OYUN KATMANI (08.10.2026)
+
+Kullanıcı görevi kapsamında (`_shared.md` SON GELİŞMELER → TAMAMLANDI kaydı)
+oyun katmanına yapılanlar (spagetti temizliği — davranış değişmedi):
+
+- **D1 — bosses aim/beam 3-kopya birleştirme:** SniperEnemy (entities.js),
+  SniperBoss ve CosmicBoss (bosses.js) havadan aşağı nişan alma +
+  lazer ateşleme/çizim bloklarını aynı yazmıyordu. Ortaklar:
+  `DE_GAME._beam_aim_phase(boss, phase, player)` (entities.js üstü),
+  `_boss_fire_beam(...)` + `_boss_draw_beam(...)` (bosses.js dosya-içi).
+  SniperEnemy `__aim_state` → `_aim_state` (6 yer). iframe farkı korundu:
+  Sniper 0.14s, Cosmic 1.15s.
+- **D2 — düşman prelude helper:** `_enemy_prelude(e, dt, stop_x)` (entities.js
+  satır 50) — PatrolEnemy/FlyerEnemy/TurretEnemy (standart) + HopperEnemy
+  (`stop_x=true`: rb hızı sıfırlama dahil). SniperEnemy kendi özel uyanış
+  bloğunu korudu (nişan sıfırlama).
+- **D3 — scenes.js helper'ları:** `_scene_from_data(data, name)` +
+  `_wire_player_restart(scene, restart_fac)` — build_procedural_level ve
+  build_campaign_boss sahne kurulumu ile entrance/boss/endless restart
+  bağlantısı tekliliği.
+- **D4 — PlayerController.update 325 → 30 satır:** iç bloklar 8 metoduna
+  bölündü (`_update_ground_effects/_powerups/_squash_effects/_dash/_movement/
+  _jump/_actions/_ui`); `_update_dash` true döndürünce gerisi atlanır. **Not:**
+  bölme sırasında kopya-hatasıyla Dash tetikleyici bloğu (`get_key_down("LSHIFT")`
+  + kick_camera + burst) silinmiş, testler kırmızı verince fark edilip geri kondu.
+- **Doğrulama:** `test_game.js` **224 OK / 0 FAIL** — Star Climber v2 ile birlikte
+  yeşil (klimber testleri artık FAIL vermiyor; önceki 3 FAIL diğer oturumun canlı
+  düzenlemesindendi ve o oturum bitirdi). Diğer 12 test de 0/0.

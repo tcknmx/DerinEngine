@@ -1,131 +1,103 @@
 ﻿# Star Collector Hero
 
-The first version of my game engine, written from scratch in Python + pygame (SDL), ships with a complete playable platformer: a procedural campaign, unique bosses, dynamic lighting, a browser level editor and an in-game dev console. The project is in active development.
+DerinEngine, JavaScript + HTML(Canvas 2D) ile sıfırdan yazılmış kendi oyun motorumuzdur.
+Bunun üzerinde **Star Collector Hero** adlı tam oynanabilir platformer vardır: prosedürel
+kampanya, benzersiz boss'lar, dinamik aydınlatma, tarayıcı seviye editörü ve oyun içi
+konsol. Proje aktif geliştirmededir.
 
-## Features
+> Motor HTML/JS tek kaynaktır. Eski Python motoru (pygame) 08.10.2026'da kaldırıldı;
+> git geçmişinde erişilebilir. Sürümler ayrı sayılır: **motor 1.0.0**, **oyun 0.1.19**.
 
-- Built-in FPS counter & debug panel (F3)
-- 2D dynamic lighting engine (dark-cave atmosphere)
-- Physics engine: gravity, collisions, one-way platforms, trampolines
-- Procedural level generator (same seed = same level)
-- Procedural campaign: 5 biomes (Forest, Lava Cave, Ice, Desert, Astro) in a random chain with rising difficulty — the Astro Boss is the final boss
-- 5 unique bosses: Forest Giant, Dark Colossus, Ice Giant, Sand Patrol, Star Destroyer
-- Algorithmic 8-bit music: 10 mathematically generated tracks (one per biome + boss), built from melody/bass/harmony/rhythm layers
-- Retro 8-bit sound effects synthesized in memory (no external files)
-- Combat & projectile system + enemy variety: Patrol, Flyer, Hopper, Turret, Spike hazards
-- 4 PowerUps: Magnetic Pull, Triple Shot, Shield, Storm Speed
-- 3-heart health system with invulnerability (i-frames)
-- Multi-language UI — Turkish / English live toggle (T)
-- Persistent high score & language saving
-- Browser level editor (tools/webpanel.py): levels are named files in custom_levels/
-- In-game developer console (backquote ` / ") with hp, god, tp, respawn commands
-- Full gamepad support
+## Özellikler
 
-## Controls
+- Canvas 2D üzerinde bileşen tabanlı motor: Scene / GameObject / Component
+- Fizik: yerçekimi, çarpışma, tek yönlü platformlar, trambolin (zıplama)
+- Prosedürel seviye üreteci (aynı seed = aynı seviye)
+- 5 biyomlu kampanya (Forest, Lava Cave, Ice, Desert, Astro) + Sonsuz Mod
+- 5 benzersiz boss çeşidi (zemin devi, uçan, lazer nişancı, kalkanlı, nihai Astro)
+- Algoritmik 8-bit müzik + CPU'da üretilen retro ses efektleri (harici dosya yok)
+- Düşman çeşitliliği: Devriye, Uçan, Zıplayan, Taret, Tuzak sivri uçlar, Keskin nişancı
+- 4 PowerUp: Mıknatıs Çekimi, Üçlü Ateş, Kalkan, Fırtına Hızı
+- 3 kalpli sağlık + i-frame (dokunulmazlık) süreleri
+- TR/EN anlık dil değiştirme (T), kalıcı yüksek skor ve dil kaydı
+- **Star Climber** (C): yükselen kule tırmanma modu, kalıcı rekor + çift zıplama skill'i
+- Tarayıcı seviye editörü (`python tools\webpanel.py` → 127.0.0.1:8765)
+- Oyun içi geliştirici konsolu ( ` veya " ): hp, god, tp, respawn, help...
+- Tam kumanda desteği, mobil dokunmatik kontroller
+- Test paketi (Node): 13 motor/oyun test dosyası, hepsi yeşil
 
-| Action | Keys |
+## Kontroller
+
+| Eylem | Tuşlar |
 |---|---|
-| Movement | A / D (or left analog / D-Pad) |
-| Jump (Stretch Physics) | SPACE / W / Up arrow (Gamepad: A) |
-| Double Jump | press Jump again in mid-air |
-| Dash | LSHIFT (Gamepad: LB) |
-| Shoot | F or LEFT CLICK (Gamepad: X) |
-| Change Language (TR/EN) | T |
-| Return to Main Menu | M |
-| Restart | R (Gamepad: A) |
-| FPS / Debug Panel | F3 |
-| Quit | ESC (Gamepad: Start) |
+| Hareket | A / D (veya sol analog / D-Pad) |
+| Zıplama (+çift) | SPACE / W / ↑ (Kumanda: A) |
+| Dash | LSHIFT (Kumanda: LB) |
+| Ateş | F veya Sol Tık (Kumanda: X) |
+| Dil (TR/EN) | T |
+| Kampanya | P |
+| Sonsuz Mod | 4 |
+| Star Climber | C |
+| Debug paneli | F3 |
+| Çıkış | ESC (Kumanda: Start) |
 
-## Main Menu
-
-| [P] Campaign (procedural)  •  [4] Endless Mode  •  [T] Language |
-|---|
-| In-game console: [ ` ] or [ " ] — try `help`, `god`, `tp 400 200` |
-
----
-
-## Star Collector Hero — v0.1.19 Update
-
-Full campaign, unique bosses, a live level editor — plus a fresh set of gameplay improvements.
-
-What's new since v0.1.0:
-
-- Live animated main menu with a close-up camera over the real campaign level
-- Smooth fade transitions between scenes
-- Mouse support in the main menu
-- Shooting stars drifting across the menu sky
-- 3 new boss types: Flying, Lazer Sniper, Shielded — plus a grander final Astro boss
-- Breakable platforms with hidden coins inside
-- Endless Mode — never-ending, ever-harder levels (unlocked by beating the campaign)
-- Slow-Motion PowerUp that slows enemies and their bullets
-- Stun Dash — knock enemies into a daze
-- New Lazer Turret enemy that tracks and fires at you
-- Fair enemy spawning — they blink in, no cheap ambushes
-- Checkpoint rescue — fall off and return to your last safe spot, not the level start
-- Platforming polish: coyote time, jump buffering, variable jumps, wall slide & wall jump, hit-stop, screen shake
-- Feedback effects: coin burst particles, floating score pop-ups, enemy death explosions, camera kicks
-- Upgraded Level Editor: inspect panel to move, resize, recolor & delete objects
-- Screen edge vignette + red flash on taking damage
-
----
-
-## About the Engine
-
-DerinEngine is the modular 2D game engine built from scratch for this project (`deep_engine/`): scene/object/component architecture, physics, collisions, tween/animation, particles, lighting, parallax, i18n, a level file format, the dev console and the browser level editor (tools/webpanel.py). The game layer (`game/`) connects to the engine through its public API; the engine knows nothing about the game.
-
-## Getting Started
+## Nasıl Çalıştırılır
 
 ```bash
-pip install pygame
-python main.py
+# Oyun: tarayıcıda
+#   deep_engine_html\index.html dosyasını tarayıcıda aç (double-click yeterli).
+
+# Testler (pencere açmaz, hepsi yeşil olmalı):
+node deep_engine_html\test_core.js
+node deep_engine_html\test_game.js          # oyuncu/düşman/boss/kampanya
+node deep_engine_html\test_visual.js        # görsel/eğlence regresyonu (31/31)
+# ... 13 test dosyasının tamamı deep_engine_html\test_*.js
+
+# Araç testleri:
+node tools_html\test_tools.js               # 36/36
+node tools_html\test_browser.js             # gerçek tuş yolu, 51/51
+
+# Tarama aracı (TR/EN interaktif):
+python tools\deep-tool.py
+python tools\deep-tool.py --lang en all
+
+# Tarayıcı seviye editörü (custom_levels/ klasörü):
+python tools\webpanel.py                    # http://127.0.0.1:8765
 ```
 
-### Windows standalone build (PyInstaller)
-
-```bash
-python -m PyInstaller --noconfirm --clean --onedir --windowed \
-  --name "StarCollectorHero" \
-  --add-data "custom_level.json;." \
-  --collect-submodules deep_engine main.py
-```
-
-Output: `dist\StarCollectorHero\` (game data is written next to the exe).
-
-### Web build (pygbag)
-
-```bash
-python -m pygbag --build --app_name StarCollectorHero .
-```
-
-Output: `build/web/` (game data is saved to localStorage in the browser).
-
-## Project Structure
+## Proje Yapısı
 
 ```
-main.py                 # thin entry point
-game/                   # game layer
-  state.py              # campaign / endless / global state
-  entities.py           # PlayerController, enemies
-  bosses.py             # chapter boss types
-  scenes.py             # procedural / campaign / endless scene builders
-  builders.py           # level file builders + extractors
-  ui.py                 # menu and UI scenes
-deep_engine/            # DerinEngine core (game-independent)
-  core.py               # Engine (game loop, window)
-  scene.py, game_object.py, components.py, tween.py
-  input.py, audio.py, particles.py, parallax.py, lighting.py
-  i18n.py, levelfile.py, procedural.py, savegame.py, math2d.py
-tools/deep-tool.py      # dev scan/checkup CLI tool (TR/EN)
-tools/webpanel.py       # browser level editor (custom_levels/ folder)
-custom_levels/          # user levels: default.json template + named levels
-custom_level.json       # pristine template source (format version: 1)
-version.txt             # version history
+deep_engine_html/          # BİRİNCİL motor + oyun (JS, tarayıcıda çalışır)
+  index.html               # giriş sayfası / script yükleme sırası
+  engine/                  # motor katmanı (oyundan bağımsız)
+    core.js, scene.js, game_object.js, components.js
+    math2d.js, render.js, physics.js, particles.js, audio.js, lighting.js
+    parallax.js, i18n.js, levelfile.js, savegame.js, log.js, procedural.js
+    console.js, tween.js, input.js, ui.js, tilemap.js, scenemanager.js
+  game/                    # Star Collector Hero
+    main.js, state.js, entities.js, bosses.js, ui.js, scenes.js
+    builders.js, climber.js, commands.js
+  test_*.js                # 13 motor/oyun test dosyası (Node)
+tools/
+  deep-tool.py             # dev tarama/kontrol aracı (TR/EN)
+  webpanel.py              # tarayıcı seviye editörü (custom_levels/)
+tools_html/                # araçların JS portları + araç testleri
+custom_levels/             # kullanıcı seviyeleri (default.json + adlı seviyeler)
+custom_level.json          # şablon kaynağı (biçim sürümü: 1)
+version.txt                # sürüm geçmişi
+sessions/                  # oturum belgeleri (yol haritası, kararlar, tuzak kayıtları)
 ```
 
-## License
+## Motor Hakkında
 
-Released under the [MIT License](LICENSE). Copyright (c) 2026 tcknmx. See the `LICENSE` file for details.
+`deep_engine_html/engine/`, motor katmanıdır ve oyundan hiçbir şey bilmez.
+Oyun (`deep_engine_html/game/`) motora yalnızca kamusal API üzerinden bağlanır
+(`DE.*`). Motor saflığı `tools_html/deep-tool.js` Modül 8 tarafından denetlenir
+(err=0 olmalı). Motor sürümü `engine/core.js → DE.__version__`, oyun sürümü
+`game/state.js → DE_GAME.__version__` içinde tanımlıdır; `custom_level.json`
+`meta.version` ise ayrı bir kavramdır (seviye biçim sürümü = 1).
 
----
+## Lisans
 
-*Latest version: **0.1.19** | Version history: see `version.txt`*
+MIT Lisansı ile yayınlanmıştır. Telif (c) 2026 tcknmx. Ayrıntılar `LICENSE` dosyasında.

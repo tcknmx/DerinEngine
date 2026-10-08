@@ -18,10 +18,6 @@ DE.register_builder = function (tag, builder) {
     DE._BUILDERS[tag] = builder;
 };
 
-DE.get_builder = function (tag) {
-    return DE._BUILDERS[tag] || null;
-};
-
 DE.registered_tags = function () {
     return Object.keys(DE._BUILDERS);
 };

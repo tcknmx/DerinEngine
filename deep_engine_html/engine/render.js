@@ -4,13 +4,6 @@
  */
 var DE = DE || {};
 
-DE._apply_camera = function (ctx, camera_offset, zoom) {
-    ctx.save();
-    ctx.translate(-(camera_offset ? camera_offset.x : 0) * (zoom || 1),
-                  -(camera_offset ? camera_offset.y : 0) * (zoom || 1));
-    ctx.scale(zoom || 1, zoom || 1);
-}
-
 DE.SpriteRenderer = class SpriteRenderer extends DE.Component {
     constructor(color = [255, 255, 255], shape = "rect", border_radius = 0) {
         super();

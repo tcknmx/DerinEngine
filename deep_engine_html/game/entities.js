@@ -22,6 +22,46 @@ function _rects_overlap(a, b) {
     return a.x < (b.x + b.w) && (a.x + a.w) > b.x && a.y < (b.y + b.h) && (a.y + a.h) > b.y;
 }
 
+/* Ortak nisan fazi (SniperEnemy + SniperBoss/CosmicBoss cagirir).
+ * aim: oyuncuyu surekli takip et; lock: kilitli koordinat dondurulur.
+ * Farkli dosyalar arasinda paylasildigi icin DE_GAME'e eklenir
+ * (testler her dosyayi ayri sarmalayicida calistirir, ust duzey
+ * function'lar dosyalar arasi gorunmez). */
+DE_GAME._beam_aim_phase = function (boss, phase, player) {
+    if (phase === "aim") {
+        boss._aim_state = "aim";
+        boss._locked = false;
+        boss._target_x = player.position.x + player.size.x / 2;
+        boss._target_y = player.position.y + player.size.y / 2;
+        boss._lock_x = boss._lock_y = null;
+    } else if (phase === "lock") {
+        if (!boss._locked) {
+            boss._locked = true;
+            boss._lock_x = boss._target_x;
+            boss._lock_y = boss._target_y;
+        }
+        boss._aim_state = "lock";
+    }
+};
+
+/* Dusman update girisi: uyandirma + yavaslatma + sersemleme. Update devam
+ * edebiliyorse olceklendirilmis dt dondurulur; erken bitmeliyse null.
+ * stop_x: sersemleyen govdeyi yatay durdurmaya da calis (Rigidbody2D varsa). */
+function _enemy_prelude(e, dt, stop_x) {
+    if (!_wake_up(e)) return null;
+    dt = DE._slow_dt(dt);
+    if (e.stun_timer > 0) {
+        e.stun_timer -= dt;
+        if (stop_x) {
+            const rb = e.game_object.get_component(DE.Rigidbody2D);
+            if (rb) rb.velocity.x = 0.0;
+        }
+        if (e._sprite) e._sprite.color = e.stun_timer > 0 ? [255, 235, 80] : e._base_color;
+        return null;
+    }
+    return dt;
+}
+
 /* ---------------------------------------------------------------------------
  * PLAYER — PlayerController
  * ------------------------------------------------------------------------ */
@@ -172,6 +212,18 @@ DE_GAME.PlayerController = class PlayerController extends DE.Component {
             return;
         }
 
+        this._update_ground_effects(dt);
+        this._update_powerups(dt);
+        this._update_squash_effects(dt);
+        if (this._update_dash(dt)) return;
+        this._update_movement(dt);
+        this._update_jump(dt);
+        this._update_run_puff(dt);
+        this._update_actions(dt);
+        this._update_ui(dt);
+    }
+
+    _update_ground_effects(dt) {
         // --- Zıplama 'pre-squash' (telgraf): çömel -> patla ---
         if (this.jump_squash_timer > 0) {
             this.jump_squash_timer -= dt;
@@ -200,6 +252,9 @@ DE_GAME.PlayerController = class PlayerController extends DE.Component {
             this.checkpoint_pos = new DE.Vector2(this.game_object.position.x, this.game_object.position.y);
         }
 
+        }
+
+    _update_powerups(dt) {
         // --- PowerUp zamanlayıcılarını azalt ---
         if (this.powerup_magnet > 0) this.powerup_magnet -= dt;
         if (this.powerup_triple > 0) this.powerup_triple -= dt;
@@ -238,6 +293,9 @@ DE_GAME.PlayerController = class PlayerController extends DE.Component {
             }
         }
 
+        }
+
+    _update_squash_effects(dt) {
         // Prosedürel Squash & Stretch Pürüzsüzleştirme (Lerp).
         // Çöl kumu: yerdeyken hafif basık kalır (görsel mini-biyom efekti).
         const squash_home_x = (this.biome === "desert" && this.rb.is_grounded) ? 1.05 : 1.0;
@@ -264,6 +322,9 @@ DE_GAME.PlayerController = class PlayerController extends DE.Component {
             this.air_time = 0.0;
         }
 
+        }
+
+    _update_dash(dt) {
         // Dash Davranışı (ağırlık: hız rampalanır, bitince momentum kalır)
         if (this.dash_timer > 0) {
             this.dash_timer -= dt;
@@ -290,9 +351,12 @@ DE_GAME.PlayerController = class PlayerController extends DE.Component {
             if (this.dash_timer <= 0) {
                 this.dash_momentum = this.direction_dash * this.speed * 1.6;
             }
-            return;
+            return true;
         }
+        return false;
+    }
 
+    _update_movement(dt) {
         // Yatay Hareket (klavye A/D + kumanda analog/D-Pad birleşik; speed powerup 1.7x)
         const move_x = DE.Input.get_horizontal_axis();
         if (move_x < 0) this.facing_dir = -1;
@@ -336,7 +400,9 @@ DE_GAME.PlayerController = class PlayerController extends DE.Component {
                 this.particles.burst(1, [200, 210, 230], [10, 30], [2, 3], [0.2, 0.4], 20.0, [wx - this.game_object.position.x, this.game_object.size.y - 6]);
             }
         }
+    }
 
+    _update_jump(dt) {
         // Zıplamayı uygula: wall jump > yer zıplaması > çift zıplama önceliği
         if (this.jump_buffer_timer > 0) {
             if (this.wall_sliding) {
@@ -388,7 +454,9 @@ DE_GAME.PlayerController = class PlayerController extends DE.Component {
 
         // --- Düşerken ekstra yerçekimi (ağır iniş hissi) ---
         if (this.rb.velocity.y > 0) this.rb.velocity.y += 550 * dt;
+    }
 
+_update_run_puff(dt) {
         // Koşu puf: yerdeyken ayak altından periyodik çimen tozları
         if (this.rb.is_grounded && Math.abs(this.rb.velocity.x) > 60 && this.particles) {
             this.run_puff_timer -= dt;
@@ -397,7 +465,9 @@ DE_GAME.PlayerController = class PlayerController extends DE.Component {
                 this.particles.burst(1, [160, 180, 130], [4, 20], [2, 4], [0.15, 0.35], 30.0, [16, this.game_object.size.y - 2]);
             }
         }
+    }
 
+    _update_actions(dt) {
         // Dash (LSHIFT)
         if (DE.Input.get_key_down("LSHIFT") && this.dash_cooldown <= 0) {
             this.dash_timer = 0.16;
@@ -424,7 +494,9 @@ DE_GAME.PlayerController = class PlayerController extends DE.Component {
             if (this.health) this.health.take_damage(1);
             this.respawn(true);
         }
+    }
 
+    _update_ui(dt) {
         // Can & Skor UI Güncelleme
         if (this.health && this.health_text_obj) {
             const txt = this.health_text_obj.get_component(DE.TextRenderer);
@@ -957,13 +1029,8 @@ DE_GAME.PatrolEnemy = class PatrolEnemy extends DE.Component {
 
     update(dt) {
         const o = this.game_object;
-        if (!_wake_up(this)) return;
-        dt = DE._slow_dt(dt);
-        if (this.stun_timer > 0) {
-            this.stun_timer -= dt;
-            if (this._sprite) this._sprite.color = this.stun_timer > 0 ? [255, 235, 80] : this._base_color;
-            return;
-        }
+        dt = _enemy_prelude(this, dt);
+        if (dt === null) return;
         const forward = this.direction;
         this._turn_cooldown = Math.max(0.0, this._turn_cooldown - dt);
 
@@ -1033,13 +1100,8 @@ DE_GAME.FlyerEnemy = class FlyerEnemy extends DE.Component {
     }
 
     update(dt) {
-        if (!_wake_up(this)) return;
-        dt = DE._slow_dt(dt);
-        if (this.stun_timer > 0) {
-            this.stun_timer -= dt;
-            if (this._sprite) this._sprite.color = this.stun_timer > 0 ? [255, 235, 80] : this._base_color;
-            return;
-        }
+        dt = _enemy_prelude(this, dt);
+        if (dt === null) return;
         this.game_object.position.x += this.speed * this.direction * dt;
         if (Math.abs(this.game_object.position.x - this.start_x) >= this.distance) {
             this.direction *= -1;
@@ -1070,15 +1132,8 @@ DE_GAME.HopperEnemy = class HopperEnemy extends DE.Component {
     }
 
     update(dt) {
-        if (!_wake_up(this)) return;
-        dt = DE._slow_dt(dt);
-        if (this.stun_timer > 0) {
-            this.stun_timer -= dt;
-            const rb = this.game_object.get_component(DE.Rigidbody2D);
-            if (rb) rb.velocity.x = 0.0;
-            if (this._sprite) this._sprite.color = this.stun_timer > 0 ? [255, 235, 80] : this._base_color;
-            return;
-        }
+        dt = _enemy_prelude(this, dt, true);
+        if (dt === null) return;
         this.timer += dt;
         const obj = this.game_object;
         const rb = obj.get_component(DE.Rigidbody2D);
@@ -1125,13 +1180,8 @@ DE_GAME.TurretEnemy = class TurretEnemy extends DE.Component {
     }
 
     update(dt) {
-        if (!_wake_up(this)) return;
-        dt = DE._slow_dt(dt);
-        if (this.stun_timer > 0) {
-            this.stun_timer -= dt;
-            if (this._sprite) this._sprite.color = this.stun_timer > 0 ? [255, 235, 80] : this._base_color;
-            return;
-        }
+        dt = _enemy_prelude(this, dt);
+        if (dt === null) return;
         this.timer += dt;
         this._apply_telegraph(dt);
         if (this.timer < this.fire_interval) return;
@@ -1177,7 +1227,7 @@ DE_GAME.SniperEnemy = class SniperEnemy extends DE.Component {
         this._lock_x = null;
         this._lock_y = null;
         this._locked = false;
-        this.__aim_state = "aim";
+        this._aim_state = "aim";
         this._beam_flash = 0.0;
     }
 
@@ -1202,7 +1252,7 @@ DE_GAME.SniperEnemy = class SniperEnemy extends DE.Component {
 
     update(dt) {
         if (!_wake_up(this)) {
-            this.__aim_state = "aim";
+            this._aim_state = "aim";
             this._locked = false;
             return;
         }
@@ -1224,14 +1274,14 @@ DE_GAME.SniperEnemy = class SniperEnemy extends DE.Component {
         const player = this._find_player();
         if (player === null) {
             this._locked = false;
-            this.__aim_state = "aim";
+            this._aim_state = "aim";
             return;
         }
         const dx = player.position.x - this.game_object.position.x;
         const dy = player.position.y - this.game_object.position.y;
         if (Math.abs(dx) > this.range || Math.abs(dy) > this.range) {
             this._locked = false;
-            this.__aim_state = "aim";
+            this._aim_state = "aim";
             return;
         }
 
@@ -1250,20 +1300,7 @@ DE_GAME.SniperEnemy = class SniperEnemy extends DE.Component {
             return;
         }
 
-        if (phase === "aim") {
-            this.__aim_state = "aim";
-            this._locked = false;
-            this._target_x = player.position.x + player.size.x / 2;
-            this._target_y = player.position.y + player.size.y / 2;
-            this._lock_x = this._lock_y = null;
-        } else if (phase === "lock") {
-            if (!this._locked) {
-                this._locked = true;
-                this._lock_x = this._target_x;
-                this._lock_y = this._target_y;
-            }
-            this.__aim_state = "lock";
-        }
+        DE_GAME._beam_aim_phase(this, phase, player);
     }
 
     _fire_beam(sx, sy, tx, ty, player) {

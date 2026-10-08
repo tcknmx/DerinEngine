@@ -531,3 +531,29 @@ Uyarı: `build/` klasörü PyInstaller (`build/StarCollectorHero/`) ile pygbag
 (`build/web/`) tarafından paylaşılır; web çıktısını korumak istiyorsan temizlikte
 `build/web*` dışında tut ya da `dist/web/`'e kopyala. *(Eski py araçların
 kaldırılması build klasörünü etkilemez; komutlar artık kullanılmıyor — yukarıda.)*
+
+---
+
+## DENETİM + SADELEŞTİRME — ARAÇ KATMANI (08.10.2026)
+
+Kullanıcı görevi kapsamında (`_shared.md` SON GELİŞMELER → TAMAMLANDI kaydı)
+araç/repo tarafına yapılanlar:
+
+- **Silinen dosyalar:** `StarCollectorHero.spec` (`git rm` — py build için
+  kalmıştı), kök `__pycache__/` (`main.cpython-314.pyc`), `_e.txt` (bir eski
+  edit döküntüsü), `motor.log` (eski py motor logu). `dist/` **DOKUNULMADI**
+  (kullanıcı emri — gitignored 52.7 MB py exe paketi).
+- **README.md yeniden yazıldı:** py odaklı (pip/pygame/PyInstaller/pygbag/
+  `deep_engine/` yapısı) içerik → JS/HTML tek-kaynak gerçeği: çalıştırma
+  (index.html + `node test_*.js`), yeni `deep_engine_html/` yapısı, ayrı sürüm
+  sayımı (motor 1.0.0 / oyun 0.1.19), webpanel + deep-tool komutları. Türkçe
+  (kullanıcı dili; istenirse EN sürüm eklenebilir).
+- **version.txt:** silinmiş `deep_engine/__init__.py` sürüm kaynağı → motor
+  `core.js → DE.__version__` / oyun `state.js → DE_GAME.__version__`; "tek sürüm
+  satırı" ifadesi → "motor ve oyun ayrı sayılır". Geçmiş (0.1.0–0.1.19) değişiklik
+  geçmişi tarihsel olarak korundu.
+- **Bayat py import'ları bilinçli KORUNDU (değişiklik yok):** `webpanel.py:33`
+  try/except fallback, `webpanel.py:414` `import deep_engine`, `webpanel.html:205`
+  — kozmetik; deep-tool hâlâ `0 WARN/0 BUG/0 ERR` üretiyor.
+- **Doğrulama:** `test_tools.js` **36/36**, `test_browser.js` **52/0** (climber
+  test sayısı arttı), 13/13 JS **0 FAIL**, `deep-tool.py --lang tr all` **0/0/0**.

@@ -127,6 +127,55 @@ function _draw_enrage_aura(ctx, obj, health, camera_offset) {
     }
 }
 
+/* --- Ortak lazer yardimcilari (SniperBoss + CosmicBoss paylasir) ---
+ * Nisan fazi (aim/lock) ise DE_GAME._beam_aim_phase (entities.js) kullanilir. */
+function _boss_fire_beam(boss, sx, sy, tx, ty, player, flash, iframe) {
+    boss._beam_flash = flash;
+    if (DE.SoundFX && DE.SoundFX.play) DE.SoundFX.play("shoot");
+    // kilitli isin uzerinde oyuncu varsa isabet
+    const px = player.position.x + player.size.x / 2;
+    const py = player.position.y + player.size.y / 2;
+    const vx = tx - sx, vy = ty - sy;
+    const mag2 = vx * vx + vy * vy;
+    if (mag2 < 1) return;
+    const t = Math.max(0.0, Math.min(1.0, ((px - sx) * vx + (py - sy) * vy) / mag2));
+    const closest_x = sx + vx * t;
+    const closest_y = sy + vy * t;
+    const dist = Math.hypot(px - closest_x, py - closest_y);
+    if (dist <= boss.beam_width) {
+        const player_health = player.get_component(DE.Health);
+        if (player_health && !player_health.is_invulnerable()) {
+            player_health.take_damage(1, iframe);
+            const ctrl = player.get_component(DE_GAME.PlayerController);
+            if (ctrl) {
+                ctrl.hitstop_timer = Math.max(ctrl.hitstop_timer, 0.06);
+                if (ctrl._screen_shake) ctrl._screen_shake(0.2);
+            }
+            const scene = _boss_scene();
+            if (scene) scene.add_shake(0.2);
+        }
+    }
+}
+
+function _boss_draw_beam(ctx, camera_offset, boss, cx, cy, blink_time) {
+    if (boss._aim_state === "lock" && boss._lock_x !== null && boss._lock_y !== null) {
+        const tx = Math.trunc(boss._lock_x - camera_offset.x);
+        const ty = Math.trunc(boss._lock_y - camera_offset.y);
+        // kilitli: donmus, yanip sonen kirmizi lazer
+        const blink = Math.sin(blink_time * 30) > 0;
+        _line(ctx, blink ? [255, 60, 60] : [200, 40, 40], cx, cy, tx, ty, boss.beam_width);
+    } else if (boss._target_x !== null && boss._target_y !== null) {
+        const tx = Math.trunc(boss._target_x - camera_offset.x);
+        const ty = Math.trunc(boss._target_y - camera_offset.y);
+        _line(ctx, [255, 90, 60], cx, cy, tx, ty, 3);
+    }
+    if (boss._beam_flash > 0) {
+        const tx = Math.trunc((boss._lock_x !== null ? boss._lock_x : boss._target_x) - camera_offset.x);
+        const ty = Math.trunc((boss._lock_y !== null ? boss._lock_y : boss._target_y) - camera_offset.y);
+        _line(ctx, [255, 120, 80], cx, cy, tx, ty, boss.beam_width + 4);
+    }
+}
+
 /* --- BossController: zemin boss'u (zıplar, ateş topu atar, üst sağlık barı) --- */
 class BossController extends DE.Component {
     constructor(patrol_distance = 200.0, speed = 60.0, fire_interval = 2.0, bullet_speed = 320.0,
@@ -478,47 +527,10 @@ class SniperBoss extends DE.Component {
             return;
         }
 
-        if (phase === "aim") {
-            this._aim_state = "aim";
-            this._locked = false;
-            this._target_x = player.position.x + player.size.x / 2;
-            this._target_y = player.position.y + player.size.y / 2;
-            this._lock_x = this._lock_y = null;
-        } else if (phase === "lock") {
-            if (!this._locked) {
-                this._locked = true;
-                this._lock_x = this._target_x;
-                this._lock_y = this._target_y;
-            }
-            this._aim_state = "lock";
-        }
+        DE_GAME._beam_aim_phase(this, phase, player);
     }
     _fire_beam(sx, sy, tx, ty, player) {
-        this._beam_flash = 0.14;
-        if (DE.SoundFX && DE.SoundFX.play) DE.SoundFX.play("shoot");
-        // kilitli ışın üzerinde oyuncu varsa isabet
-        const px = player.position.x + player.size.x / 2;
-        const py = player.position.y + player.size.y / 2;
-        const vx = tx - sx, vy = ty - sy;
-        const mag2 = vx * vx + vy * vy;
-        if (mag2 < 1) return;
-        const t = Math.max(0.0, Math.min(1.0, ((px - sx) * vx + (py - sy) * vy) / mag2));
-        const closest_x = sx + vx * t;
-        const closest_y = sy + vy * t;
-        const dist = Math.hypot(px - closest_x, py - closest_y);
-        if (dist <= this.beam_width) {
-            const player_health = player.get_component(DE.Health);
-            if (player_health && !player_health.is_invulnerable()) {
-                player_health.take_damage(1);
-                const ctrl = player.get_component(DE_GAME.PlayerController);
-                if (ctrl) {
-                    ctrl.hitstop_timer = Math.max(ctrl.hitstop_timer, 0.06);
-                    if (ctrl._screen_shake) ctrl._screen_shake(0.2);
-                }
-                const scene = _boss_scene();
-                if (scene) scene.add_shake(0.2);
-            }
-        }
+        _boss_fire_beam(this, sx, sy, tx, ty, player, 0.14, null);
     }
     draw(ctx, camera_offset) {
         const sx = Math.trunc(this.game_object.position.x - camera_offset.x);
@@ -530,23 +542,7 @@ class SniperBoss extends DE.Component {
 
         const cx = sx + w / 2;
         const cy = sy + h / 2;
-        if (this._aim_state === "lock" && this._lock_x !== null && this._lock_y !== null) {
-            const tx = Math.trunc(this._lock_x - camera_offset.x);
-            const ty = Math.trunc(this._lock_y - camera_offset.y);
-            // kilitli: donmuş, yanıp sönen kırmızı lazer
-            const blink = Math.sin(this.timer * 30) > 0;
-            _line(ctx, blink ? [255, 60, 60] : [200, 40, 40], cx, cy, tx, ty, this.beam_width);
-        } else if (this._target_x !== null && this._target_y !== null) {
-            const tx = Math.trunc(this._target_x - camera_offset.x);
-            const ty = Math.trunc(this._target_y - camera_offset.y);
-            _line(ctx, [255, 90, 60], cx, cy, tx, ty, 3);
-        }
-
-        if (this._beam_flash > 0) {
-            const tx = Math.trunc((this._lock_x !== null ? this._lock_x : this._target_x) - camera_offset.x);
-            const ty = Math.trunc((this._lock_y !== null ? this._lock_y : this._target_y) - camera_offset.y);
-            _line(ctx, [255, 120, 80], cx, cy, tx, ty, this.beam_width + 4);
-        }
+        _boss_draw_beam(ctx, camera_offset, this, cx, cy, this.timer);
 
         if (this.health) {
             _draw_boss_bar(ctx, this.game_object, this.health, this.boss_key, camera_offset);
@@ -606,46 +602,10 @@ class CosmicBoss extends FlyingBoss {
             this._lock_x = this._lock_y = null;
             return;
         }
-        if (phase === "aim") {
-            this._aim_state = "aim";
-            this._locked = false;
-            this._target_x = player.position.x + player.size.x / 2;
-            this._target_y = player.position.y + player.size.y / 2;
-            this._lock_x = this._lock_y = null;
-        } else if (phase === "lock") {
-            if (!this._locked) {
-                this._locked = true;
-                this._lock_x = this._target_x;
-                this._lock_y = this._target_y;
-            }
-            this._aim_state = "lock";
-        }
+        DE_GAME._beam_aim_phase(this, phase, player);
     }
     _fire_beam(sx, sy, tx, ty, player) {
-        this._beam_flash = 0.16;
-        if (DE.SoundFX && DE.SoundFX.play) DE.SoundFX.play("shoot");
-        const px = player.position.x + player.size.x / 2;
-        const py = player.position.y + player.size.y / 2;
-        const vx = tx - sx, vy = ty - sy;
-        const mag2 = vx * vx + vy * vy;
-        if (mag2 < 1) return;
-        const t = Math.max(0.0, Math.min(1.0, ((px - sx) * vx + (py - sy) * vy) / mag2));
-        const closest_x = sx + vx * t;
-        const closest_y = sy + vy * t;
-        const dist = Math.hypot(px - closest_x, py - closest_y);
-        if (dist <= this.beam_width) {
-            const player_health = player.get_component(DE.Health);
-            if (player_health && !player_health.is_invulnerable()) {
-                player_health.take_damage(1, 1.15);
-                const ctrl = player.get_component(DE_GAME.PlayerController);
-                if (ctrl) {
-                    ctrl.hitstop_timer = Math.max(ctrl.hitstop_timer, 0.06);
-                    if (ctrl._screen_shake) ctrl._screen_shake(0.2);
-                }
-                const scene = _boss_scene();
-                if (scene) scene.add_shake(0.2);
-            }
-        }
+        _boss_fire_beam(this, sx, sy, tx, ty, player, 0.16, 1.15);
     }
     draw(ctx, camera_offset) {
         // Uçan boss gövdesi (kanatlar dahil)
@@ -655,21 +615,7 @@ class CosmicBoss extends FlyingBoss {
         const w = Math.trunc(this.game_object.size.x);
         const cx = sx + w / 2;
         const cy = sy + this.game_object.size.y / 2;
-        if (this._aim_state === "lock" && this._lock_x !== null && this._lock_y !== null) {
-            const tx = Math.trunc(this._lock_x - camera_offset.x);
-            const ty = Math.trunc(this._lock_y - camera_offset.y);
-            const blink = Math.sin(this._beam_timer * 30) > 0;
-            _line(ctx, blink ? [255, 60, 60] : [200, 40, 40], cx, cy, tx, ty, this.beam_width);
-        } else if (this._target_x !== null && this._target_y !== null) {
-            const tx = Math.trunc(this._target_x - camera_offset.x);
-            const ty = Math.trunc(this._target_y - camera_offset.y);
-            _line(ctx, [255, 90, 60], cx, cy, tx, ty, 3);
-        }
-        if (this._beam_flash > 0) {
-            const tx = Math.trunc((this._lock_x !== null ? this._lock_x : this._target_x) - camera_offset.x);
-            const ty = Math.trunc((this._lock_y !== null ? this._lock_y : this._target_y) - camera_offset.y);
-            _line(ctx, [255, 120, 80], cx, cy, tx, ty, this.beam_width + 4);
-        }
+        _boss_draw_beam(ctx, camera_offset, this, cx, cy, this._beam_timer);
     }
 }
 

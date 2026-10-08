@@ -262,18 +262,6 @@ DE._pr_maybe_island = function (objects, rng, cx0, cx1, ground_y, b, difficulty,
     }
 };
 
-DE._pr_maybe_ramp = function (objects, rng, cx0, cx1, ground_y, b, safe_max_x) {
-    if (safe_max_x && cx0 < safe_max_x) return;
-    if (rng.random() >= 0.30) return;
-    const rw = rng.choice([120, 160, 200]);
-    const rh = rng.randint(56, 96);
-    const rx = rng.randint(cx0 + 40, cx1 - rw - 20);
-    const slope = rng.random() < 0.5 ? 1 : -1;
-    DE._pr_push(objects, "Ramp", rx, ground_y - rh, rw, rh, b["platform"], { slope: slope });
-    const coin_x = slope > 0 ? rx + rw - 40 : rx + 40;
-    DE._pr_push(objects, "Coin", coin_x, ground_y - rh - 30, 18, 18, b["coin"]);
-};
-
 DE._pr_maybe_breakable = function (objects, rng, cx0, cx1, ground_y, safe_max_x, is_last_chunk) {
     if (safe_max_x && cx0 < safe_max_x && !is_last_chunk) return;
     if (rng.random() < 0.28) {

@@ -8,6 +8,42 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[DENETİM + SADELEŞTİRME — TAMAMLANDI, 08.10.2026]** Kullanıcı görevi (tüm
+  dosyalar; gereksiz sil, dağınığı sadeleştir, spagetti düzelt; `dist/` hariç
+  onaylandı) bitti. **A — silinenler:** `StarCollectorHero.spec` (git rm),
+  kök `__pycache__` (main.cpython-314.pyc), `_e.txt`, `motor.log`. **C — ölü kod:**
+  `DE._apply_camera` (render.js), `DE._pr_maybe_ramp` (procedural.js),
+  `DE.get_builder` (levelfile.js). **D — spagetti:**
+  a) bosses aim/beam 3-kopya → ortak `DE_GAME._beam_aim_phase` (entities.js) +
+  `_boss_fire_beam`/`_boss_draw_beam` (bosses.js); SniperEnemy `_aim_state`;
+  b) 4 düşmana ortak `_enemy_prelude` helper (entities.js);
+  c) scenes.js `_scene_from_data` + `_wire_player_restart` (2 sahne kurulumu +
+  3 restart bağlantısı tekliliği);
+  d) `PlayerController.update` 325 satır → 9 metoda bölündü (`_update_*`, dash
+  in ayri `_update_dash` — kopya-hatasıyla silinen Dash tetikleyici bloğu fark
+  edilip geri kondu; tutarlılık kullanıcı onaylı `DE.Input.*` API çağrılarıyla
+  sağlandı). **B — belgeler:** README.md py odaklı → JS/HTML tek-kaynak gerçeğine
+  yeniden yazıldı (sürüm ayrı sayım motor 1.0.0 / oyun 0.1.19, yeni yapı,
+  testing komutları, Turkish); version.txt silinmiş `deep_engine/__init__.py`
+  referansı → `core.js DE.__version__` / `state.js DE_GAME.__version__`.
+  **Doğrulama:** 13/13 JS test **0 FAIL** (test_game 224 OK/0 FAIL — Star
+  Climber v2 kaydıyla birlikte yeşil), browser **52/0**, tools **36/0**,
+  `deep-tool.py --lang tr all` **0 WARN/0 BUG/0 ERR**. *Etkilenen: 02 motor
+  (render/procedural/levelfile ölü kod), 03 oyun (entities/bosses/scenes),
+  04 araç (spec / README / version). NOT: `webpanel.py:33/414` +
+  `webpanel.html:205` bayat py import'ları bilinçli kaldı (kozmetik).*
+
+- **[Star Climber v2 oynanabilirlik — TAMAMLANDI, 08.10.2026]** Kullanıcı şikayetleri
+  (dikenler kötü / dümdüz zıplama / ölüm döngüsü / grid arka plan) `climber.js`'e
+  cevaplandı: dikenler `SPIKE_CHANCE=0`; `FREE_CLIMB` 3 + **oru-sütun yasağı**
+  (katman merkezi ekran ortası `CLEAR=72` içine giremez) → "SPACE-only" bot sınırlı
+  (7-10), ör kaydı şeridini hedefleyen bot 30-60 kata çıkar; ölüm döngüsü
+  yumuşatıldı (`DEATH_MARGIN` 140, `CAM_BOOST_CAP` 1.5, `DOUBLE_GAP_CAP` 52);
+  arka plan grid'siz (sinüs tepe + biyom gradyanı). Doğrulama: 13 JS test **0 FAIL**
+  (test_game 244 satır, yeni: orta-sütun yasağı + iki yönlendirme botu + diken-yok),
+  deep-tool 14 **0 WARN/0 BUG/0 ERR**. *Etkilenen: 03 oyun (climber.js + test_game.js)
+  — motor katmanı DEĞİŞMEDİ. Detay: `03_game.md`.*
+
 - **[OYUN] STAR CLIMBER YÜKSELTME (08.10.2026, `03_game.md` "STAR CLIMBER
   YÜKSELTME — TAMAMLANDI").** Evren kuralları kapsamı: (1) yüzey ANA OYUN
   biyomlarından biri (astro hariç — `CLIMB_BIOMES` paleti, `_pick_biome()` seed'a

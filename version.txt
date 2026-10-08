@@ -1,16 +1,17 @@
 DerinEngine
 ===========
-Version: 0.1.19
-Status : Beta (active development build)
+Oyun (Star Collector Hero): 0.1.19
+Motor                      : 1.0.0
+Status: Beta (active development build)
 
-The version is defined in the code at:
-  - deep_engine/__init__.py  ->  __version__ = "0.1.19"
+Sürümler kodda tanımlıdır:
+  - Motor : deep_engine_html/engine/core.js  ->  DE.__version__ = "1.0.0"
+  - Oyun  : deep_engine_html/game/state.js    ->  DE_GAME.__version__ = "0.1.19"
 
-The engine and the demo game (Star Collector Hero) share a single version line.
-The plan is to reach 1.0.0 once the five priority areas of the 2D v1 roadmap
-(physics, tilemap + layers, scene tree + editor UI, animation + keyframes, UI)
-are complete.
-  - custom_level.json        ->  meta.version = 1  (level file format version, separate)
+Motor ve oyun AYRI sayılır (tek sürüm satırı fikri iptal edildi). 2D v1 yol
+haritasının beş kritik alanı (fizik, tilemap + katmanlar, sahne ağacı + editör
+UI, animasyon + anahtar kareler, UI) tamamlandıkça motor 1.0.0'a ilerler.
+  - custom_level.json  ->  meta.version = 1  (seviye biçim sürümü, ayrı kavram)
 
 Version history:
   0.1.0  (beta)  First official release. Playable prototype with the level file

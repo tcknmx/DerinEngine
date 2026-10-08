@@ -32,6 +32,40 @@ function _register_pause(scene) {
     };
 }
 
+/* Ortak sahne kurulumu: prosedürel/boss verisinden bir DE.Scene açar, paralaks
+ * zeminini bağlar, nesneleri yerleştirir ve start() çeker (M3 sonrası aynı yol). */
+function _scene_from_data(data, name) {
+    const meta = {
+        "name": name,
+        "background_color": [].concat(data["background_color"]),
+        "parallax_theme": data["parallax_theme"],
+    };
+    const scene = new DE.Scene(meta["name"], meta["background_color"]);
+    if (meta["parallax_theme"]) {
+        try {
+            scene.parallax_background = new DE.ParallaxBackground(meta["parallax_theme"]);
+        } catch (e) { /* yok say */ }
+    }
+    for (const entry of data["objects"]) {
+        DE.place_object(scene, Object.assign({}, entry));
+    }
+    scene.start();
+    return scene;
+}
+
+/* Oyuncuyu yeniden başlatma sarmalayıcısına bağlar: restart + ölümde game-over. */
+function _wire_player_restart(scene, restart_fac) {
+    const player = scene.find_by_tag("Player");
+    if (player) {
+        const ctrl = player.get_component(DE_GAME.PlayerController);
+        if (ctrl) ctrl.restart_scene_factory = restart_fac;
+        const health = player.get_component(DE.Health);
+        if (health) {
+            health.on_death = () => DE.Engine.switch_scene(DE_GAME.build_game_over_scene(restart_fac));
+        }
+    }
+}
+
 /* Mobil dokunmatik kontrolleri sahneye bağlar (yalnız oyun sahneleri).
  * TouchControls yalnız touch cihazda etkinleşir; masada no-op'tur. */
 function _attach_touch(scene) {
@@ -175,23 +209,7 @@ function import_scene_tilemap(scene, data) {
 
 function build_procedural_level(biome = null, seed = null, chunks = 8, difficulty = 0) {
     const data = DE.procedural_generate(biome, seed, chunks, difficulty);
-    const meta = {
-        "name": DE.I18n.current_lang === "tr" ? data["name_tr"] : data["name_en"],
-        "background_color": [].concat(data["background_color"]),
-        "parallax_theme": data["parallax_theme"],
-    };
-
-    const scene = new DE.Scene(meta["name"], meta["background_color"]);
-    if (meta["parallax_theme"]) {
-        try {
-            scene.parallax_background = new DE.ParallaxBackground(meta["parallax_theme"]);
-        } catch (e) { /* yok say */ }
-    }
-
-    for (const entry of data["objects"]) {
-        DE.place_object(scene, Object.assign({}, entry));
-    }
-    scene.start();
+    const scene = _scene_from_data(data, DE.I18n.current_lang === "tr" ? data["name_tr"] : data["name_en"]);
 
     // Gerçek tilemap zemini: düz Zemin rect'lerini 32px ızgaraya rasterize et
     // (platform yüzeyi + alt toprak, 2 renk katmanı) ve eski sprite'ları gizle.
@@ -284,15 +302,7 @@ function build_campaign_entrance(biome, difficulty, index) {
         _campaign_sector_wipe();
         return build_campaign_entrance(biome, difficulty, index);
     }
-    const player = scene.find_by_tag("Player");
-    if (player) {
-        const ctrl = player.get_component(DE_GAME.PlayerController);
-        if (ctrl) ctrl.restart_scene_factory = restart_fac;
-        const health = player.get_component(DE.Health);
-        if (health) {
-            health.on_death = () => DE.Engine.switch_scene(DE_GAME.build_game_over_scene(restart_fac));
-        }
-    }
+    _wire_player_restart(scene, restart_fac);
 
     // Giriş portali -> seçilen oyun moduna göre: kampanya (boss) / sonsuz (yeni harita)
     const portals = scene.find_all_by_tag("Portal");
@@ -320,23 +330,8 @@ function build_campaign_boss(biome, difficulty, index) {
 
     const data = DE.procedural_generate_boss_arena(biome, null, difficulty, next_target);
 
-    const meta = {
-        "name": (DE.I18n.t("campaign_boss") + " - "
-                 + (DE.I18n.current_lang === "tr" ? data["name_tr"] : data["name_en"])),
-        "background_color": [].concat(data["background_color"]),
-        "parallax_theme": data["parallax_theme"],
-    };
-    const scene = new DE.Scene(meta["name"], meta["background_color"]);
-    if (meta["parallax_theme"]) {
-        try {
-            scene.parallax_background = new DE.ParallaxBackground(meta["parallax_theme"]);
-        } catch (e) { /* yok say */ }
-    }
-
-    for (const entry of data["objects"]) {
-        DE.place_object(scene, Object.assign({}, entry));
-    }
-    scene.start();
+    const scene = _scene_from_data(data, DE.I18n.t("campaign_boss") + " - "
+                                   + (DE.I18n.current_lang === "tr" ? data["name_tr"] : data["name_en"]));
 
     // ESC durdurmada pause overlay'i açar (menu_idle çıkış davranışını korur)
     _register_pause(scene);
@@ -363,14 +358,7 @@ function build_campaign_boss(biome, difficulty, index) {
         _campaign_sector_wipe();
         return build_campaign_entrance(biome, difficulty, index);
     }
-    if (player) {
-        const ctrl = player.get_component(DE_GAME.PlayerController);
-        if (ctrl) ctrl.restart_scene_factory = boss_death_target;
-        const health = player.get_component(DE.Health);
-        if (health) {
-            health.on_death = () => DE.Engine.switch_scene(DE_GAME.build_game_over_scene(boss_death_target));
-        }
-    }
+    _wire_player_restart(scene, boss_death_target);
 
     // Çıkış portalı nereye gider:
     // - final (astro): zafer; yoksa sonraki biyomun girişi (difficulty +1)
@@ -408,15 +396,7 @@ function build_endless_level(difficulty, index = 0) {
     scene.name = DE.I18n.t("endless_name");
 
     const restart_fac = () => build_endless_level(difficulty, index);
-    const player = scene.find_by_tag("Player");
-    if (player) {
-        const ctrl = player.get_component(DE_GAME.PlayerController);
-        if (ctrl) ctrl.restart_scene_factory = restart_fac;
-        const health = player.get_component(DE.Health);
-        if (health) {
-            health.on_death = () => DE.Engine.switch_scene(DE_GAME.build_game_over_scene(restart_fac));
-        }
-    }
+    _wire_player_restart(scene, restart_fac);
 
     const portals = scene.find_all_by_tag("Portal");
     for (const portal of portals) {

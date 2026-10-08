@@ -731,3 +731,19 @@ silme aşaması (`deep_engine/`, `game/*.py`, `main.py`, `tests/*.py`,
   tools **36/36**; `deep-tool.py all` 0/0/0. py testleri (silindi — çalıştırılamaz,
   bilinçli). **Motor KALAN listesi bu kayıtla kapandı; kalan tek iş: session
   `_shared`/`01`/`03`/`04` kayıtları + COMMIT ONAYI (40+ dosya).**
+
+---
+
+## DENETİM + SADELEŞTİRME — MOTOR KATMANI (08.10.2026)
+
+Kullanıcı görevi kapsamında (`_shared.md` SON GELİŞMELER → TAMAMLANDI kaydı)
+motor katmanına yapılanlar:
+
+- **Ölü kod silindi (3):** `DE._apply_camera` (render.js — Hiçbir çağıranı yoktu),
+  `DE._pr_maybe_ramp` (procedural.js — 07.10 kararı rampa üretimini kaldırmıştı;
+  "tanım kalır — parite" gerekçesi py motoru silinince geçersiz oldu),
+  `DE.get_builder` (levelfile.js — erişilemeyen dormant yol).
+- **Etki:** yalnızca motor kamu yüzeyi küçüldü; `test_*.js` (13/13) + tools
+  (36/36) + browser (**52/0**) + `deep-tool.py --lang tr all` (**0/0/0**) yeşil.
+- **`DE.Input.*` API'si dokunulmadı** (oyun tarafı `_update_dash`'e taşınan
+  tetikleyici `DE.Input.get_keys()` → `get_key_down` ile uyumlu tutuldu).
