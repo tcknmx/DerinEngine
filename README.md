@@ -2,11 +2,12 @@
 
 DerinEngine, JavaScript + HTML(Canvas 2D) ile sıfırdan yazılmış kendi oyun motorumuzdur.
 Bunun üzerinde **Star Collector Hero** adlı tam oynanabilir platformer vardır: prosedürel
-kampanya, benzersiz boss'lar, dinamik aydınlatma, tarayıcı seviye editörü ve oyun içi
-konsol. Proje aktif geliştirmededir.
+kampanya, benzersiz boss'lar, dinamik aydınlatma ve oyun içi konsol. (Seviye tasarımı
+için ayrı bir tarayıcı aracı var: **webpanel** — oyun menüsünde editör/seviye seçimi
+YOKTUR.) Proje aktif geliştirmededir.
 
 > Motor HTML/JS tek kaynaktır. Eski Python motoru (pygame) 08.10.2026'da kaldırıldı;
-> git geçmişinde erişilebilir. Sürümler ayrı sayılır: **motor 1.0.0**, **oyun 0.1.19**.
+> git geçmişinde erişilebilir. Sürümler ayrı sayılır: **motor 1.0.0**, **oyun 0.1.20**.
 
 ## Özellikler
 
@@ -20,7 +21,6 @@ konsol. Proje aktif geliştirmededir.
 - 4 PowerUp: Mıknatıs Çekimi, Üçlü Ateş, Kalkan, Fırtına Hızı
 - 3 kalpli sağlık + i-frame (dokunulmazlık) süreleri
 - TR/EN anlık dil değiştirme (T), kalıcı yüksek skor ve dil kaydı
-- **Star Climber** (C): yükselen kule tırmanma modu, kalıcı rekor + çift zıplama skill'i
 - Tarayıcı seviye editörü (`webpanel.bat` → 127.0.0.1:8766)
 - Oyun içi geliştirici konsolu ( ` veya " ): hp, god, tp, respawn, help...
 - Tam kumanda desteği, mobil dokunmatik kontroller
@@ -37,7 +37,6 @@ konsol. Proje aktif geliştirmededir.
 | Dil (TR/EN) | T |
 | Kampanya | P |
 | Sonsuz Mod | 4 |
-| Star Climber | C |
 | Debug paneli | F3 |
 | Çıkış | ESC (Kumanda: Start) |
 
@@ -80,7 +79,7 @@ deep_engine_html/          # BİRİNCİL motor + oyun (JS, tarayıcıda çalış
     console.js, tween.js, input.js, ui.js, tilemap.js, scenemanager.js
   game/                    # Star Collector Hero
     main.js, state.js, entities.js, bosses.js, ui.js, scenes.js
-    builders.js, climber.js, commands.js
+    builders.js, commands.js
   test_*.js                # 13 motor/oyun test dosyası (Node)
 tools_html/                # araçların TAMAMI (Node)
   deep-tool.js             # dev tarama/kontrol aracı (TR/EN, deep-tool.bat kısayolu)

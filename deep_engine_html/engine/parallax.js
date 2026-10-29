@@ -20,12 +20,20 @@ DE.ParallaxLayer = class ParallaxLayer {
     _rgb(c) { return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")"; }
 
     draw(ctx, w, h, camera_offset) {
-        const scroll_x = DE._pmod(Math.trunc(-camera_offset.x * this.speed_factor), this.cached_width);
+        // Faz kaydırması kameranın yatay konumuyla orantılıdır. ÖNEMLİ: eski kod
+        // `_pmod(..., cached_width=2400)` ile sarmalıyordu; 2400 sinüs periyodunun
+        // (2π/0.003 ≈ 2094, 2π/0.006 ≈ 1047) TAM KATI olmadığından sarma anında
+        // yıldızlar ve dağlar ZIPLIYORDU → hareket ederken arka plan "bir anlığına
+        // değişiyor" gibi görünüyordu. Çözüm: fazı gerçek periyoda göre hizala
+        // (tam kat → görünümsüz sarma) veya hiç sarma.
+        const cam_x = camera_offset ? camera_offset.x : 0;
+        const off = cam_x * this.speed_factor;
 
         if (this.layer_type === "stars") {
+            const scroll = Math.trunc(off);
             ctx.fillStyle = "rgb(220,235,255)";
             for (let i = 0; i < 50; i++) {
-                const sx = (i * 47 + scroll_x) % w;
+                const sx = DE._pmod(i * 47 - scroll, w);
                 const sy = (i * 31) % Math.trunc(h * 0.7);
                 const r = i % 3 !== 0 ? 1 : 2;
                 ctx.beginPath();
@@ -35,10 +43,12 @@ DE.ParallaxLayer = class ParallaxLayer {
         } else if (this.layer_type === "mountains" || this.layer_type === "hills") {
             const step = this.layer_type === "mountains" ? 160 : 100;
             const freq = this.layer_type === "mountains" ? 0.003 : 0.006;
+            const period = (2 * Math.PI) / freq;              // sinüs periyodu
+            const off_w = off - Math.floor(off / period) * period;  // periyot-hizalı sarma
             const points = [];
             points.push([0, h]);
             for (let x = -step; x < w + step * 2; x += step) {
-                const world_x = x - scroll_x;
+                const world_x = x + off_w;
                 const peak_h = this.height_range[0] + (Math.sin(world_x * freq) * 0.5 + 0.5) * (this.height_range[1] - this.height_range[0]);
                 points.push([x, Math.trunc(h - peak_h)]);
             }
@@ -136,8 +146,12 @@ DE.ParallaxBackground = class ParallaxBackground {
             ctx.arc(stx, sty, size, 0, 6.283185307);
             ctx.fill();
         }
-        // Halkalı gezegen (üst sağda, kamerayla yavaş süzülür)
-        const px = Math.trunc(w * 0.20 + DE._pmod(sx * 0.8, w + 400));
+        // Halkalı gezegen (üst sağda, kamerayla yumuşak salınımla süzülür).
+        // NOT: eski kod `_pmod(sx*0.8, w+400)` ile sarmalıyordu; gezegen tek bir
+        // nesne olduğu için sarma anında sağdan sola ZIPLIYORDU. Sinüs salınımı
+        // ile sınırlı ve kesintisiz hale getirildi.
+        const planet_drift = Math.sin((sx * 0.8) * (6.283185307 / (w + 400))) * (w * 0.16);
+        const px = Math.trunc(w * 0.20 + planet_drift);
         const py = Math.trunc(h * 0.22);
         const planet_r = 42;
         ctx.fillStyle = "rgb(150,90,220)";

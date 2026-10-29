@@ -270,18 +270,6 @@ DE_GAME.MenuController = class MenuController extends DE.Component {
             return !!profile.get("endless_unlocked", false);
         } catch (e) { return false; }
     }
-    // Star Climber: Icy Tower tarzı tırmanış oyunu (ayrı sahne, fade ile açılır)
-    _start_climber() {
-        DE.SoundFX.play("win");
-        DE_GAME.state.game_mode = "climber";
-        this._pending_factory = DE_GAME.build_climber_scene;
-        // KRİTİK: karartmayı BA�?LAT. _fade_dir init'te 0'dır ve update()
-        // yalnız _fade_dir=1 iken koyulaştırır — bu satır olmadan sahne hiç
-        // değişmez (C tuşu / tıklama sessizce hiçbir şey yapmaz).
-        this._fade = 0;
-        this._fade_dir = 1;
-        this._fading_out = true;
-    }
     // Ayarlar ekranı: aynı andaki menü gibi fade + ayrı sahne ile açılır.
     _start_settings() {
         DE.SoundFX.play("click");
@@ -294,8 +282,6 @@ DE_GAME.MenuController = class MenuController extends DE.Component {
         if (action === "campaign") {
             DE_GAME.state.game_mode = "campaign";
             this._start_campaign();
-        } else if (action === "climber") {
-            this._start_climber();
         } else if (action === "settings") {
             this._start_settings();
         } else if (action === "endless") {
@@ -355,8 +341,6 @@ DE_GAME.MenuController = class MenuController extends DE.Component {
                 DE.SoundFX.play("click");
                 console.log(DE.I18n.t("endless_locked_warn"));
             }
-        } else if (DE.Input.get_key_down("C")) {   // Star Climber (climb game)
-            this._start_climber();
         } else if (DE.Input.get_key_down("P") || DE.Input.get_key_down("SPACE") || DE.Input.get_key_down("ENTER")) {
             DE_GAME.state.game_mode = "campaign";
             this._start_campaign();
@@ -570,17 +554,13 @@ DE_GAME.build_main_menu_scene = function build_main_menu_scene() {
     scene.add_object(set_go);
     _menu_ui.push(set_go);
 
-    // SA�? ALT: Sonsuz Mod + Star Climber kutucukları (gri "bot" yok; kilitliyken
-    // canlı panel + kilit ikonu). M_CLIMB adı/test kuralı korunur (TextRenderer
-    // "Climber" içermeli).
+    // SAĞ ALT: Sonsuz Mod kutucuğu (gri "bot" yok; kilitliyken canlı panel +
+    // kilit ikonu). Star Climber mini-oyunu 09.10.2026'da kaldırıldı.
     const _endless_locked = !getp("endless_unlocked", false);
     _menu_box("M_RND", 610, 428, 280, 70,
         _endless_locked ? [64, 58, 140] : [46, 110, 150], [168, 156, 220],
         "endless_name", 22, _endless_locked ? [185, 175, 255] : [140, 240, 255],
         "endless", _endless_locked);
-    _menu_box("M_CLIMB", 610, 508, 280, 70,
-        [34, 96, 120], [130, 200, 236], "menu_climber", 19, [175, 228, 255],
-        "climber", false);
 
     // ALT-ORTA: kontroller + yüksek skor + kampanya rozetleri (kutucuklarla çakışmaz).
     // Merkez semantiği: center_x + center_y true, y = metnin görsel merkezi.

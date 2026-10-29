@@ -350,12 +350,13 @@ DE.PR_BOSSES = {
 };
 DE.PR_BOSS_TYPES = ["archer", "flying", "sniper", "shield"];
 
-DE._pr_boss_design = function (biome, difficulty, rng) {
+DE._pr_boss_design = function (biome, difficulty, rng, forced_type) {
     rng = rng || DE._pr_rng(0);
     const b = DE.PR_BOSSES[biome];
     const scale = 1.0 + difficulty * 0.15;
     let boss_type;
     if (biome === "astro") boss_type = "cosmic";
+    else if (forced_type && DE.PR_BOSS_TYPES.indexOf(forced_type) !== -1) boss_type = forced_type;
     else boss_type = rng.choice(DE.PR_BOSS_TYPES);
     return {
         "boss_key": biome,
@@ -371,7 +372,7 @@ DE._pr_boss_design = function (biome, difficulty, rng) {
     };
 };
 
-DE.procedural_generate_boss_arena = function (biome = null, seed = null, difficulty = 0, next_target = "victory") {
+DE.procedural_generate_boss_arena = function (biome = null, seed = null, difficulty = 0, next_target = "victory", forced_boss_type = null) {
     if (seed === null) seed = Math.floor(Math.random() * 100000000);
     seed = Math.floor(seed);
     const rng = DE._pr_rng(seed);
@@ -390,7 +391,7 @@ DE.procedural_generate_boss_arena = function (biome = null, seed = null, difficu
         "color": [60, 200, 245],
     });
 
-    const boss = DE._pr_boss_design(bname, difficulty, rng);
+    const boss = DE._pr_boss_design(bname, difficulty, rng, forced_boss_type);
     objects.push({
         "tag": "Boss", "name": "Boss",
         "x": Math.floor(arena_w / 2) - 32, "y": ground_level - 84, "w": 64, "h": 64,

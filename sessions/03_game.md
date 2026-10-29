@@ -10,6 +10,137 @@
 
 ---
 
+> **HEDEF (09.10.2026, 2. paket):** Kullanıcı dört iş verdi:
+> 1. **Ölü yükleri temizle:** `engine/i18n.js`'te hiç çağrılmayan eski menü
+>    anahtarları (`menu_play_l1/l2/l3`, `menu_lang`, `menu_quit`, `menu_procedural`,
+>    `menu_random`, `menu_random_locked`, `menu_campaign`) tr+en birlikte silinir.
+> 2. **Parallax flicker fix:** hareket ederken arka plan bir anlığına değişiyor.
+>    KÖK NEDEN: `engine/parallax.js` `scroll_x`'i `_pmod(..., cached_width=2400)`
+>    ile sarmalıyor; 2400 sinüs periyodunun tam katı olmadığından sarma anında
+>    yıldızlar + dağlar ZIPLIYOR. Çözüm: fazı gerçek periyoda göre hizala (sarma
+>    yok) → kesintisiz kayma.
+> 3. **Boss benzersiz sıralama:** `procedural.js` `rng.choice(PR_BOSS_TYPES)` her
+>    arenada rastgele tip seçiyor → üst üste aynı boss gelebiliyor. Kampanyada her
+>    biyoma farklı tip (permütasyon) atanır.
+> 4. **Fazladan boss mekaniği (ShieldBoss):** "etrafı bloklarla kaplı boss anlamsız"
+>    → blok-kalkan mekaniği yeniden tasarlanacak. Tasarım önerisi kullanıcı onayına
+>    sunuldu (aşağıdaki "BOSS MEKANİK ÖNERİSİ" notu). Onay gelince uygulanır.
+> Doğrulama: 13/13 JS test + `test_tools` + `test_browser` + `deep-tool.js --lang tr all`.
+>
+> **SONUÇ (09.10.2026):** 1–3 tamamlandı ("PAKET 2" bölümü). 4 (boss mekaniği)
+> kullanıcı seçimi bekliyor → **KALAN**.
+
+---
+
+## PAKET 2 (09.10.2026) — TAMAMLANDI (1–3), 4 → KALAN
+
+1. **Ölü i18n anahtarları silindi:** `engine/i18n.js`'ten kodda hiç çağrılmayan eski
+   menü anahtarları tr+en kaldırıldı (`menu_play_l1/l2/l3`, `menu_lang`, `menu_quit`,
+   `menu_procedural`, `menu_random`, `menu_random_locked`, `menu_campaign`). Repo
+   taraması: başka referans yok. (Kullanılan `menu_play`/`menu_settings`/
+   `menu_highscore`/`menu_endless_locked` korundu.)
+2. **Parallax flicker düzeltildi (KÖK NEDEN):** `engine/parallax.js`
+   `ParallaxLayer.draw`, `scroll_x`'i `_pmod(..., cached_width=2400)` ile
+   sarmalıyordu; 2400 sinüs periyodunun (2π/0.003≈2094, 2π/0.006≈1047) tam katı
+   olmadığından sarma anında yıldızlar + dağlar ZIPLIYORDU. Çözüm: yıldızlar kendi
+   periyodunda `_pmod(i*47 - trunc(cam.x*speed), w)`; dağ/tepe fazı
+   `period=2π/freq`'e göre hizalanır (tam kat → görünümsüz sarma); `_draw_cosmic`
+   gezegeni `_pmod` sarması yerine sınırlı sinüs salınımına çevrildi (tek nesne
+   zıplaması giderildi). Regresyon: `test_visual.js` **P1b** (sarma sınırında
+   `maxDeltaY ≤ 8`; ölçülen **1**).
+3. **Boss benzersiz sıralama:** `engine/procedural.js` `_pr_boss_design` +
+   `procedural_generate_boss_arena`'ya opsiyonel `forced_boss_type` eklendi (astro
+   final yine her zaman `cosmic`). `game/state.js` `campaign_state["boss_types"]`
+   alanı; `game/scenes.js` `start_campaign` final-dışı 4 biyoma 4 FARKLI tip
+   (permütasyon) atar, `build_campaign_boss` bu tipi zorlar → arka arkaya aynı boss
+   gelmez. Regresyon: `test_procedural.js` **P6b** (zorunlu tip uygulanır, astro yok
+   sayar, 4 tip benzersiz).
+
+**Değişen dosyalar:** `engine/i18n.js`, `engine/parallax.js`, `engine/procedural.js`,
+`game/state.js`, `game/scenes.js`, `test_visual.js`, `test_procedural.js`, `README.md`.
+
+**Doğrulama (hepsi yeşil):** test_game 149/0 · test_visual 32/0 · test_procedural 34/0 ·
+test_smoke 0 HATA + 50/50 görsel kapı · test_tools 36/0 · test_browser 37/0 ·
+`deep-tool.js --lang tr all` 0 WARN/0 BUG/0 ERR.
+
+> **MOTOR NOTU (02'ye):** 03 oturumu `engine/parallax.js` (flicker fix) ve
+> `engine/procedural.js` (opsiyonel `forced_boss_type` param) dosyalarını değiştirdi.
+> Davranış geriye dönük uyumlu: `forced_boss_type` opsiyonel, verilmezse eski
+> `rng.choice(PR_BOSS_TYPES)` çalışır (test_procedural bunu doğrular).
+
+### BOSS MEKANİK ÖNERİSİ (fazladan boss = ShieldBoss) — KALAN (kullanıcı seçimi)
+
+Korunacak boss seti: **sniper, flying, zeminde-normal (archer), final (cosmic)**.
+"Fazladan" boss = `shield`. MEVCUT TASARIM ANLAMSIZ: 3 kırılabilir blok kalkan
+sayılıyor ama kod `every(p.active)` ile **TEK blok kırılınca** kalkanı düşürüyor →
+bloklar dekoratif. Öneriler (kullanıcı seçecek):
+
+- **A) Katmanlı kalkan (önerilen):** 3 blok = 3 bağımsız kalkan katmanı. Boss
+  canına hasar yalnız TÜM katmanlar kırıldıktan sonra işler; her katman kırıldığında
+  boss kısa süre savunmasız kalır; boss zamanla katman yeniler (regen). Oyuncu
+  boşlukta vurmaya zorlanır → bloklar anlam kazanır.
+- **B) Döner kalkan:** Bloklar boss etrafında döner; oyuncu doğru açıyı bekleyip
+  ateş eder; bloklar kırıldıkça dönüş hızlanır.
+- **C) Tek büyük kalkan + görsel:** Mevcut mantık korunur, 3 blok → 1 büyük kalkan
+  nesnesi + görsel iyileştirme (en az kod).
+
+---
+
+> **HEDEF (09.10.2026, Star Climber mini-oyununu TAMAMEN KALDIR):** Kullanıcı v4
+> sonrası kesin karar verdi: *"kendiliğinden seken zıplama oyunu istemiyorum.
+> star climber ile ilgili her şeyi sil. minigame'i kaldır artık istemiyorum."*
+> → Star Climber TÜMÜYLE kaldırılır: `game/climber.js` silinir; menü kutucuğu
+> (`M_CLIMB`), **[C] kısayolu**, `_start_climber` + `"climber"` aksiyonu, i18n
+> `climber_*` + `menu_climber` anahtarları (tr+en), `index.html` script + info
+> metni, tüm testler (test_game TEST17 bloğu + TEST13d satırı, test_smoke
+> "climber" turu, test_browser bölüm 4b + load listesi), README/AGENTS metinleri
+> temizlenir. Oyun sürümü 0.1.19 → **0.1.20**. Doğrulama: 13/13 JS test 0 FAIL +
+> `test_tools` 36/0 + `test_browser` 0 FAIL + `deep-tool.js --lang tr all` 0/0/0.
+>
+> **SONUÇ — TAMAMLANDI (09.10.2026):** aşağıdaki "STAR CLIMBER KALDIRMA" bölümüne bak.
+
+---
+
+## STAR CLIMBER KALDIRMA (09.10.2026) — TAMAMLANDI
+
+**Karar:** Kullanıcı v4'ü de istemedi; mini-oyunun tümüyle kaldırılmasını istedi
+("kendiliğinden seken zıplama oyunu istemiyorum"). Oynanış modları (kampanya/
+rastgele/editör/özel) korunur; yalnız Star Climber çıkarılır.
+
+**Silinen/değişen dosyalar:**
+- `deep_engine_html/game/climber.js` — **silindi** (ClimbGame, ClimberPlayer,
+  katman üretimi, HUD; tüm tırmanma motoru).
+- `game/ui.js` — `_start_climber()` metodu, menü aksiyon dalı `"climber"`,
+  `[C]` tuş dalı ve `M_CLIMB` menü kutucuğu kaldırıldı (yalnız "kaldırıldı"
+  açıklayan yorum kaldı).
+- `engine/i18n.js` — `menu_climber` + `climber_hud/goal/speed/jump/combo/hint/
+  banner1/banner2/skill/record` anahtarları **tr + en** birlikte silindi.
+- `deep_engine_html/index.html` — `game/climber.js` script etiketi + info
+  metnindeki "C Star Climber" kaldırıldı.
+- `game/state.js` — oyun sürümü `0.1.19` → **`0.1.20`**.
+
+**Test temizliği:**
+- `test_game.js` — load listesinden `climber.js`, TEST13d `star climber HUD`
+  girdisi ve **TEST17 bloğu (725 satır)** silindi (`node -c` temiz). Sonuç:
+  244 OK → **149 OK, 0 FAIL**.
+- `test_smoke.js` — `"climber"` turu silindi (tur 34 → 33). Ek kök neden: eski
+  `"ortam/ses-yok"` turu `tap("c")` ile (kaldırılan) climber'ı açıyordu; C artık
+  işlevsiz kalınca ardından gelen ESC ana menüde motoru durdurup smoke'u
+  bozuyordu → `tap("c")` yerine `tap("p")` (kampanya) kondu. Sonuç: **0 HATA,
+  50/50 görsel kapı**.
+- `tools_html/test_browser.js` — load listesinden `climber.js` ve **BÖLÜM 4b
+  (94 satır)** silindi. Sonuç: 52/0 → **37/0**.
+- Belgeler: `README.md` (özellik + kontrol tablosu + dosya listesi), `AGENTS.md`
+  (dosya listesi + kontrol satırı + sürüm + test sayaçları), `version.txt`
+  (0.1.20 + geçmiş girdisi).
+
+**Doğrulama (09.10.2026):** `deep_engine_html\test_*.js` 13/13 → 0 FAIL;
+`test_tools.js` 36/0; `test_browser.js` 37/0; `deep-tool.js --lang tr all`
+0 WARN / 0 BUG / 0 ERR; `node -c` temiz. Fonksiyonel "climber" izi kalmadı
+(yalnız açıklayıcı yorum).
+
+---
+
 > **HEDEF (08.10.2026, Star Climber v3):** Kullanıcı Star Climber'ı hâlâ beğenmiyor;
 > gerçek vizyonunu verdi: Star Climber, Star Collector Hero'nun **alternatif evreni**
 > olacak — bu evrende portallar KAPANDI; koleksiyonerler Astro boyutuna uzanan bir
@@ -26,6 +157,96 @@
 > `engine/i18n.js` (yeni key'ler: climber_goal, climber_banner1/2, hint'e dash).
 > Ek (önceden var olan kırıcı): `tools_html/test_tools.js` api/script girdisi
 > `print(1+1)` → `console.log(1+1)` — webpanel komutu node ile çalıştırır.
+>
+> **HEDEF (09.10.2026, Star Climber v4 — "CLIMBER JUMP" TÜRÜNÜN KENDİSİ):**
+> Kullanıcı, 4 tur (v1/v2/v3/v3b) sonrası net bir yargı verdi: *"star climber
+> minigame'i sırekli ama sürekli her defasında istediğimiz **climber jump tarzı
+> oyunlar** gibi olmuyor."* → **KÖK NEDEN: dört turda da PARAMETRE ayarı yapıldı
+> (platform genişliği, kamera hızı, arka plan), OYNANIŞ MEKANİĞİ değiştirilmedi.**
+> Aşağıdaki tablo, "Climber Jump / Icy Tower / Doodle Jump" türünün imza
+> mekaniklerini o anki kodla satır satır karşılaştırır:
+>
+> | # | Türün imzası | v3b'deki durum | Neden "benzemiyor" |
+> |---|---|---|---|
+> | 1 | **Kombo zıplama YÜKSEKLİĞİ artırır** (Icy Tower) | Kombi **yatay hızı** artırıyor (`speed_mult`) | Yanlış değişkene bağlı — oyuncu "hız" hissini zıplama olarak yaşıyor |
+> | 2 | **Yere her inişte OTOMATİK sekiş**; oyuncu sadece yatay yön verir | SPACE zorunlu + üstüne **orta sütun yasağı** | Tür kanonunun **tam tersi**: en basit girdi tırmanmayı bilerek engelleniyor |
+> | 3 | Katman aralığı **her zaman zıplama gücüne göre** üretilir | Aralık 188px, tek zıplama erişimi 112px | İmkânsız boşluk → oyun "bozuk/kötü" hissediliyor |
+> | 4 | Kamera **ilerlemeyi izler** (yeni katmana yukarı kayar) | Sabit **66 px/sn yükselen duvar** | "Görünmez duvar yarışı" — türün ruhuna aykırı |
+> | 5 | **Katman numarası ekran ortasında** büyük harfler | Yok | İmza UI eksik |
+> | 6 | Dikey tırmanış **engellenmez** | `CLEAR=96` orta-sütun yasağı | Oyun kendi imzasını yasaklıyordu |
+>
+> **v4 tedavi (hepsi `game/climber.js`):** (1) kombi → `jump_mult` (zıplama
+> yüksekliği; yatay hüzme ikincil), (2) `floor_gap` **zıplama yüksekliğinden
+> türetilir** (imkânsız boşluk kalmaz, çift zıplama skill'i gerçekten işe yarar),
+> (3) **`AUTO_BOUNCE`** — yere inişte otomatik sekiş (SPACE artık sadece skill
+> olan havada ek zıplama), (4) **kamera rekor katmanı izler** (yükselen duvar
+> kalktı), (5) **orta-sütun yasağı silindi**, yerleştirme yumuşatıldı,
+> (6) **ekran ortasında büyük katman numarası + kombi göstergesi** (i18n tr/en).
+> Python yok (08.10'da silindi). Doğrulama: `test_game.js` TEST17/17b yeni
+> kapılara göre yeniden yazıldı + 13 test + deep-tool.
+>
+> **v3b (08.10 — kullanıcının 3 yeni şikayeti):** "player yanlardan sıkıştırılmış
+> görünüyor / hâlâ çok kolay, sadece SPACE / arka plan hâlâ kötü" — uygulanan:
+> (1) player 32×32 (eski 30×40) + yerçekimi 1400 + zıplama -560 + hız 260
+> (ANA OYUN parametreleri birebir); (2) zorluk: FREE_CLIMB 3→1 (ilk 2 katman
+> serbest), orta-sütun CLEAR 96, overlap şerit 54/min38, platformlar dar
+> (92-146), dikey boşluk hızlı artar (GAP_GROWTH 2.2) — ölçü: **SPACE-only bot
+> artık 3. katta takılıyor** (eskiden 7-11), şerit-hedefli bot 10 (2+ kat yüksek);
+> (3) arka plan: biyoma göre 3 katmanlı tepe sırtları (uzak/orta/yakın, kamera
+> x'iyle drift, astro'ya söner), grid zaten yok. Test zarfı: "ilk 2 katman
+> sütunda", SPACE bot 2..10, overlap bot ≥6, NO-STACK ortShift≥14/≥0.15.
+> Doğrulama: 13/13 JS 0 FAIL, tools 36/0, `node tools_html\deep-tool.js --lang
+> tr all` 0 WARN/0 BUG/0 ERR (Python deep-tool artık yok — git'te silinmiş).
+
+---
+
+## V4 DEVİR TESLİMİ — TAMAMLANDI (09.10.2026)
+
+> v4 (yukarıdaki "HEDEF" girişi — AUTO_BOUNCE, kombi→zıplama, kamera rekor izliyor):
+> `game/climber.js` v4 mekanikleri yazılmış ama `test_game.js` HÂLÂ v3b beklentilerini
+> tutuyordu ve TEST17 bloğunun kapanış `}` kaybolmuştu → SyntaxError "Unexpected end
+> of input". Bu oturum devri bitirdi ve **fiilen doğruladı**:
+>
+> 1. **test_game.js TEST17/17b/17c v4 kanonuna YENİDEN YAZILDI** (eskiler v3b'yi
+>    test ediyordu):
+>    - **4/4b/4c:** SPACE'siz OTOMATİK sekiş + kombi→zıplama yüksekliği (h3 > 1.5·h0)
+>      + her katman aralığı zıplama erişimine sığar (**ULAŞILABİLİRLİK kapısı**,
+>      index 0..60; türün 3. kırığı).
+>    - **6:** kırılabilir katman artık İLK inişte kırılır (otomatik sekişte duraklama yok).
+>    - **7:** kamera boşta SABİT (yükselen 66px/sn duvar kalktı), rekor katmanı
+>      yukarı izler (`0.58` hattı), asla aşağı inmez.
+>    - **9b/12:** skill kilidi `best_floor >= 10`; kombi `jump_mult`'u büyütür
+>      (v3b'de yatay `speed_mult` — yanlış değişkendi).
+>    - **15:** ORTA-SÜTUN YASAĞI KALKTI (ilk 5 katman sütunda, sonrası serbest).
+>    - **16/16b:** sahne içi otomatik sekiş + bounce kilidi (aynı inişte çift sekiş yok);
+>      ekran ortasında BÜYÜK katman no + kombi göstergesi (i18n tr/en).
+>    - **17:** HİÇ TUŞ basılmadan tırmanış başlar (ölçüm: 24. kata kadar — skill'siz tavan).
+>    - **17b:** doğru oynayan yatay-yön botu ≥20 kat (ölçüm 24). **17c:** çift zıplama
+>      skill botu ≥30 kat (ölçüm 47/45/47) — skill gerçekten işe yarıyor.
+>    - Eksik kapanış `}` eklendi (brace dengesi tam; node -c temiz).
+> 2. **`game/climber.js` `combo_hud` düzeltmesi:** kombi göstergesi açılışta PASİF
+>    (`active=false`) olduğundan `find_by_tag` onu bulamıyordu → `find_all_by_tag[0]`
+>    (yoksa 16b "kombi varken yazar" FAIL).
+> 3. **test_browser.js 4b v4'e uyarlama:** v3b kuralı "girişsiz otomatik zıplama
+>    YOK + kule respawn akıyor" idi; v4'te AUTO_BOUNCE kanonu olduğu için test
+>    "girişsiz OTOMATİK sekiş tırmanışı başlatır (≥1) + respawn döngüsü yok
+>    (kamera yarışı kalktı)" oldu.
+> 4. **Önceki oturumun görsel/fizik düzeltmeleri v4'te KORUNDU** (doğrulandı):
+>    climber gövdesi collider'a oturuyor (`sy = pos.y - (anim_h - base_h)`,
+>    climber.js:1144 — ana oyundaki doğru çapa), afterimage `gy - cam.y` (1156),
+>    physics.js one_way `go.position.y = srect.y - go.size.y` + proximity probu
+>    (248-255, motor katmanında DE_GAME referansı YOK). Kullanıcının "havada
+>    kalma" şikayetinin kök nedeni buydu; probe ile kanıt: eski ofsette ayak
+>    yüzeyin 6px İÇİNDEYDİ (gap 6.00) → düzeltilmiş fizikte gap **0.00**.
+> 5. **Doğrulama (hepsi yeşil, bu oturumda koşuldu):** 13/13
+>    `deep_engine_html\test_*.js` 0 FAIL (test_game **244 OK / 0 FAIL** — TEST18 dahil),
+>    `test_tools.js` 36/0, `test_browser.js` **52/0**,
+>    `node tools_html\deep-tool.js --lang tr all` **0 WARN/0 BUG/0 ERR**.
+>
+> **Kayıt:** bu satırlar + `_shared.md` SON GELİŞMELER. KALAN: kullanıcı
+> "arka plan hâlâ kötü" dedi — arka plan iyileştirmesi ayrı görev (henüz yapılmadı).
+> AYRICA: `engine/physics.js` one_way proximity değişikliği bu oturumda commit
+> edilmedi — motor katmanı (02) bilgisi; 02'ye rapor notu `_shared.md`'de.
 
 ---
 

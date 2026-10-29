@@ -1,12 +1,12 @@
 DerinEngine
 ===========
-Oyun (Star Collector Hero): 0.1.19
+Oyun (Star Collector Hero): 0.1.20
 Motor                      : 1.0.0
 Status: Beta (active development build)
 
 Sürümler kodda tanımlıdır:
   - Motor : deep_engine_html/engine/core.js  ->  DE.__version__ = "1.0.0"
-  - Oyun  : deep_engine_html/game/state.js    ->  DE_GAME.__version__ = "0.1.19"
+  - Oyun  : deep_engine_html/game/state.js    ->  DE_GAME.__version__ = "0.1.20"
 
 Motor ve oyun AYRI sayılır (tek sürüm satırı fikri iptal edildi). 2D v1 yol
 haritasının beş kritik alanı (fizik, tilemap + katmanlar, sahne ağacı + editör
@@ -57,5 +57,13 @@ Version history:
                    async 'import wave' download used to freeze the game in the
                    browser; WAV bytes are now packed in code ('_build_wav_bytes').
                    The game starts on the web (30fps).
+  0.1.20 (beta)  Star Climber mini-game fully removed on request:
+                 - game/climber.js deleted; main-menu [C] box, "climber" action
+                   and keyboard shortcut removed (ui.js).
+                 - i18n climber_* / menu_climber keys removed (TR + EN).
+                 - index.html script + info line cleaned; tests (test_game
+                   TEST17 block + TEST13d entry, test_smoke "climber" tour,
+                   test_browser section 4b) and docs (README/AGENTS) updated.
+                   Gameplay modes (campaign/random/editor/custom) unchanged.
 
 The project uses git (main branch, initialized locally); releases can be tagged.

@@ -82,7 +82,7 @@ Detaylı çizelge + 2D v1 5 alan planı: `01_strategy.md`.
     `parallax.js`, `i18n.js`, `math2d.js`, `levelfile.js`, `savegame.js`, `log.js`,
     `procedural.js`, `console.js`, `render.js`, `physics.js`, `ui.js`, `tilemap.js`.
   - `game/` — `main.js` + `state.js`, `entities.js`, `bosses.js`, `ui.js`,
-    `builders.js`, `scenes.js`, `climber.js`, `commands.js`.
+    `builders.js`, `scenes.js`, `commands.js`.
   - `test_*.js` — **13 motor/oyun test dosyası** (node ile çalışır; hepsi yeşil).
 - `tools_html/` — araçların TAMAMI JS (Node): **deep-tool.js** (tarama aracı,
   TR/EN interaktif, `.bat` kısayolu kökte: `deep-tool.bat`), **webpanel.js** +
@@ -96,7 +96,7 @@ Detaylı çizelge + 2D v1 5 alan planı: `01_strategy.md`.
 
 ## SÜRÜM MODELİ
 
-Motor **1.0.0**, oyun **0.1.19** (ayrı sayılır — tek sürüm satırı fikri iptal edildi).
+Motor **1.0.0**, oyun **0.1.20** (ayrı sayılır — tek sürüm satırı fikri iptal edildi).
 Kaynaklar: `deep_engine_html/engine/core.js → DE.__version__`,
 `deep_engine_html/game/state.js → DE_GAME.__version__`, `version.txt`.
 `custom_level.json` `meta.version` = seviye **biçim** sürümü (1) — ayrı kavram.
@@ -113,14 +113,14 @@ node tools_html\deep-tool.js run game   # oyunu varsayılan tarayıcıda açar (
 Testler (pencere açmaz, hepsi yeşil olmalı):
 ```powershell
 node deep_engine_html\test_core.js    # JS motor çekirdeği -> ALL OK
-node deep_engine_html\test_game.js    # oyun (TEST17 dahil) -> 224 geçti
+node deep_engine_html\test_game.js    # oyun -> 149 geçti
 node tools_html\test_tools.js         # deep-tool -> 36/36
-node tools_html\test_browser.js       # tarayıcı testi (gerçek tuş yolu) -> 52/0
+node tools_html\test_browser.js       # tarayıcı testi (gerçek tuş yolu) -> 37/0
 ```
 (13 test dosyasının tamamı: `deep_engine_html\test_*.js` — hepsi yeşil olmalı.)
 
 Kontroller: A/D hareket, SPACE/W/↑ zıplama (+çift), LSHIFT dash, F/sol-tık ateş,
-T dil, P kampanya, 4 Sonsuz Mod (kilitli olabilir), **C Star Climber (tırmanış)**,
+T dil, P kampanya, 4 Sonsuz Mod (kilitli olabilir),
 F3 debug, ESC çıkış.
 Konsol: ` veya " ile aç (dev komutları: help, version, hp, god, tp, respawn, list...).
 Oyun kumandası: analòg/D-Pad + A zıpla, X ateş, LB dash, Start çıkış.

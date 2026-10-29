@@ -98,6 +98,26 @@ function done() {
     check("astro her zaman cosmic", ab["boss_type"] === "cosmic");
 }
 
+// ================= P6b zorunlu boss tipi (kampanya benzersizliği) =================
+{
+    const forced = DE.procedural_generate_boss_arena("forest", 7, 2, "victory", "sniper");
+    const fb = forced["objects"].find(o => o["tag"] === "Boss");
+    check("zorunlu tip uygulanir", fb["boss_type"] === "sniper");
+
+    const af = DE.procedural_generate_boss_arena("astro", 7, 2, "victory", "sniper");
+    const afb = af["objects"].find(o => o["tag"] === "Boss");
+    check("astro zorunlu tipi yok sayar", afb["boss_type"] === "cosmic");
+
+    // Kampanyada 4 farkli tip 4 biyoma permütasyonla dagitilir -> hepsi benzersiz
+    // (eski rng.choice ust uste ayni tipi secebiliyordu).
+    const types = DE.PR_BOSS_TYPES.slice();
+    const seen = types.map(t => {
+        const d = DE.procedural_generate_boss_arena("forest", 3, 1, "victory", t);
+        return d["objects"].find(o => o["tag"] === "Boss")["boss_type"];
+    });
+    check("4 boss tipi benzersiz", new Set(seen).size === types.length, seen.join(","));
+}
+
 // ================= P7 tüm biyomlar üretilebilir =================
 {
     for (const b of DE.PR_BIOME_NAMES) {

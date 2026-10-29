@@ -385,15 +385,6 @@ tour("lang", function () {
   h.tap("t"); h.frames(20);
 });
 
-// 6) Ana menuye don (ESC) -> Star Climber (C)
-tour("climber", function () {
-  h.tap("Escape"); h.frames(40);
-  h.tap("c");
-  h.frames(200);
-  for (let i = 0; i < 6; i++) { h.hold("d"); h.frames(25); h.release("d"); h.tap(" "); h.frames(25); }
-  h.frames(120);
-});
-
 // 7) Sonsuz Mod (4)
 tour("endless", function () {
   h.tap("Escape"); h.frames(40);
@@ -539,7 +530,7 @@ tour("ortam/ses-yok", function () {
   const h2 = boot({ no_audio: true });
   if (!h2.engine) { fail("ses-yok", "ses'siz motor kurulamadi"); return; }
   h2.frames(120);
-  h2.tap("c"); h2.frames(90);
+  h2.tap("p"); h2.frames(90);   // kampanya (Star Climber kaldırıldı; menüde ESC motoru durdurur)
   h2.tap("Escape"); h2.frames(60);
   if (ERRORS.length === before) console.log("       (ses'siz ortamda 270 kare sorunsuz)");
 });
@@ -692,7 +683,7 @@ gate("JS ziplama tepesi = Python referansi (132.2px)",
 const FRAMES = TOTAL_FRAMES;
 console.log("");
 console.log("==============================================");
-console.log("Oynanan kare: " + FRAMES + " | tur: " + (29 + BIOMES.length) + " | canvas cizim cagrisi: " + (h.canvas._stats.calls));
+console.log("Oynanan kare: " + FRAMES + " | tur: " + (28 + BIOMES.length) + " | canvas cizim cagrisi: " + (h.canvas._stats.calls));
 console.log("Gorsel kapilar: " + GATES.filter(function (g) { return g.ok; }).length + "/" + GATES.length + " gecti");
 if (ERRORS.length === 0) {
   console.log("SONUC: 0 HATA - tum demolar hatasiz acildi ve oynadi.");

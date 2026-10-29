@@ -7,9 +7,8 @@ var DE_GAME = DE_GAME || {};
 
 // Oyun sürümü (Star Collector Hero). Motor sürümü DE.__version__ (core.js) ile
 // AYRI sayılır — tek sürüm satırı fikri iptal (AGENTS.md "SÜRÜM MODELİ").
-// Python tarafındaki tek satır (deep_engine/__init__.py = 0.1.19) burada oyun
-// sürümü olarak taşınır; menü rozeti + konsol `version` bu değeri gösterir.
-DE_GAME.__version__ = "0.1.19";
+// Menü rozeti + konsol `version` bu değeri gösterir.
+DE_GAME.__version__ = "0.1.20";
 
 // Global kampanya durumu: chain (biyom listesi) + başlangıç bilgisi.
 DE_GAME.state = {
@@ -19,6 +18,7 @@ DE_GAME.state = {
         "difficulty": 1,       // aktif zorluk (her sektörde artar)
         "score": 0,            // kalıcı taban: önceki tamamlanan sektörlerin puanı
         "sector_score": 0,     // aktif sektörün (giriş + boss) kümülatif toplamı
+        "boss_types": [],      // her biyoma atanan BENZERSİZ boss tipi (permütasyon)
     },
     // Aktif oyun modu: "campaign" (P) veya "endless" (4).
     // Aynı giriş haritası paylaşılır; portal davranışı bu moda göre değişir:

@@ -228,7 +228,7 @@ function bootGame() {
   ];
   const GAMES = [
     "game/state.js", "game/entities.js", "game/bosses.js", "game/ui.js",
-    "game/scenes.js", "game/builders.js", "game/climber.js", "game/commands.js",
+    "game/scenes.js", "game/builders.js", "game/commands.js",
     "game/main.js",
   ];
   ENGS.concat(GAMES).forEach(f => {
@@ -400,97 +400,6 @@ console.log("=== 4) oyun: gerçek açılış + çizim + P ile kampanya ===");
     const listed = DE._CONSOLE_COMMANDS["list"].fn(g.engine.active_scene, []);
     check("oyun konsolu: list oyuncuyu sayar",
       typeof listed === "string" && listed.indexOf("Player") >= 0, String(listed).slice(0, 60));
-  }
-}
-
-/* ---------- BÖLÜM 4b: GERÇEK KULLANICI YOLU — C ile tırmanışa gir ---------- */
-/* Bu bölüm 03.10.2026'da bulunan asıl tarayıcı hatasını kilitler: menüdeki
-   karartma (_fade_dir=0) başlamadığı için "C" ve fare tıklaması sahneyi
-   hiç değiştirmiyordu, kullanıcı oyuna giremiyordu. Test TAMAMEN gerçek
-   DOM olay zincirinden gider: keydown -> Input -> main.js -> _start_climber
-   -> karartma -> Engine.switch_scene. */
-console.log("=== 4b) oyun: C ile tırmanisa gir, D ile hareket et, ESC ile don ===");
-{
-  let g;
-  try { g = bootGame(); check("4b: oyun motoru kuruldu", true); }
-  catch (e) { check("4b: oyun motoru kuruldu", false, String(e)); }
-  if (g) {
-    const DE = g.sandbox.DE, DE_GAME = g.sandbox.DE_GAME;
-    const pumpN = (n) => { for (let i = 0; i < n; i++) g.pump(); };
-
-    check("4b: başlangıç ana menü", g.engine.active_scene.name === "Main Menu");
-    // C tuşu: gerçek keydown olayı
-    g.press("c");
-    g.pump();
-    g.release("c");
-    let switched = false;
-    for (let i = 0; i < 200 && !switched; i++) {
-      g.pump();
-      switched = g.engine.active_scene.name === "Star Climber";
-    }
-    check("4b: C tusu ile Star Climber'a girildi", switched,
-      "sahne=" + g.engine.active_scene.name);
-    if (switched) {
-      const sc = g.engine.active_scene;
-      // karartma bitene kadar bekle (FadeIn sahnede)
-      pumpN(80);
-      const player = sc.find_by_tag("Player");
-      const cgame = sc.find_by_tag("ClimbGame")
-        ? sc.find_by_tag("ClimbGame").get_component(DE_GAME.ClimbGame) : null;
-      check("4b: tırmanista oyuncu var", !!player);
-      const nfloors = cgame ? Object.keys(cgame.floors).length : 0;
-      check("4b: tırmanista katmanlar var", nfloors >= 17, "katman=" + nfloors);
-      // gercek tus: D basili 1sn
-      const x0 = player.position.x;
-      g.press("d");
-      pumpN(60);
-      g.release("d");
-      check("4b: D tusu oyuncuyu saga tasirdi", player.position.x > x0 + 30,
-        "x " + x0.toFixed(0) + " -> " + player.position.x.toFixed(0));
-      // ok tuslari
-      const x1 = player.position.x;
-      g.press("ArrowLeft");
-      pumpN(40);
-      g.release("ArrowLeft");
-      check("4b: ArrowLeft oyuncuyu sola tasirdi", player.position.x < x1,
-        "x " + x1.toFixed(0) + " -> " + player.position.x.toFixed(0));
-      // YENİ OYNANIŞ (06.10.2026): MANUEL zıplama — girişsiz oyuncu zıplamaz.
-      // Kamera yükseldikçe alt çizgi oyuncuyu yakalar -> respawn 0. katmana.
-      let nspawn0 = cgame.falls;
-      pumpN(120);
-      check("4b: girisiz otomatik ziplama YOK", cgame.best_floor === 0,
-        "katman=" + cgame.best_floor);
-      check("4b: girisiz kule akiyor (respawn dongusu)", cgame.falls >= nspawn0,
-        "dusme=" + (cgame.falls - nspawn0));
-      // SPACE bot: her kare gerçek keydown + kare -> zıpla -> tırman (30sn).
-      // En az-8 katman iddiası headless TEST17'de (3 seed) güvence altında;
-      // burada DOM tuş yolunun oyunculu zıplamaya dönmesi + ekranda kalması.
-      let off = 0, worst = 0, jumpFrames = 0;
-      let rb2 = player.get_component(DE.Rigidbody2D);
-      for (let i = 0; i < 1800; i++) {
-        g.press(" ");
-        g.release(" ");   // her kare YENİ keydown (Input _down sadece ilk basışta dolar)
-        g.pump();
-        if (rb2 && rb2.velocity.y < 0) jumpFrames++;
-        const sy = player.position.y - sc.camera_position.y;
-        if (sy < -1) { off++; worst = Math.min(worst, sy); }
-      }
-      check("4b: SPACE bot tugunun ziplamaya donustu", jumpFrames > 200,
-        "ziplama-kare=" + jumpFrames);
-      check("4b: SPACE bot tirmanisi ilerledi", cgame.best_floor >= 3,
-        "katman=" + cgame.best_floor);
-      check("4b: bot boyunca ekran disi kare yok", off === 0,
-        "disarida=" + off + (worst < 0 ? " en=" + Math.round(worst) : ""));
-      // ESC -> menu, oyun KAPANMAMALI
-      g.press("Escape");
-      pumpN(3);
-      g.release("Escape");
-      pumpN(5);
-      check("4b: ESC menuye dondu", g.engine.active_scene.name === "Main Menu" ||
-        DE_GAME.state.game_mode === "menu",
-        "sahne=" + g.engine.active_scene.name + " mod=" + DE_GAME.state.game_mode);
-      check("4b: ESC oyunu KAPATMADI", g.engine.is_running === true);
-    }
   }
 }
 

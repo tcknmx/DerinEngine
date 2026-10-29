@@ -72,6 +72,31 @@ console.log("P1 ParallaxLayer mountain/hills/stars cizim:'");
     check("hills cizildi (hata yok)", true);
 }
 
+console.log("P1b Parallax kayma surekliligi (sarma ziplamasi regression):");
+{
+    // Eski kod `_pmod(..., 2400)` sarmasi nedeniyle off_cam=2400 sinirinda
+    // daglar/yildizlar ZIPLIYORDU. Bu test o sinirda gecisi kucuk tutar.
+    function rec_ctx() {
+        const pts = [];
+        return {
+            _pts: pts, fillStyle: "", strokeStyle: "", lineWidth: 1,
+            beginPath() { pts.length = 0; },
+            moveTo(x, y) { pts.push([Math.round(x), Math.round(y)]); },
+            lineTo(x, y) { pts.push([Math.round(x), Math.round(y)]); },
+            closePath() {}, fill() {}, stroke() {}, arc() {}, fillRect() {},
+            save() {}, restore() {}, translate() {}, scale() {},
+        };
+    }
+    const layer = new DE.ParallaxLayer(0.10, [25, 32, 50], "mountains", [200, 360]);
+    const a = rec_ctx(); layer.draw(a, 800, 600, new DE.Vector2(24000, 0));
+    const b = rec_ctx(); layer.draw(b, 800, 600, new DE.Vector2(24010, 0));
+    let maxd = 0;
+    for (let i = 0; i < Math.min(a._pts.length, b._pts.length); i++) {
+        maxd = Math.max(maxd, Math.abs(a._pts[i][1] - b._pts[i][1]));
+    }
+    check("sarma sinirinda daglar zip yapmaz", maxd <= 8, "maxDeltaY=" + maxd);
+}
+
 console.log("P2 ParallaxBackground temalar (6):");
 {
     for (const theme of ["forest", "lava", "cave", "ice", "desert", "astro"]) {

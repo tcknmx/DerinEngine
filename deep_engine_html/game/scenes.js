@@ -252,6 +252,16 @@ function start_campaign() {
     }
     chain.push("astro");  // final boss her zaman astro
 
+    // Boss tipleri BENZERSİZ olsun: final-dışı 4 biyoma 4 FARKLI tip (permütasyon).
+    // Böylece arka arkaya aynı boss gelmez (eski `rng.choice` rastgeleydi). Final
+    // (astro) zaten her zaman "cosmic".
+    const boss_types = DE.PR_BOSS_TYPES.slice();
+    for (let i = boss_types.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = boss_types[i]; boss_types[i] = boss_types[j]; boss_types[j] = tmp;
+    }
+    DE_GAME.state.campaign_state["boss_types"] = boss_types;
+
     DE_GAME.state.campaign_state["chain"] = chain;
     DE_GAME.state.campaign_state["index"] = 0;
     DE_GAME.state.campaign_state["difficulty"] = 1;
@@ -328,7 +338,11 @@ function build_campaign_boss(biome, difficulty, index) {
     const is_final = (index === chain.length - 1);   // astro -> final
     const next_target = is_final ? "victory" : "campaign_next_entrance";
 
-    const data = DE.procedural_generate_boss_arena(biome, null, difficulty, next_target);
+    // Bu biyoma atanmış BENZERSİZ boss tipi (final-dışı). Final => "cosmic".
+    const boss_types = DE_GAME.state.campaign_state["boss_types"] || [];
+    const forced = (!is_final && index >= 0 && index < boss_types.length) ? boss_types[index] : null;
+
+    const data = DE.procedural_generate_boss_arena(biome, null, difficulty, next_target, forced);
 
     const scene = _scene_from_data(data, DE.I18n.t("campaign_boss") + " - "
                                    + (DE.I18n.current_lang === "tr" ? data["name_tr"] : data["name_en"]));
