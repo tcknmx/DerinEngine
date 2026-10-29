@@ -742,6 +742,9 @@ DE.Engine = class Engine {
                 prof.save();
             } catch (e) { /* yok say */ }
             if (DE.SoundFX && DE.SoundFX.play) DE.SoundFX.play("coin");
+            if (typeof DE_GAME !== "undefined" && typeof DE_GAME.on_language_changed === "function") {
+                try { DE_GAME.on_language_changed(); } catch (e) { /* sessiz */ }
+            }
         }
         // Python Engine._frame: debug bilgi katmanı (F3).
         if (_gkd("F3")) {

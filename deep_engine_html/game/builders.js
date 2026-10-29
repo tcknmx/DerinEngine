@@ -273,6 +273,7 @@ function _build_player(scene, data) {
 
     const info_obj = new DE.GameObject("InfoUI", 20, 60, 0, 0, "UI");
     info_obj.add_component(new DE.TextRenderer(DE.I18n.t("l1_info"), 13, [160, 240, 200], true, null, false, false));
+    info_obj.add_component(new DE_GAME.LocalizedLabel("l1_info"));
     scene.add_object(info_obj);
 
     const pu_label = new DE.GameObject("PowerUpLabelUI", 20, 84, 0, 0, "UI");

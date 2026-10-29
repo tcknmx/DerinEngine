@@ -906,15 +906,19 @@ DE_GAME.build_victory_scene = function build_victory_scene() {
     // Merkez semantiği: tüm satırlar x=450, center_x + center_y (kayma yok).
     const t1 = new DE.GameObject("Title1", 450, 148, 0, 0, "UI");
     t1.add_component(new DE.TextRenderer(DE.I18n.t("victory_title"), 36, [255, 220, 50], true, [0, 0, 0], true, true));
+    t1.add_component(new DE_GAME.LocalizedLabel("victory_title"));
     scene.add_object(t1);
     const t2 = new DE.GameObject("Title2", 450, 222, 0, 0, "UI");
     t2.add_component(new DE.TextRenderer(DE.I18n.t("victory_subtitle"), 23, [200, 240, 255], true, [0, 0, 0], true, true));
+    t2.add_component(new DE_GAME.LocalizedLabel("victory_subtitle"));
     scene.add_object(t2);
     const t3 = new DE.GameObject("Title3", 450, 303, 0, 0, "UI");
     t3.add_component(new DE.TextRenderer(DE.I18n.t("victory_praise"), 26, [100, 255, 160], true, [0, 0, 0], true, true));
+    t3.add_component(new DE_GAME.LocalizedLabel("victory_praise"));
     scene.add_object(t3);
     const t4 = new DE.GameObject("Title4", 450, 420, 0, 0, "UI");
     t4.add_component(new DE.TextRenderer(DE.I18n.t("victory_restart"), 20, [180, 180, 210], true, [0, 0, 0], true, true));
+    t4.add_component(new DE_GAME.LocalizedLabel("victory_restart"));
     scene.add_object(t4);
     DE.SoundFX.play_music("victory");
     return scene;
@@ -1017,11 +1021,13 @@ DE_GAME.build_pause_scene = function build_pause_scene() {
     const resume = new DE.GameObject("ResumeBtn", 350, 240, 200, 46, "UI");
     const resume_button = new DE.Button(DE.I18n.t("pause_resume_btn"), pause_controller._resume.bind(pause_controller), theme, 22);
     resume.add_component(resume_button);
+    resume.add_component(new DE_GAME.KitLabelSync(resume_button, "pause_resume_btn"));
     scene.add_object(resume);
 
     const menu = new DE.GameObject("MenuBtn", 350, 306, 200, 46, "UI");
     const menu_button = new DE.Button(DE.I18n.t("pause_menu_btn"), pause_controller._to_menu.bind(pause_controller), theme, 22);
     menu.add_component(menu_button);
+    menu.add_component(new DE_GAME.KitLabelSync(menu_button, "pause_menu_btn"));
     scene.add_object(menu);
 
     pause_controller._buttons = [[resume_button, resume_button.on_click], [menu_button, menu_button.on_click]];

@@ -351,19 +351,21 @@ function build_campaign_boss(biome, difficulty, index) {
     _register_pause(scene);
 
     // Boss arenasında hedef yıldız toplamak değil boss'u yenmektir -> UI ayarı
-    const _boss_ui = (DE.I18n.t("campaign_boss") + ": " + DE.I18n.t("boss_" + biome) + "   |   "
-                      + DE.I18n.localize("campaign_stage", { "index": index + 1, "total": chain.length }));
-    const player = scene.find_by_tag("Player");
-    if (player) {
-        const ctrl = player.get_component(DE_GAME.PlayerController);
-        if (ctrl && ctrl.goal_text_obj) {
-            const gtr = ctrl.goal_text_obj.get_component(DE.TextRenderer);
-            if (gtr) {
-                gtr.text = _boss_ui;
-                gtr.color = [255, 190, 120];
+    const _boss_ui_data = { biome: biome, index: index, total: chain.length };
+    function _refresh_boss_ui() {
+        const _boss_ui = (DE.I18n.t("campaign_boss") + ": " + DE.I18n.t("boss_" + _boss_ui_data.biome) + "   |   "
+                          + DE.I18n.localize("campaign_stage", { "index": _boss_ui_data.index + 1, "total": _boss_ui_data.total }));
+        const player = scene.find_by_tag("Player");
+        if (player) {
+            const ctrl = player.get_component(DE_GAME.PlayerController);
+            if (ctrl && ctrl.goal_text_obj) {
+                const gtr = ctrl.goal_text_obj.get_component(DE.TextRenderer);
+                if (gtr) { gtr.text = _boss_ui; gtr.color = [255, 190, 120]; }
             }
         }
     }
+    _refresh_boss_ui();
+    scene._refresh_i18n = _refresh_boss_ui;
 
     // ÖLÜM (kampanya): boss seviyesinde ölmek o biyomun normal girişine döner
     // (boss'u tekrar oynamak yerine). Giriş sahnesi sıfırdan yeniden kurulur;
@@ -407,7 +409,9 @@ function build_campaign_boss(biome, difficulty, index) {
 
 function build_endless_level(difficulty, index = 0) {
     const scene = build_procedural_level(null, null, 8, difficulty);
-    scene.name = DE.I18n.t("endless_name");
+    function _refresh_endless_name() { scene.name = DE.I18n.t("endless_name"); }
+    _refresh_endless_name();
+    scene._refresh_i18n = _refresh_endless_name;
 
     const restart_fac = () => build_endless_level(difficulty, index);
     _wire_player_restart(scene, restart_fac);
@@ -442,3 +446,13 @@ DE_GAME._attach_touch = _attach_touch;
 DE_GAME._attach_ground_tilemap = _attach_ground_tilemap;
 DE_GAME.export_scene_tilemap = export_scene_tilemap;
 DE_GAME.import_scene_tilemap = import_scene_tilemap;
+// Dil değiştiğinde aktif sahnenin i18n'e bağımlı metinlerini tazele.
+// (LocalizedLabel/KitLabelSync kendi başlarına her karede güncellenir; burada
+//  yalnızca bir kez kurulan birleşik metinler yenilenir.)
+DE_GAME.on_language_changed = function on_language_changed() {
+    const eng = DE.Engine.instance;
+    const sc = eng ? eng.active_scene : null;
+    if (sc && typeof sc._refresh_i18n === "function") {
+        try { sc._refresh_i18n(); } catch (e) { /* sessiz */ }
+    }
+};
