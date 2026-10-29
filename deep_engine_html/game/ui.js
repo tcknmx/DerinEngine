@@ -562,6 +562,23 @@ DE_GAME.build_main_menu_scene = function build_main_menu_scene() {
         "endless_name", 22, _endless_locked ? [185, 175, 255] : [140, 240, 255],
         "endless", _endless_locked);
 
+    // SAĞ ALT (boşluk doldurma): "Yakında / Coming Soon" gri, tıklanamaz kutu.
+    // İçerik yok, yanıt vermez — yalnızca yer tutucu (itch.io demosu için).
+    {
+        const _cs_box = new DE.GameObject("M_COMING_box", 610, 508, 280, 70, "UI");
+        _cs_box.add_component(new DE.Panel(null, [78, 78, 84], [130, 130, 136], 10));
+        scene.add_object(_cs_box);
+        _menu_ui.push(_cs_box);
+
+        const _cs_lbl = new DE.GameObject("M_COMING", 610 + 280 / 2, 508 + 70 / 2, 0, 0, "UI");
+        _cs_lbl.add_component(new DE.TextRenderer(DE.I18n.t("menu_coming_soon"), 22,
+            [195, 195, 200], true, [0, 0, 0], true, true));
+        _cs_lbl.add_component(new DE_GAME.LocalizedLabel("menu_coming_soon"));
+        scene.add_object(_cs_lbl);
+        _menu_ui.push(_cs_lbl);
+        // _click_rect / _click_action kasıtlı olarak set edilmiyor → tıklanamaz.
+    }
+
     // ALT-ORTA: kontroller + yüksek skor + kampanya rozetleri (kutucuklarla çakışmaz).
     // Merkez semantiği: center_x + center_y true, y = metnin görsel merkezi.
     const cinfo = new DE.GameObject("M5", 360, 450, 0, 0, "UI");
