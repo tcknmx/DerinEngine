@@ -8,6 +8,118 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
 
 ## SON GELİŞMELER (kronolojik, en üstte en yeni)
 
+- **[STRATEJİ→TÜMÜ] CHECKUP ARDINDAN 4 İŞ KAPANDI (29.10.2026) — PAKET COMMIT'LENDİ,
+  PHYSICS PROBU TESTLE KİLİTLENDİ, SHIELDBOSS A OYUNDA.** Kullanıcı "önerdiklerini ve
+  yarım kalanların hepsini yap" dedi. Yapılanlar:
+  (1) **09.10 paketi commit edildi** — `db9726d` (PAKET 2 + Star Climber kaldırma,
+  oyun 0.1.20). Working tree o an temizlendi; git HEAD artık güncel.
+  (2) **`engine/physics.js` one-way yakınlık probu KİLİTLENDİ** — `test_core.js`'e
+  **TEST17** eklendi (hızlı düşüşte tünelleme yok + alttan geçiş serbest).
+  Mutasyon kanıtı: eski physics ile 2 FAIL, yenisiyle ALL OK; test_core **50 → 53**.
+  (3) **ShieldBoss A (katmanlı kalkan) oyuna geçti** (`game/bosses.js`): 3 blok = 3
+  katman; en az biri ayaktayken hasar bloklanır; katman kırılınca 2 sn savunmasızlık
+  (ateş yok, hasar geçer); 7 sn sonra katman yenilenir; **üçü birden kırılırsa kalıcı
+  savunmasız + boss gezinir**. Motor kancası `shield_intact()` (duck-typing) korundu →
+  motora dokunulmadı. **B (döner kalkan)** ve **C (tek büyük kalkan)** tasarımları
+  `03_game.md`'de YEDEK olarak yazıldı, kodlanmadı (kullanıcı kararı).
+  Regresyon: `test_game.js` **TEST19** (14 kontrol) → oyun testi 149 → **163 OK**.
+  (4) **Bayat kayıtlar temizlendi:** `03_game.md` "motor modül modül parite denetimi"
+  maddesi kapandı (08.10'da Python silindi), `04_tools.md` ARAÇ KALAN bölümü
+  sadeleşti (parite aracı/pygbag/Star Climber/webpanel.py maddeleri "KAPANAN" altına).
+  **Doğrulama (tümü yeşil):** 13/13 JS test 0 FAIL (core 53, game 163, smoke 0 HATA) +
+  test_tools 36/0 + test_browser 37/0 + `deep-tool.js --lang tr all` 0 WARN/0 BUG/0 ERR.
+  *Etkilenen: 02 motor (physics.js + test_core.js), 03 oyun (bosses.js + test_game.js),
+  tüm oturumlar (git HEAD `db9726d` + yeni commit'ler).* **Gelir/fiyat modeline
+  dokunulmadı (kullanıcıda).**
+
+- **[STRATEJİ] CHECKUP (29.10.2026) — MOTOR YEŞİL, TEK YARIM İŞ `physics.js` PROBU
+  (TESTSİZ) + 20 DOSYA COMMIT BEKLİYOR.** Envanter: 20 motor + 8 oyun dosyası
+  (`climber.js` yok), `index.html` 28 dosyayı tam yüklüyor, sürüm 1.0.0 / 0.1.20
+  üç yerde tutarlı. Test: 13/13 JS 0 FAIL (core 50, game 149, components 27, input 72,
+  math2d 38, procedural 34, systems 73, tilemap 38, tween 33, ui 33, audio 33,
+  visual 32; smoke 0 HATA + görsel kapılar) + test_tools 36/36 + test_browser 37/37
+  + deep-tool `all` 0/0/0. **Açık iş 1 (MOTOR — 02 sahiplenmeli):**
+  `engine/physics.js` one-way yakınlık probu commit edilmemiş ve **hiçbir test onu
+  kilitlemiyor** (HEAD physics ile de tüm süitler yeşil); gerçek fark probda görüldü:
+  `vy=1500, dt=1/30` düşüşte eski kod platformu delip geçiyor, yeni kod durduruyor →
+  `test_core.js`'e tünelleme kapısı gerekiyor. **Açık iş 2:** 20 dosya commit
+  bekliyor (PAKET 2 + Star Climber kaldırma + physics + belgeler; HEAD `6f44cde`).
+  **Açık kararlar:** ShieldBoss A/B/C (03), gelir/fiyat modeli (01). Eski
+  `01_strategy.md` MASTER kuyruğu bayat (tüm HTML port maddeleri bitti) → yeni
+  kuyruk önerisi o dosyada. *Etkilenen: TÜM oturumlar (kod değişmedi).*
+  > **ÇÖZÜLDÜ (29.10.2026):** yukarıdaki "4 iş kapandı" kaydına bak — commit, test
+  > kapısı, ShieldBoss A ve bayat kayıt temizliği tamamlandı.
+
+
+- **[STRATEJİ oturumu] CHECKUP (10.10.2026) — TÜM TESTLER YEŞİL, ANCAK 09.10 PAKETİ
+  COMMIT EDİLMEMİŞ.** 15 dosya koşuldu: 13/13 motor+oyun 0 FAIL (core 50, game 34,
+  components 27, input 72, math2d 38, procedural 34, systems 73, tilemap+levelfile 38,
+  tween 33, ui 33, audio 33, visual 32; smoke 33 tur + 50/50 görsel kapı + 60Hz fizik
+  ölçümü) + test_tools 36/36 + test_browser 37/37. **`git status`: 19 dosya working
+  tree'de commit bekliyor** — PAKET 2 (i18n ölü anahtar, parallax flicker fix,
+  forced_boss_type/benzersiz boss) + STAR CLIMBER kaldırma (0.1.20: climber.js silindi,
+  test_game −596, ui/i18n/index/smoke/browser + session kayıtları) + `engine/physics.js`
+  one-way proximity probu. Son commit `6f44cde` (08.10). **Karar bekliyor: hangi oturum
+  commit'leyecek (OYUN + ARAC doğal sahipleri); GitHub push'u zaten "gönder" deyince.**
+  *Etkilenen: TÜM oturumlar (çalışan kod güncel, ama git HEAD 0.1.19 sonrasını gösteriyor).*
+
+- **[OYUN+MOTOR] Ölü yük temizliği + parallax flicker + benzersiz boss sıralaması —
+  TAMAMLANDI, 09.10.2026]** Kullanıcı 4 iş verdi; 3'ü bitti, 4. (boss mekaniği)
+  kullanıcı seçimine kaldı. (1) `engine/i18n.js`'ten ölü eski menü anahtarları tr+en
+  silindi (`menu_play_l1/l2/l3`, `menu_lang`, `menu_quit`, `menu_procedural`,
+  `menu_random`, `menu_random_locked`, `menu_campaign`). (2) **Parallax flicker KÖK
+  NEDEN fix'i:** `engine/parallax.js` kamerayı `_pmod(..., 2400)` ile sarmalıyordu;
+  2400 sinüs periyodunun tam katı olmadığından hareket ederken yıldızlar + dağlar
+  ZIPLIYORDU → faz artık gerçek periyoda hizalı; `_draw_cosmic` gezegeni de
+  zıplamasız salınıma çevrildi. (3) **Benzersiz boss sırası:** `procedural.js`'e
+  opsiyonel `forced_boss_type` param; `scenes.js start_campaign` 4 final-dışı biyoma
+  4 farklı tip (permütasyon) atar → üst üste aynı boss gelmez (astro=cosmic final).
+  **Doğrulama:** test_game 149/0, test_visual 32/0 (yeni P1b), test_procedural 34/0
+  (yeni P6b), test_smoke 0 HATA + 50/50, test_tools 36/0, test_browser 37/0,
+  deep-tool 0/0/0. **KALAN:** fazladan boss (ShieldBoss) mekaniği yeniden tasarımı —
+  öneri (A katmanlı / B döner / C tek kalkan) `03_game.md`'de, kullanıcı seçecek.
+  *Etkilenen: 02 motor (parallax.js + procedural.js değişti — geriye dönük uyumlu);
+  03 oyun. Detay: `03_game.md` "PAKET 2".*
+
+- **[STAR CLIMBER TAMAMEN KALDIRILDI — TAMAMLANDI, 09.10.2026]** Kullanıcı v4
+  sonrası kesin karar verdi: *"kendiliğinden seken zıplama oyunu istemiyorum.
+  star climber ile ilgili her şeyi sil. minigame'i kaldır artık istemiyorum."*
+  Sonuç — motor/oyun kodu, menü, kısayol, i18n, testler ve güncel belgelerden TÜM
+  izler temizlendi: `game/climber.js` silindi; `ui.js` **M_CLIMB** kutucuğu +
+  `_start_climber` + **[C]** kısayolu + `"climber"` aksiyonu kaldırıldı; `i18n.js`
+  `climber_*` + `menu_climber` (tr+en) silindi; `index.html` script etiketi + info
+  satırı; `test_game.js` TEST17 bloğu (725 satır) + TEST13d girdisi (244→149 OK);
+  `test_smoke.js` "climber" turu (34→33) + eski `tap("c")`→`tap("p")` düzeltmesi;
+  `tools_html/test_browser.js` bölüm 4b + load listesi (52→37); README + AGENTS.
+  Oyun sürümü **0.1.19 → 0.1.20** (`state.js` + `version.txt` geçmiş girdisi).
+  **Doğrulama:** 13/13 JS test 0 FAIL (smoke 0 HATA + 50/50 görsel kapı), test_tools
+  36/0, test_browser 37/0, `deep-tool.js --lang tr all` 0/0/0. Oynanış modları
+  (kampanya/rastgele/editör/özel) DEĞİŞMEDİ. *Etkilenen: 03 oyun + tüm oturumlar
+  (menüde C kısayolu artık yok, oyun sürümü 0.1.20). Detay: `03_game.md`
+  "STAR CLIMBER KALDIRMA".*
+
+- **[STAR CLIMBER v4 — "CLIMBER JUMP" TÜRÜ — TAMAMLANDI, 09.10.2026]** Kullanıcı
+  4 turdur (v1/v2/v3/v3b) Star Climber'ı beğenmiyordu: *"her defasında istediğimiz
+  climber jump tarzı oyunlar gibi olmuyor."* **KÖK NEDEN:** dört turda da sadece
+  PARAMETRE ayarlandı, türün İMZA MEKANİKLERİ yoktu. `game/climber.js` v4 + test
+  devri tamamlandı: (1) kombi artık **zıplama yüksekliği**ni büyütür (`jump_mult`;
+  eskiden yatay `speed_mult`); (2) **`AUTO_BOUNCE`** — yere inişte otomatik sekiş,
+  SPACE sadece havada skill'li ek zıplama; (3) `floor_gap` zıplama erişiminden
+  TÜRETİLİR → imkânsız boşluk kalmaz, çift-zıplama skill'i gerçekten işe yarar;
+  (4) kamera **rekor katmanı izler** (sabit yükselen 66px/sn duvar kalktı);
+  (5) ORTA-SÜTUN yasağı silindi; (6) ekranda BÜYÜK katman numarası + kombi (i18n
+  tr/en). Motor-dışı dokunulan: `engine/i18n.js` (yeni `climber_jump`/`climber_combo`).
+  test_game.js TEST17/17b/17c v4'e yeniden yazıldı + eksik `}` onarıldı; test_browser
+  4b v4 kanonuna uyarlandı. **Doğrulama:** 13/13 JS 0 FAIL (test_game **244 OK**),
+  tools 36/0, browser **52/0**, deep-tool **0/0/0**. Ölçüm: tuşsuz bot 24. kat,
+  skill botu 47. kat. *Etkilenen: 03 oyun (climber), 2 motor (i18n + oyun görsel/fizik).
+  KALAN: arka plan iyileştirmesi yapılmadı. Detay: `03_game.md` "V4 DEVİR TESLİMİ".*
+  **MOTOR NOTU (02):** `engine/physics.js` one_way proximity probu (satır 244-255)
+  bu çalışmada commit edilmedi; "havada kalma" bug'ının kök düzeltmesi — 02 inceleyip
+  sahiplenmeli (motor katmanında `DE_GAME` referansı YOK, denetim temiz).
+  > **✅ KAPANDI (29.10.2026):** prob `test_core.js` **TEST17** ile kilitlendi ve commit
+  > edildi (yukarıdaki "4 iş kapandı" kaydı + `02_engine.md` "ONE-WAY YAKINLIK PROBU").
+
 - **[KÖK DİZİN ORGANİZASYONU, 08.10.2026]** Kullanıcı direktifi: "tüm
   klasörleri organize et, ana dizindeki kalabalığı minimalize et". Sonuç:
   (1) `tools/` klasörü (boş kalıntı) silindi; (2) ana kökte **3 yedek .bat**

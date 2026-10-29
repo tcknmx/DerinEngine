@@ -151,8 +151,6 @@ barındırılsın.
 
 ---
 
-## MASTER SIRADAKİ Kuyruğu (hangi oturumda ne sırada)
-
 ## KARAR LOGU (kullanıcı kararları, kronolojik özet)
 
 ### 08.10.2026 — **PYTHON MOTOR SİLDİ + parite kapısı kaldırıldı (ORTA kapandı)**
@@ -212,6 +210,35 @@ devam edecez, py motor back geliştirme kalcsk"*.
 ---
 
 ## MASTER SIRADAKİ Kuyruğu (hangi oturumda ne sırada)
+
+### MASTER SIRADAKİ (29.10.2026 — ÖNERİ, kullanıcı onayı bekliyor)
+
+> Durum: 2D v1 motoru (20 motor + 8 oyun dosyası) tamam ve **tüm testler yeşil**
+> (29.10 checkup). Aşağıdaki eski kuyruk (HTML portu G1–G10, SCH portu M1–M5,
+> Star Climber) **tamamı bitmiştir**; arşiv olarak duruyor. Yeni sıra önerisi:
+
+1. **[OYUN + ARAÇ] Commit temizliği — ✅ TAMAMLANDI (29.10.2026).** 09.10 paketi
+   `db9726d` olarak `main`e yazıldı (PAKET 2 + Star Climber kaldırma, oyun 0.1.20);
+   ardından physics + ShieldBoss + belge commit'leri geldi. `git status` temiz.
+   Doğrulama: 13/13 JS test 0 FAIL + tools 36/0 + browser 37/0.
+2. **[02 MOTOR] One-way yakınlık probu — ✅ TAMAMLANDI (29.10.2026).** `test_core.js`
+   **TEST17** kapısı eklendi (hızlı düşüşte tünelleme yok + alttan geçiş serbest);
+   test_core 50 → **53/53**. Mutasyon kanıtı: eski `physics.js` ile 2 FAIL. Kalıcı
+   kayıt `02_engine.md` "ONE-WAY YAKINLIK PROBU — KİLİTLENDİ" bölümünde.
+3. **[03 OYUN] ShieldBoss mekaniği — ✅ A UYGULANDI (29.10.2026).** Kullanıcı:
+   "a, b, c özelliklerini yaz, sadece a'yı (katmanlı kalkan) oyuna geçir."
+   → `game/bosses.js` A tasarımı (3 katman, savunmasızlık penceresi, regen, kalıcı
+   düşüş) + `test_game.js` **TEST19** (149 → **163 OK**). B (döner) ve C (tek büyük
+   kalkan) **yedek** olarak `03_game.md`'de yazılı, kodlanmadı.
+4. **[01 STRATEJİ] Gelir modeli kararı** (23.09 notu): fiyat + hedef tutar + oyun
+   önceliği. Karar gelmeden kod işi başlamaz; strateji oturumu seçenekleri netleştirir.
+   (29.10.2026: kullanıcı bu konuya **kendi** bakacağını söyledi — oturum karışmıyor.)
+5. **[STRATEJİ/02] 2D v1 → 2.5D köprüsü (yeni büyük hedef):** 2D v1 olgunlaştı;
+   sıradaki ürün STAR COLLECTOR 2 (2.5D). İlk adım tartışması (motor tarafı):
+   perspektif kamera + derinlik sıralaması (z_index) + 2.5D'de çarpışma modeli
+   (2D fizik korunur mu?) — kullanıcıyla netleşip 02'ye KALAN olarak yazılır.
+   **Bu, sıradaki açık büyük başlık.**
+
 
 > **06.10.2026 YOL NOTU (kullanıcı kararı):** Öncelik = **HTML motoru standalone
 > yapmak** ve artık **yalnız JS/HTML hattından devam etmek.** Python **silinmiyor**
@@ -416,6 +443,73 @@ gerekebilir), mor düşman yoğunluğu/saldırganlığı. Bunlar yeni özellikte
 ---
 
 ## TARTIŞMA / ÖNERİ GÜNLÜĞÜ (bu oturum)
+
+> **HEDEF (29.10.2026 — kullanıcı: "önerdiklerini ve yarım kalanların hepsini yap"):**
+> Checkup'ta çıkan 4 iş birlikte bitecek: **(1)** 09.10 paketini (PAKET 2 + Star
+> Climber kaldırma) commit'le, **(2)** `physics.js` one-way probunu `test_core.js`'e
+> tünelleme kapısıyla kilitle, **(3)** ShieldBoss **A (katmanlı kalkan)** oyuna geçir +
+> B/C tasarımlarını belgeye yaz (yedekte), **(4)** bayat kayıtları temizle.
+> Gelir/fiyat modeline dokunulmaz (kullanıcıda). Doğrulama: 13/13 JS test + test_tools
+> 36/36 + test_browser 37/37 + `deep-tool.js --lang tr all` 0/0/0.
+>
+> **SONUÇ — TAMAMLANDI (29.10.2026), 3 commit.**
+> (1) `db9726d` — 09.10 paketi (PAKET 2 + Star Climber kaldırma, oyun 0.1.20).
+> (2) Motor commit'i — `engine/physics.js` one-way yakınlık probu + `test_core.js`
+> **TEST17** (tünelleme kapısı; test_core **53/53**, eski kodla 2 FAIL → kapı gerçek).
+> (3) Oyun commit'i — `game/bosses.js` **ShieldBoss A** (katmanlı kalkan) +
+> `test_game.js` **TEST19** (oyun testi **163 OK, 0 FAIL**); B/C tasarımları
+> `03_game.md`'de **yedek** (kodlanmadı, kullanıcı kararı).
+> Bayat kayıtlar temizlendi: `03_game.md` parite maddesi kapandı, `04_tools.md`
+> ARAÇ KALAN sadeleşti, MASTER SIRADAKİ 1–3 ✅ işaretlendi.
+> **Doğrulama (tümü yeşil):** 13/13 JS test 0 FAIL (core 53, game 163, smoke 0 HATA) +
+> test_tools 36/0 + test_browser 37/0 + `deep-tool.js --lang tr all` 0 WARN/0 BUG/0 ERR.
+> Yeni açık başlık: **2D v1 → 2.5D köprüsü** (MASTER 5). Gelir modeli kullanıcıda.
+
+
+- **[CHECKUP — 29.10.2026, okuma + test + mutasyon probu ile] Kullanıcı: "motoru kontrol et
+  neler var, neler kaldı, yarım kalan iş kalmış mı?"**
+  **HEDEF:** Kod DEĞİŞTİRMEDEN motorun envanterini, test durumunu ve açık işlerini
+  doğrulamak; yarım kalan iş varsa sahibi oturuma yönlendirmek. (Kod dosyasına
+  dokunulmadı; yalnız okuma + test + geçici `%TEMP%` kopyasında deney.)
+  **SONUÇ — hepsi yeşil:** 13/13 motor+oyun testi 0 FAIL (core 50, game **149**,
+  components 27, input 72, math2d 38, procedural 34, systems 73, tilemap+levelfile 38,
+  tween 33, ui 33, audio 33, visual 32; smoke 0 HATA + görsel kapılar),
+  `test_tools` **36/36**, `test_browser` **37/37**, `deep-tool.js --lang tr all`
+  **0 WARN / 0 BUG / 0 ERR**.
+  **Envanter:** 20 motor dosyası (`engine/*.js`) + 8 oyun dosyası (`game/*.js`;
+  `climber.js` yok), `index.html` 28 dosyanın **tamamını** doğru sırada yüklüyor,
+  sürüm üç yerde tutarlı (motor **1.0.0**, oyun **0.1.20**). 2D v1'in 5 alanı da
+  koda girmiş: fizik (eğim/çokgen/daire + coyote/jump-buffer/jump-cut/wall-slide/
+  wall-jump), tilemap, sahne ağacı + SceneManager, Animator/Keyframe/Tween, UI kiti.
+  **YARIM KALAN TEK GERÇEK İŞ — `engine/physics.js` one-way yakınlık probu:** çalışma
+  ağacında commit edilmemiş ve **hiçbir test onu kilitlemiyor**. Kanıt (geçici kopyada
+  HEAD `physics.js` ile mutasyon): tüm süitler eski kodla da yeşil; davranış probu ise
+  farkı gösteriyor — `vy=1500, dt=1/30` hızlı düşüşte eski kod platformu **delip
+  geçiyor** (y=602.67), yeni kod yüzeyde durduruyor (y=260.00); yüzeyin 4px üstünde
+  `vy=0` iken eski kod düşmeye devam, yeni kod yüzeye oturuyor. → **02 MOTOR**
+  sahiplenmeli: `test_core.js`'e "hızlı düşüşte one-way tünellemesi yok" kapısı +
+  kalıcı kayıt (`_shared.md` MOTOR NOTU hâlâ açık).
+  **Açık 2 — 20 dosya commit bekliyor** (09.10 PAKET 2 + Star Climber kaldırma 0.1.20
+  + physics probu + belgeler); HEAD `6f44cde` (08.10) → sahibi OYUN/ARAÇ.
+  **Açık 3 — ShieldBoss mekaniği** (A/B/C) kullanıcı seçimi (`03_game.md`).
+  **Açık 4 — ACİL GELİR fiyat modeli** (aşağıdaki 23.09 notu, karar yok).
+  **Bayat kayıtlar — ✅ TEMİZLENDİ (29.10.2026):** `03_game.md` OYUN KALAN'daki "motor
+  modül modül parite denetimi" maddesi kapandı (Python silindi), `04_tools.md` ARAÇ
+  KALAN bölümü sadeleşti (parite aracı/pygbag/Star Climber/webpanel.py "KAPANAN"
+  altına), bu dosyadaki eski MASTER kuyruğu arşiv notuyla işaretlendi.
+
+- **[CHECKUP — 10.10.2026, okuma + test ile]** Kullanıcı: "köklü değişiklikler yaptık,
+  checkup yap, neler değişti neler kaldı." **Sonuç:** (1) 15 test dosyası koşuldu —
+  hepsi yeşil (13 motor/oyun + test_tools 36/36 + test_browser 37/37; smoke 33 tur +
+  50/50 görsel kapı). (2) **Commit edilmemiş 19 dosya duruyor** (09.10.2026 paketi:
+  PAKET 2 = i18n ölü anahtar temizliği + parallax flicker fix + `forced_boss_type`/
+  benzersiz boss sırası; STAR CLIMBER kaldırma = 0.1.20, `climber.js` silindi,
+  test_game −596 satır; `engine/physics.js` one-way proximity probu) — son commit
+  `6f44cde` (08.10). **Karar/onay bekliyor: bu paketi kim commit'liyor (OYUN/ARAC).**
+  (3) Açık kararlar: ShieldBoss mekaniği (A/B/C seçeneği kullanıcıda, `03_game.md`),
+  fizik probunu motor oturumunun sahiplenmesi (`_shared` MOTOR NOTU), ACİL GELİR
+  fiyat modeli. Doğrulama: alttaki test komutları. (Kod değişmedi — varsayılan sürüm:
+  motor 1.0.0 / oyun 0.1.20.)
 
 - **[ACİL GELİR HEDEFİ — 1 ay, 23.09.2026]** Kullanıcı motoru gelirsiz sürdüremeyeceğini
   söyledi; 1 ay içinde gelir gerekiyor. DerinEngine tarafındaki adaylar: (a) **Star

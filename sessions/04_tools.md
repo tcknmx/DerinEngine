@@ -413,41 +413,31 @@ tamamlanınca araçlar da JS'e taşınıyor: **`tools_html/`** klasörü.
 
 ## ARAÇ KALAN (bekleyen araç işleri)
 
-### TAMAMLANDI — Python/JS parite denetimi (03.10.2026)
-- **`tools/parity_check.py` (yeni, kalıcı):** Python↔JS API envanter karşılaştırması.
-  Python tarafı `ast`; JS tarafı **gerçek Node yüklemesi** + `DE.*` / `DE_GAME.*`
-  introspection (metin tahmini değil). Çıktı: insan-okunur rapor ve `--json`.
-  `game/commands.py::ensure_dir()` bilinen istisna (Python disk yardımcısı).
-- **deep-tool Modül 14 `[14] Python/JS parity`:** boşluk → `BUG`, denetim
-  çalıştırılamazsa `ERR` (sessiz geçiş yok). TR/EN i18n metinleri eklendi.
-  `python tools\deep-tool.py --lang tr 14` → `0 WARN, 0 BUG, 0 ERR`.
-- Doğrulama: mutasyonla boşluk yakalandı (`world_position` → `METOT_YOK`,
-  `cmd_hp` → `FONKSIYON_YOK`); araç 3 uyarıyı düzelttikten sonra tam tarama
-  **0 WARN / 0 BUG / 0 ERR** (TR ve EN).
+> **Temizlik notu (29.10.2026):** Bu bölümde 08.10.2026 "Python silindi" kararından
+> önce kalmış bayat maddeler vardı (parite aracı, pygbag iframe, Star Climber,
+> `webpanel.py`). Aşağıda yalnızca **hâlâ geçerli** işler duruyor.
 
-- **HTML MOTOR SIRADAKİ (DerinEngine HTML) — bakınız `01_strategy.md` MASTER SIRADAKİ
-  (28.09.2026).** ~~SIRADA G2–G9~~ **KAPANDI (28.09.2026):** G2–G9 motor eşitliği
-  bitti (G1–G9 tamam; ardından G10 INPUT denkliği + Modül 7 JS eşi de kapandı).
-  Bu oturumun açık kalanı artık yalnızca tarayıcı interaktif playtest (aşağıda).
-  Kalan yeni hat: SCH tam portu + **Star Climber** (tırmanma oyunu, Icy Tower
-  mekaniği) → `01_strategy.md` MASTER SIRADAKİ kuyruğuna işaretli.
-  Doğrulama komutu: `node deep_engine_html\test_core.js` → `ALL OK`.
-- **Modül 7 kullanılmayan import WARN temizliği** (`game/*.py`) — ~~KALAN~~ **KAPANDI
-  (01.10.2026):** tarama zaten temiz; araçtaki uyarı mekanizması geçici
-  `game/zz_probe_unused.py` ile kanıtlandı (`[WARN] … unused import 'os'`), dosya
-  silindi. Ayrıca **JS eşindeki 13 yanlış pozitif** düzeltildi (madde 18).
-- **tarayıcı interaktif playtest** (kullanıcıya bırakıldı — `test_browser.js` 33/33
-  boot/rAF/klavye smoke yeşil; gerçek kullanıcı etkileşimi gerekiyor).
-- **web paneli: katıştırılmış oyun sekmesi (pygbag iframe)** — ~~aday, ertelendi~~
-  **İPTAL (01.10.2026):** ana paket artık standalone `deep_engine_html/index.html`
-  (`main.js` rAF döngüsü), Python/pyscript iframe'ine gerek kalmadı.
-- **editör: gizle/kilit + sürükle-bırak sıralama** — ~~KALAN~~ **KAPANDI:** özellikler
-  zaten `tools/webpanel.py:790+` içinde ve `48163a5` commit'inde var (gizle, kilit,
-  `ondrop` ile sıra değiştirme); kayıt bayattı, düzeltildi.
-- **Modül 6 (Performans) yanlış-pozitif yumuşatması** (27.09, MOTOR devri —
-  `02_engine.md`) — ~~KALAN~~ **KAPANDI (01.10.2026, madde 18):** kanıtlanabilir
-  sabit küçük döngü tanımı (≤32) iki araca da girdi, 8 döngü INFO'ya indi,
-  dinamik döngü uyarısı duruyor, iki araç 0 WARN.
+- **Tarayıcıda interaktif playtest** (kullanıcıya bırakıldı): `test_browser.js` 37/37
+  boot/rAF/klavye smoke yeşil; gerçek kullanıcı etkileşimi (fare, ses, his) hâlâ insan
+  eliyle doğrulanmalı.
+- **Web build / paketleme (JS hattı):** `deep_engine_html/index.html` doğrudan
+  çalışıyor; ayrı bir "tek dosya build" **henüz talep edilmedi** (istendiğinde araç
+  oturumunun işi).
+
+### KAPANAN / SİLİNEN (bayat kayıtlar — tekrar açılmasın)
+- **Python/JS parite aracı** (`tools/parity_check.py` + deep-tool Modül 14):
+  08.10.2026'da **kaldırıldı** — Python motoru silindi, ölçülecek hedef kalmadı.
+- **pygbag / pyscript iframe** (web panelinde oyun sekmesi): **iptal**; ana paket
+  standalone `deep_engine_html/index.html`.
+- **Star Climber** mini-oyunu: **tamamen kaldırıldı** (09.10.2026, oyun 0.1.20).
+- **`tools/webpanel.py` / `tools/deep-tool.py` referansları:** araçlar artık
+  `tools_html/*.js` (Node); Python araçları silindi.
+- **Modül 7 kullanılmayan import WARN temizliği:** **kapandı** (01.10.2026; JS eşindeki
+  13 yanlış pozitif de düzeltildi).
+- **Modül 6 (Performans) yanlış-pozitif yumuşatması:** **kapandı** (01.10.2026, madde 18).
+- **Editör: gizle/kilit + sürükle-bırak sıralama:** **kapandı** (özellikler mevcut;
+  kayıt bayattı, düzeltildi).
+- **HTML motor sıradaki G2–G9 / G10 INPUT / Modül 7 JS eşi:** **kapandı** (28.09–01.10).
 
 ## GÖREV HEDEFİ — editörü gerçek motor UI'ye çevir (26.09.2026)
 
