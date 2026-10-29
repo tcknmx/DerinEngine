@@ -5,8 +5,9 @@
  *    (kinematik: hareketi doğrudan pozisyona yazar; kutusu trigger → oyuncu içinden geçer).
  *  - Zemin boss'lar (shield/archer) Rigidbody + katı BoxCollider kullanır.
  *  - Canvas çizimi: Python pygame primitiflerinin birebir benzeri (fillRect/arc/line).
- *  - NOT: Python'ın _draw_shield_bar son döngüsü yarım kalmıştır (hiçbir şey çizmez);
- *    burada amaçlanan görsel segmentler çizilir (belgeli kozmetik düzeltme).
+ *  - ShieldBoss kalkanı 29.10.2026'da KATMANLI tasarıma (A) geçti; kalkan çubuğu
+ *    3 segmenttir (ayakta/kırık/savunmasız renkleri). Eski Python "yarım kalmış
+ *    _draw_shield_bar" notu geçersizdir (Python motoru silindi).
  */
 var DE_GAME = DE_GAME || {};
 
@@ -619,7 +620,19 @@ class CosmicBoss extends FlyingBoss {
     }
 }
 
-/* --- ShieldBoss: etrafında kırılabilir platformlardan kalkan olan boss --- */
+/* --- ShieldBoss: KATMANLI kalkan (A tasarımı, 29.10.2026) --------------------
+ * 3 kırılabilir blok = 3 BAĞIMSIZ kalkan katmanı:
+ *  - En az bir katman ayaktayken boss hasar ALMAZ (blok kırılana kadar kalkan var).
+ *  - Her katman kırıldığında boss kısa süre SAVUNMASIZ kalır (VULN_TIME): ateş
+ *    etmez, kaleden çıkmaz, gelen hasar işler.
+ *  - Savunmasız pencere bitince REGEN_DELAY kadar sonra kırılan katman YENİLENİR
+ *    (blok geri gelir, kalkan yine hasar keser).
+ *  - Üç katman birlikte kırılırsa kalkan KALICI olarak düşer (yenilenme yok) ve
+ *    boss kaleden çıkıp gezinmeye başlar.
+ * NOT: motor (`DE.Projectile.on_collision`) `shield_intact()` kancasını duck-typing
+ * ile çağırır → katman mantığı motora dokunmadan burada çalışır.
+ * Yedek tasarımlar (B döner kalkan / C tek büyük kalkan) `03_game.md`'de duruyor.
+ * --------------------------------------------------------------------------- */
 class ShieldBoss extends DE.Component {
     constructor(distance = 60.0, speed = 45.0, fire_interval = 2.2, bullet_speed = 320.0,
                 shoot_count = 2, body_color = [150, 70, 210], accent_color = [255, 230, 80],
@@ -637,39 +650,100 @@ class ShieldBoss extends DE.Component {
         this.health = null;
         this.shoot_timer = 0.0;
         this._timer = 0.0;
-        this.shield_parts = [];   // kalkanı oluşturan Breakable nesneleri
+        this.shield_parts = [];   // kalkanı oluşturan Breakable nesneleri (katmanlar)
+        this._parts_ready = false;   // katman listesi bir kez kurulur (kırılanlar da kalır)
+        this._broken = [];           // kırık katman indeksleri (kırılma sırasıyla)
+        this._vuln_timer = 0.0;      // kırılma sonrası savunmasızlık penceresi
+        this._regen_timer = 0.0;     // katman yenilenmesine kalan süre
+        this.layer_count = 0;        // kalkan katmanı sayısı (blok sayısı)
+        this.all_layers_broken = false;
+        this.VULN_TIME = 2.0;        // kırılan katman başına savunmasızlık (sn)
+        this.REGEN_DELAY = 7.0;      // pencere bittikten sonra yenilenme (sn)
         this._previously_shielded = true;
     }
     start() {
         this.start_x = this.game_object.position.x;
         this.health = this.game_object.get_component(DE.Health);
+        this._register_shield_parts();   // bloklar hazırsa hemen, değilse ilk karede
     }
     _register_shield_parts() {
-        // Sahnedeki kırılabilir parçaları bul (nesne: boss yakınındaki Breakable)
-        if (this.shield_parts.length) return;
+        // Boss'un çevresindeki kırılabilir blokları KATMAN olarak bir kez topla.
+        // Kırılmış (active=false) bloklar da listeye girer: yenilenme için şart.
+        if (this._parts_ready) return;
         const scene = _boss_scene();
         if (!scene) return;
         const cx = this.game_object.position.x + this.game_object.size.x / 2;
         const cy = this.game_object.position.y + this.game_object.size.y / 2;
+        const found = [];
         for (const o of scene.game_objects) {
-            if (o.tag === "Breakable" && o.active) {
-                const ox = o.position.x + o.size.x / 2;
-                const oy = o.position.y + o.size.y / 2;
-                if (Math.abs(ox - cx) < 150 && Math.abs(oy - cy) < 90) {
-                    this.shield_parts.push(o);
-                }
+            if (o.tag !== "Breakable") continue;
+            const ox = o.position.x + o.size.x / 2;
+            const oy = o.position.y + o.size.y / 2;
+            if (Math.abs(ox - cx) < 150 && Math.abs(oy - cy) < 90) {
+                found.push({ obj: o, d: Math.abs(ox - cx) + Math.abs(oy - cy) });
             }
         }
+        if (!found.length) return;   // bloklar henüz sahneye eklenmedi -> sonraki karede tekrar dene
+        found.sort((a, b) => a.d - b.d);
+        this.shield_parts = found.slice(0, 3).map(e => e.obj);   // en fazla 3 katman
+        this.layer_count = this.shield_parts.length;
+        this._parts_ready = true;
+    }
+    _sync_layers() {
+        // Kırılan/yenilenen katmanları duruma yansıt (her karede çağrılabilir).
+        this._register_shield_parts();
+        if (!this.layer_count) {
+            this.all_layers_broken = true;   // kalkan yok -> normal boss gibi davran
+            return;
+        }
+        for (let i = 0; i < this.shield_parts.length; i++) {
+            const alive = this.shield_parts[i].active;
+            const known = this._broken.indexOf(i) !== -1;
+            if (!alive && !known) {
+                this._broken.push(i);
+                this._vuln_timer = this.VULN_TIME;
+                this._regen_timer = this.REGEN_DELAY;
+            } else if (alive && known) {
+                this._broken.splice(this._broken.indexOf(i), 1);
+            }
+        }
+        this.all_layers_broken = this._broken.length >= this.layer_count;
     }
     shield_intact() {
-        this._register_shield_parts();
-        // 'tümü': her parça sağlam olmalı. Yani tek parçayı (oyuncunun atış
-        // menzilindekini) kırmak yeterli — hepsi değil.
-        return Boolean(this.shield_parts.length) && this.shield_parts.every(p => p.active);
+        // Motor bu kancayla hasarı keser (true = hasar bloklanır).
+        this._sync_layers();
+        if (!this.layer_count) return false;        // kalkan parçası yok
+        if (this.all_layers_broken) return false;   // tüm katmanlar düştü (kalıcı)
+        if (this._vuln_timer > 0.0) return false;   // savunmasız pencere açık
+        return true;                                // en az bir katman ayakta
+    }
+    _regen_layer() {
+        // En son kırılan katmanı geri getir (tümü düştüyse yenilenme YOK).
+        if (this.all_layers_broken || !this._broken.length) return;
+        const idx = this._broken[this._broken.length - 1];
+        const part = this.shield_parts[idx];
+        if (!part) return;
+        part.active = true;
+        const bp = part.get_component(DE.BreakablePlatform);
+        if (bp) bp.hits = 0;                        // blok sıfırdan kırılır
+        this._broken.pop();
+        this._vuln_timer = 0.0;
+        this._regen_timer = 0.0;
+        this.all_layers_broken = this._broken.length >= this.layer_count;
+        if (DE.SoundFX && DE.SoundFX.play) DE.SoundFX.play("powerup_shield");
     }
     update(dt) {
         dt = DE._slow_dt(dt);
         this._timer += dt;
+        this._sync_layers();
+        if (this._vuln_timer > 0.0) this._vuln_timer = Math.max(0.0, this._vuln_timer - dt);
+        // Katman yendi: savunmasız pencere bittiğinde yenilenme sayacı işler.
+        if (!this.all_layers_broken && this._broken.length && this._vuln_timer <= 0.0) {
+            this._regen_timer -= dt;
+            if (this._regen_timer <= 0.0) this._regen_layer();
+        }
+        // Savunmasız pencere: boss ateş ETMEZ, kaleden çıkmaz (nefes alma anı).
+        if (this._vuln_timer > 0.0) return;
         this.shoot_timer += dt;
         // Her zaman ateş eder: kalkan içindeyken bile saldırabilir (kale);
         // kendi mermileri kırılabilir kalkandan GEÇER (onlara dokunmaz, kırmaz).
@@ -677,9 +751,8 @@ class ShieldBoss extends DE.Component {
             this.shoot_timer = 0.0;
             this._shoot_fan();
         }
-        // Hareket: kalkan kırılana dek kalesinde durur; kırılınca (menzildeki
-        // parça yok olduğunda) kaleden çıkıp gezinir.
-        if (this.shield_intact()) return;
+        // Katmanlar ayaktayken kalesinde durur; TÜMÜ düşünce gezinmeye başlar.
+        if (!this.all_layers_broken) return;
         this.game_object.position.x = this.start_x + Math.sin(this._timer * 0.8) * this.distance * 0.5;
     }
     _shoot_fan() {
@@ -715,7 +788,11 @@ class ShieldBoss extends DE.Component {
         const sy = Math.trunc(this.game_object.position.y - camera_offset.y);
         const w = Math.trunc(this.game_object.size.x);
         const h = Math.trunc(this.game_object.size.y);
-        _fill_rect(ctx, this.body_color, sx, sy, w, h, 10);
+        // Savunmasız pencerede gövde parlar: "şimdi vur" görsel sinyali.
+        const body = this._vuln_timer > 0.0
+            ? this.body_color.map(c => Math.min(255, c + 60))
+            : this.body_color;
+        _fill_rect(ctx, body, sx, sy, w, h, 10);
         _fill_rect(ctx, this.accent_color, sx + 14, sy + 16, 12, 8, 2);
         _fill_rect(ctx, this.accent_color, sx + w - 26, sy + 16, 12, 8, 2);
         _fill_rect(ctx, [20, 10, 10], sx + 16, sy + 36, w - 32, 6, 2);
@@ -725,15 +802,14 @@ class ShieldBoss extends DE.Component {
         }
     }
     _draw_shield_bar(ctx, camera_offset) {
-        // Kalkan sağlık çubuğu: kalkanı oluşturan kırılabilir parçalardan kaçının
-        // hâlâ sağlam olduğunu segment segment gösterir. Hepsi kırılınca kaybolur.
-        // (NOT: Python'da bu döngü gövdesi yarım kalmıştır ve hiç çizmez; burada
-        //  amaçlanan segment çizgisi belgeli kozmetik düzeltme olarak çizilir.)
+        // Katman çubuğu: her blok bir segment. Ayakta = mavi-gri, kırık = koyu;
+        // savunmasız pencerede tüm segmentler ALTIN (hasar geçer).
         this._register_shield_parts();
-        if (!this.shield_parts.length) return;
-        const total = this.shield_parts.length;
-        const intact = this.shield_parts.filter(p => p.active).length;
-        if (intact <= 0) return;
+        if (!this.layer_count) return;
+        const total = this.layer_count;
+        const intact = total - this._broken.length;
+        const vulnerable = this._vuln_timer > 0.0;
+        if (intact <= 0 && !vulnerable) return;
         const sx = Math.trunc(this.game_object.position.x - camera_offset.x) + Math.trunc(this.game_object.size.x / 2);
         const sy = Math.trunc(this.game_object.position.y - camera_offset.y);
         const bar_w = 60;
@@ -742,7 +818,10 @@ class ShieldBoss extends DE.Component {
         const y0 = sy - 14;
         for (let i = 0; i < total; i++) {
             const px = x0 + i * seg;
-            _fill_rect(ctx, intact > i ? [160, 160, 200] : [70, 70, 90], px, y0, 8, 6);
+            let col;
+            if (vulnerable) col = [255, 220, 120];
+            else col = this.shield_parts[i].active ? [160, 160, 200] : [70, 70, 90];
+            _fill_rect(ctx, col, px, y0, 8, 6);
         }
     }
 }

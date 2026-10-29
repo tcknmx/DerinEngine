@@ -32,7 +32,7 @@
 
 ---
 
-## PAKET 2 (09.10.2026) — TAMAMLANDI (1–3), 4 → KALAN
+## PAKET 2 (09.10.2026) — TAMAMLANDI (1–3), 4 → 29.10'da TAMAMLANDI (ShieldBoss A)
 
 1. **Ölü i18n anahtarları silindi:** `engine/i18n.js`'ten kodda hiç çağrılmayan eski
    menü anahtarları tr+en kaldırıldı (`menu_play_l1/l2/l3`, `menu_lang`, `menu_quit`,
@@ -68,21 +68,75 @@ test_smoke 0 HATA + 50/50 görsel kapı · test_tools 36/0 · test_browser 37/0 
 > Davranış geriye dönük uyumlu: `forced_boss_type` opsiyonel, verilmezse eski
 > `rng.choice(PR_BOSS_TYPES)` çalışır (test_procedural bunu doğrular).
 
-### BOSS MEKANİK ÖNERİSİ (fazladan boss = ShieldBoss) — KALAN (kullanıcı seçimi)
+### ShieldBoss MEKANİĞİ — **A UYGULANDI** (29.10.2026), B/C yedekte
 
-Korunacak boss seti: **sniper, flying, zeminde-normal (archer), final (cosmic)**.
-"Fazladan" boss = `shield`. MEVCUT TASARIM ANLAMSIZ: 3 kırılabilir blok kalkan
-sayılıyor ama kod `every(p.active)` ile **TEK blok kırılınca** kalkanı düşürüyor →
-bloklar dekoratif. Öneriler (kullanıcı seçecek):
+Kullanıcı kararı (29.10.2026): *"shieldboss mekaniğinin a, b, c özelliklerini yaz ama
+sadece a'yı (katmanlı kalkan'ı) oyuna geçir; b ve c yedekte dursun."*
 
-- **A) Katmanlı kalkan (önerilen):** 3 blok = 3 bağımsız kalkan katmanı. Boss
-  canına hasar yalnız TÜM katmanlar kırıldıktan sonra işler; her katman kırıldığında
-  boss kısa süre savunmasız kalır; boss zamanla katman yeniler (regen). Oyuncu
-  boşlukta vurmaya zorlanır → bloklar anlam kazanır.
-- **B) Döner kalkan:** Bloklar boss etrafında döner; oyuncu doğru açıyı bekleyip
-  ateş eder; bloklar kırıldıkça dönüş hızlanır.
-- **C) Tek büyük kalkan + görsel:** Mevcut mantık korunur, 3 blok → 1 büyük kalkan
-  nesnesi + görsel iyileştirme (en az kod).
+Korunan boss seti: **sniper, flying, zeminde-normal (archer), final (cosmic)**; "fazladan"
+boss = `shield`. Eski davranış anlamsızdı: 3 kırılabilir blok "kalkan" sayılıyordu ama
+kod `every(p.active)` ile **tek blok kırılınca** kalkanı düşürüyordu → diğer bloklar
+dekoratifti.
+
+#### A) KATMANLI KALKAN — **OYUNDA** (`deep_engine_html/game/bosses.js → ShieldBoss`)
+
+3 kırılabilir blok = **3 bağımsız kalkan katmanı**. Oyuncu gerçekten "kalkanı delip"
+boss'a ulaşmak zorunda kalır; bloklar anlam kazanır.
+
+**Kurallar (uygulanan):**
+1. **En az bir katman ayaktayken boss hasar ALMAZ.** Oyuncunun her mermisi kalkan
+   tarafından yutulur (mermi yok olur, can düşmez).
+2. **Bir katman kırıldığında** boss `VULN_TIME = 2.0 sn` **savunmasız** kalır: ateş
+   etmez, kalesinden çıkmaz, gelen hasar normal işler. Gövde bu sürede parlar (görsel
+   "şimdi vur" sinyali), kalkan çubuğu altın renge döner.
+3. **Savunmasız pencere bitince** `REGEN_DELAY = 7.0 sn` sonra kırılan katman
+   **yenilenir** (blok geri gelir, `BreakablePlatform.hits` sıfırlanır) → kalkan yine
+   hasar keser. Yani oyuncu sonsuza kadar bekleyemez; kalkan kendini toplar.
+4. **Üç katman birden kırılırsa** kalkan **KALICI** olarak düşer (yenilenme yok) ve
+   boss kalesinden çıkıp gezinmeye (patrol) başlar — normal dövüş.
+5. Kalkan çubuğu: 3 segment; ayakta = mavi-gri, kırık = koyu, savunmasız pencerede
+   tüm segmentler altın.
+
+**Kod noktaları:** `shield_parts` / `_parts_ready` / `_broken` / `_vuln_timer` /
+`_regen_timer` / `layer_count` / `all_layers_broken` alanları; `_register_shield_parts`
+(blokları boss merkezine uzaklıkla sıralayıp en yakın 3'ünü katman yapar; **bloklar
+henüz sahneye eklenmediyse sonraki karede tekrar dener**), `_sync_layers` (kırılma/
+yenilenmeyi duruma yansıtır), `shield_intact()` (**motor kancası** — `DE.Projectile.
+on_collision` duck-typing ile çağırır, motora dokunulmadı), `_regen_layer`, `update`,
+`draw` + `_draw_shield_bar`.
+
+**Regresyon:** `deep_engine_html/test_game.js → TEST19` (14 kontrol): katman sayısı,
+hasar bloklama, kalede durma, kırılma → savunmasızlık, yenilenme, üçü birden kırılınca
+kalıcı savunmasızlık + gezinme. **Sonuç:** test_game 149 → **163 OK, 0 FAIL**.
+
+#### B) DÖNER KALKAN — **YEDEK** (kodlanmadı, istenirse A'nın yerine)
+
+Bloklar boss'un etrafında **döner**; oyuncu doğru açıyı bekleyip ateş etmek zorunda
+kalır. Bloklar kırıldıkça dönüş hızlanır (baskı artar).
+
+- Uygulama taslağı: `_register_shield_parts` blokları boss merkezine göre açısal
+  sırayla dizer; `update` içinde her kare `angle += (0.6 + 0.35 * broken_count) * dt`
+  ile blok konumları merkez etrafında döndürülür (bloklar trigger olduğu için fizik
+  çakışması yok). Hasar kesme aynı `shield_intact()` kancasıyla kalır.
+- Dikkat: bloklar sahnede GameObject olarak taşındığı için oyuncunun blok üstünde
+  "binmesi" engellenmeli (trigger zaten engel değil) ve bloklar zemine gömülmemeli
+  (dönme yarıçapı + blok boyu arena yüksekliğine sığmalı).
+- Test taslağı: dönüş sonrası blok merkezlerinin boss merkezine uzaklığı sabit kalmalı;
+  kırılan katman sayısı arttıkça açısal hız artmalı.
+
+#### C) TEK BÜYÜK KALKAN + GÖRSEL — **YEDEK** (en az kod)
+
+Mevcut "kalkan" fikri korunur ama 3 küçük blok yerine **tek büyük kalkan nesnesi**
+(ör. 120×150, `hits: 6`) boss'un önünde durur; kırılınca boss savunmasız kalır. Görsel
+iyileştirme: kalkan çizimi (parlayan kenar, kırılma çatlakları) + kırılma anında büyük
+parçacık patlaması.
+
+- Uygulama taslağı: `engine/procedural.js` boss arenasında `shield` tipi için 3 blok
+  yerine tek `Breakable` üret; `ShieldBoss` içinde katman mantığı sadeleşir
+  (`layer_count = 1`, regen yok). Hasar kesme yine `shield_intact()`.
+- Ne zaman seçilir: B'nin dönüş kodunu istemiyorsak ama A'nın "3 blok" görüntüsü
+  yerine daha "büyük tek kalkan" estetiği istiyorsak.
+
 
 ---
 
@@ -514,20 +568,10 @@ rastgele/editör/özel) korunur; yalnız Star Climber çıkarılır.
   doğal "uzun turlar" hissi. Kullanıcı onaylarsa bu madde aktif göreve döner.
 - **deneyim_iyilestirmeleri 5–8** (aşağıda, bu dosyaya taşındı — orijinal dosya silindi):
   1. (1–4 zaten uygulandı; 5 TAMAMLANDI, 6–7 uygulandı; 8 TAMAMLANDI — aşağıya bak.)
-- **JS motoru ↔ Python parite denetimi (03.10.2026 eklendi, kullanıcı isteği):**
-  Kullanıcı netleştirdi: istenen şey "oyun katmanını JS'e taşımak" değil, **JS
-  motorunun Python ile aynı denklikte yazılması** — tarayıcı sürümü oynanabilir
-  ve davranış olarak birebir aynı olmalı. Bulunan ilk gerçek parite boşluğu
-  düzeltildi: `DE.Engine.set_scene()` sahneye `screen_width/height` atamıyordu
-  (bkz. AÇIK RAPOR 4, yan bulgu). **Kalan:** modül modül API/karşılaştırması
-  (`core/scene/game_object/components/input/render/physics` ↔ Python eşleri) ve
-  bunu kilitleyen otomatik test. Not: aynı seed'te `random.Random` ile
-  `mulberry32` **aynı kule düzenini üretmez** — denklik oynanış/API düzeyindedir.
-  **> OYUN KATMANI TAMAMLANDI (05.10.2026):** 10 betiğin tamamı denetlendi
-  (`main.py`↔`main.js`, `__init__.py`↔`DE_GAME` dahil) — sonuç ve **3 gerçek hata
-  + 1 gerçek fark** için bkz. aşağıdaki "PYTHON ↔ JS OYUN KATMANI PARİTE DENETİMİ".
-  Düzeltilmedi (kullanıcı kararı bekliyor). **Kalan:** motor modül modül
-  (`core/scene/game_object/components/input/render/physics` ↔ Python eşleri) denetimi.
+- ~~**JS motoru ↔ Python parite denetimi** (03.10.2026)~~ — **KAPANDI (08.10.2026):**
+  Python motoru tamamen silindi (`deep_engine/*.py`, `main.py`, `tests/*.py`); JS artık
+  tek kaynak, "parite" ölçülecek bir hedef kalmadı. Bu maddenin "kalan: motor modül
+  modül denetimi" notu **geçersiz** — bakılacak yer git geçmişi + `02_engine.md`.
 
 ### Deneyim iyileştirmeleri 5–8
 - **5. Dash after-image**: dash süresince arkada yarı-saydam oyuncu kopyası izi

@@ -823,3 +823,86 @@ console.log("TEST18 biyom fiziği minimum:");
   check("18: dash sonrası izler yaşlanıp silinir", expired,
     "n=" + ctrl._afterimages.length + " ages=[" + ctrl._afterimages.map(g => g[4].toFixed(2)).join(",") + "]");
 }
+
+// TEST19: ShieldBoss KATMANLI kalkan (A tasarımı, 29.10.2026)
+// 3 blok = 3 bağımsız katman. Ayaktayken hasar bloklanır; katman kırılınca kısa
+// savunmasızlık penceresi; pencere+gecikme sonrası katman yenilenir; ÜÇÜ birden
+// kırılırsa kalkan kalıcı olarak düşer ve boss gezinmeye başlar.
+console.log("TEST19 ShieldBoss katmanlı kalkan (A):");
+{
+  // Test izolasyonu: önceki testler time-slow bırakabilir; gerçek motorda bu
+  // sayaç her karede azalır, test iskeletinde azalmadığı için burada sıfırlanır.
+  engine._time_slow_remaining = 0.0;
+  engine._time_slow_factor = 0.4;
+
+  function shieldArena() {
+    const data = DE.procedural_generate_boss_arena("cave", 9, 1, "victory", "shield");
+    const scene = new DE.Scene("Boss Arena", [16, 20, 34]);
+    for (const od of data["objects"]) {
+      if (od["tag"] === "Player") continue;   // oyuncusuz arena: boss ateşi testi bozmasın
+      DE.place_object(scene, od);
+    }
+    use(scene);
+    scene.start();   // bekleyen nesneleri sahneye al (boss + kalkan blokları)
+    return scene;
+  }
+  function shotAt(target, dmg) {
+    const go = new DE.GameObject("Bullet", 0, 0, 8, 8, "Bullet");
+    const pr = new DE.Projectile(new DE.Vector2(1, 0), 100, dmg, false);
+    go.add_component(pr);
+    pr.on_collision(target);
+    return go;
+  }
+  const scene = shieldArena();
+  const boss = scene.find_by_tag("Boss");
+  const comp = boss ? boss.get_component(DE_GAME.ShieldBoss) : null;
+  const hp = boss ? boss.get_component(DE.Health) : null;
+  if (comp) comp._sync_layers();   // katmanları (sahnedeki 3 blok) topla
+  const parts = comp ? comp.shield_parts : [];
+  check("19: kalkan boss'u kuruldu", boss !== null && comp !== null && boss.boss_type === "shield");
+  check("19: 3 kalkan katmanı bulundu", comp !== null && comp.layer_count === 3,
+    "n=" + (comp ? comp.layer_count : -1));
+
+  const hp0 = hp.current_hp;
+  shotAt(boss, 10);
+  check("19: katmanlar ayaktayken hasar BLOKLANIR", hp.current_hp === hp0,
+    "hp=" + hp.current_hp + "/" + hp0);
+
+  const x0 = boss.position.x;
+  step(scene, 30);
+  check("19: kalkan ayaktayken kalede durur", Math.abs(boss.position.x - x0) <= 0.5,
+    "dx=" + (boss.position.x - x0).toFixed(2));
+
+  // Bir katman kırıldı -> savunmasız pencere: hasar geçer, boss ateş etmez.
+  parts[0].active = false;
+  check("19: katman kırılınca savunmasız pencere açılır", comp.shield_intact() === false);
+  shotAt(boss, 10);
+  check("19: savunmasız pencerede hasar İŞLER", hp.current_hp === hp0 - 10,
+    "hp=" + hp.current_hp);
+
+  // Pencere (VULN) + gecikme (REGEN) sonrası katman geri gelir, hasar yine kesilir.
+  const wait_frames = Math.ceil((comp.VULN_TIME + comp.REGEN_DELAY + 0.5) * 60);
+  step(scene, wait_frames);
+  check("19: katman YENİLENDİ (blok geri geldi)", parts[0].active === true);
+  check("19: yenilenen kalkan hasar keser", comp.shield_intact() === true);
+  const hp1 = hp.current_hp;
+  shotAt(boss, 10);
+  check("19: yenilenen kalkan hasar bloklar", hp.current_hp === hp1, "hp=" + hp.current_hp);
+
+  // Üç katman birlikte kırılır -> kalkan kalıcı olarak düşer.
+  for (const p of parts) p.active = false;
+  comp._sync_layers();
+  check("19: üç katman birden kırıldı", comp.all_layers_broken === true);
+  check("19: kalıcı savunmasız", comp.shield_intact() === false);
+  const hp2 = hp.current_hp;
+  shotAt(boss, 10);
+  check("19: kalıcı savunmasızken hasar işler", hp.current_hp === hp2 - 10, "hp=" + hp.current_hp);
+
+  step(scene, 60 * 12);
+  check("19: kalıcı savunmasızlık YENİLENMEZ",
+    comp.shield_intact() === false && parts.every(p => p.active === false));
+  const x1 = boss.position.x;
+  step(scene, 60);
+  check("19: kalkan düşünce boss gezinir", Math.abs(boss.position.x - x1) > 1.0,
+    "dx=" + (boss.position.x - x1).toFixed(2));
+}
