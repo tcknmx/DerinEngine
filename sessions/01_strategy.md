@@ -489,10 +489,18 @@ gerekebilir), mor düşman yoğunluğu/saldırganlığı. Bunlar yeni özellikte
   `vy=0` iken eski kod düşmeye devam, yeni kod yüzeye oturuyor. → **02 MOTOR**
   sahiplenmeli: `test_core.js`'e "hızlı düşüşte one-way tünellemesi yok" kapısı +
   kalıcı kayıt (`_shared.md` MOTOR NOTU hâlâ açık).
+  → **✅ ÇÖZÜLDÜ (29.10.2026):** TEST17 + commit ade29b5; `_shared.md` MOTOR NOTU
+  kapatıldı.
   **Açık 2 — 20 dosya commit bekliyor** (09.10 PAKET 2 + Star Climber kaldırma 0.1.20
   + physics probu + belgeler); HEAD `6f44cde` (08.10) → sahibi OYUN/ARAÇ.
+  → **✅ ÇÖZÜLDÜ (29.10.2026):** 4 commit (db9726d + ade29b5 + 2bc6829 + 845edfb),
+  `git status` temiz.
   **Açık 3 — ShieldBoss mekaniği** (A/B/C) kullanıcı seçimi (`03_game.md`).
+  → **✅ A ÇÖZÜLDÜ (29.10.2026):** A oyuna geçti (2bc6829, TEST19 → 163 OK);
+  B/C yedek (kullanıcı kararı).
   **Açık 4 — ACİL GELİR fiyat modeli** (aşağıdaki 23.09 notu, karar yok).
+  → **KULLANICIDA (29.10.2026):** kullanıcı bu konuya kendi bakacağını söyledi;
+  oturum karışmıyor.
   **Bayat kayıtlar — ✅ TEMİZLENDİ (29.10.2026):** `03_game.md` OYUN KALAN'daki "motor
   modül modül parite denetimi" maddesi kapandı (Python silindi), `04_tools.md` ARAÇ
   KALAN bölümü sadeleşti (parite aracı/pygbag/Star Climber/webpanel.py "KAPANAN"

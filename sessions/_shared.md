@@ -47,6 +47,10 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
   **Açık kararlar:** ShieldBoss A/B/C (03), gelir/fiyat modeli (01). Eski
   `01_strategy.md` MASTER kuyruğu bayat (tüm HTML port maddeleri bitti) → yeni
   kuyruk önerisi o dosyada. *Etkilenen: TÜM oturumlar (kod değişmedi).*
+  > **✅ ÇÖZÜLDÜ (29.10.2026):** Açık iş 1 (physics probu) → `test_core.js` TEST17 ile
+  > kilitlendi + commit edildi (ade29b5). Açık iş 2 (20 dosya) → commit edildi
+  > (db9726d + ade29b5 + 2bc6829 + 845edfb). ShieldBoss A uygulandı (2bc6829).
+  > Gelir modeli kullanıcıda (değişmedi).
   > **ÇÖZÜLDÜ (29.10.2026):** yukarıdaki "4 iş kapandı" kaydına bak — commit, test
   > kapısı, ShieldBoss A ve bayat kayıt temizliği tamamlandı.
 
@@ -78,6 +82,9 @@ yarım işi buraya YAZILMAZ (o, kendi oturum dosyanda `KALAN` olarak durur).
   (yeni P6b), test_smoke 0 HATA + 50/50, test_tools 36/0, test_browser 37/0,
   deep-tool 0/0/0. **KALAN:** fazladan boss (ShieldBoss) mekaniği yeniden tasarımı —
   öneri (A katmanlı / B döner / C tek kalkan) `03_game.md`'de, kullanıcı seçecek.
+  > **✅ ÇÖZÜLDÜ (29.10.2026):** A tasarımı uygulandı (`game/bosses.js` + TEST19,
+  > test_game 149 → 163 OK); B/C yedek olarak `03_game.md`'de kaldı (kodlanmadı,
+  > kullanıcı kararı). Detay: `03_game.md` "ShieldBoss MEKANİĞİ".
   *Etkilenen: 02 motor (parallax.js + procedural.js değişti — geriye dönük uyumlu);
   03 oyun. Detay: `03_game.md` "PAKET 2".*
 

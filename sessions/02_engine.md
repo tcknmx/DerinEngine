@@ -285,6 +285,11 @@ testi (bkz. `03_game.md` OYUN KALAN, "JS motoru ↔ Python parite denetimi").
 > kaydının yarım kalan mükerreridir (aynı iş iki kez yazılmış). Geçerli kayıt
 > L246-252'deki TAMAMLANDI bloğudur; oyun tarafındaki karşılığı (`tilemap_save` /
 > `tilemap_load` konsol komutları) `03_game.md`'de durur.
+>
+> **Not (29.10.2026, bayat kayıt temizliği):** Yukarıdaki 27.09–08.10 "MOTOR
+> KALAN" maddelerinin çoğu tamamlandı (Python motoru silindi, JS tek kaynak).
+> Güncel açık iş yok — motor tarafında yeni iş kullanıcı talebiyle açılır
+> (`01_strategy.md` MASTER SIRADAKİ). Bu bölüm tarihsel kayıt olarak duruyor.
 
 ---
 

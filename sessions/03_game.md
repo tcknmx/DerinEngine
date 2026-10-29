@@ -573,6 +573,11 @@ rastgele/editör/özel) korunur; yalnız Star Climber çıkarılır.
   tek kaynak, "parite" ölçülecek bir hedef kalmadı. Bu maddenin "kalan: motor modül
   modül denetimi" notu **geçersiz** — bakılacak yer git geçmişi + `02_engine.md`.
 
+> **Not (29.10.2026, bayat kayıt temizliği):** Yukarıdaki 27.09–01.10 "KALAN"
+> maddelerinin çoğu (tilemap zeminleri, overlay pause, zoom_punch burst, UI kit,
+> parite denetimi) tamamlandı; güncel açık işler `01_strategy.md` MASTER SIRADAKİ
+> ve `04_tools.md` ARAÇ KALAN'da. Bu bölüm tarihsel kayıt olarak duruyor.
+
 ### Deneyim iyileştirmeleri 5–8
 - **5. Dash after-image**: dash süresince arkada yarı-saydam oyuncu kopyası izi
   (dash_timer'ın sonucu; her ~2 kaybolan kopya, `_AutoRemove`). Hız arttıkça iz daha
