@@ -747,3 +747,33 @@ motor katmanına yapılanlar:
   (36/36) + browser (**52/0**) + `deep-tool.py --lang tr all` (**0/0/0**) yeşil.
 - **`DE.Input.*` API'si dokunulmadı** (oyun tarafı `_update_dash`'e taşınan
   tetikleyici `DE.Input.get_keys()` → `get_key_down` ile uyumlu tutuldu).
+
+---
+
+## ONE-WAY YAKINLIK PROBU — KİLİTLENDİ (29.10.2026)
+
+> **Sahiplik notu:** Bu iş STRATEJİ oturumunda, kullanıcının "önerdiklerini ve yarım
+> kalanların hepsini yap" talimatıyla yapıldı. Motor dosyası (`engine/physics.js`)
+> değişti; motor oturumu bilgilendirildi (`_shared.md` → SON GELİŞMELER).
+
+**Neden:** 29.10 checkup'ında `engine/physics.js` içinde **commit edilmemiş** bir
+düzeltme bulundu: one-way (tek yönlü) platforma **yüksek hızda düşen** oyuncu, temas
+anını "kaçırdığı" için platformun içinden geçiyordu (tünelleme). Düzeltme, one-way
+platformun üst yüzeyine **6 px yaklaşınca** da yakalama yapıyor.
+
+**MUTASYON KANITI (düzeltme gerçekten iş görüyor mu?):**
+- Yeni kod: `vy=1500, dt=1/30` ile düşen oyuncu platformda duruyor → `y=260.00`.
+- Eski kod (HEAD `physics.js`): aynı senaryo platformun içinden geçiyor → `y=602.67`.
+
+**Kalıcı kapı:** `deep_engine_html/test_core.js → TEST17` (3 kontrol):
+1. hızlı düşüş platformda durur (y≈260),
+2. `is_grounded === true`,
+3. alttan yukarı geçiş **serbest** kalır (regresyon: one-way davranışı bozulmadı).
+
+**Doğrulama:** test_core 50 → **53/53 ALL OK**. Eski `physics.js` ile aynı test
+**2 FAIL** veriyor (kapı gerçekten yakalıyor). 13/13 JS test + tools 36/36 +
+browser 37/37 + `deep-tool.js --lang tr all` 0/0/0 yeşil.
+
+**Motor KALAN durumu:** bu kayıtla birlikte motor tarafında **açık iş yok**;
+motor oturumunun yeni işi kullanıcı talebiyle açılır.
+

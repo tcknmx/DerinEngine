@@ -239,21 +239,27 @@ DE.Physics = class Physics {
                 if (!(s instanceof DE.BoxCollider)) continue;
                 const rect = rb.collider.get_aabb();
                 const srect = s.get_aabb();
-                if (!rect.overlaps(srect)) continue;
 
-                // One-way platform: üstten gelirken durulur (Python one_way davranışı)
+                // One-way platform: üstten gelirken durulur — çakışma YOKSA bile
+                // ayak probuyla (proximity) yakalar. Böylece büyük dt / düşük FPS'te
+                // oyuncu ince platformun içinden geçmez (tünelleme yok).
+                // Not: motor katmanı oyun component'leri hakkında bilgi TUTMAZ —
+                // platformların görsel yüzeyi collider tepesidir (ofset YOKTUR).
                 if (s.one_way) {
-                    if (rb.velocity.y >= 0 && (rect.bottom - srect.y) <= Math.max(4.0, srect.h + 6.0)) {
-                        go.position.y = srect.y - go.size.y;
-                        rb.velocity.y = 0;
-                        rb.is_grounded = true;
-                    } else if (rb.velocity.y >= 0 && rb.collider.get_aabb().centery < srect.centery) {
+                    const foot_y = go.position.y + go.size.y;
+                    const horizontal_overlap = rect.right > srect.x && rect.x < srect.right;
+                    const falling = rb.velocity.y >= -10.0;
+                    const near_top = foot_y >= srect.y - 6.0 &&
+                                     foot_y <= srect.y + Math.max(10.0, srect.h + 6.0);
+                    if (falling && horizontal_overlap && near_top) {
                         go.position.y = srect.y - go.size.y;
                         rb.velocity.y = 0;
                         rb.is_grounded = true;
                     }
                     continue;
                 }
+
+                if (!rect.overlaps(srect)) continue;
 
                 const overlap_left = rect.right - srect.x;
                 const overlap_right = srect.right - rect.x;

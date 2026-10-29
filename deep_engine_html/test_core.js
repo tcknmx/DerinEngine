@@ -455,5 +455,34 @@ console.log("TEST16 lighting (Engine.lighting + render_lights + muafiyet):");
   }
 }
 
+// TEST17 one-way yakinlik probu (hizli dususte tunelleme yok) -- 29.10.2026:
+// Motor, one-way platformun ustunden gelen oyuncuyu temas etmeden de (ayak
+// yuzeye 6px'e kadar yakin) yakalar. Boylece buyuk dt / dusuk FPS'te ince
+// platformun icinden gecme (tunelleme) olmaz. Alt taraftan gecis serbest kalir.
+console.log("TEST17 one-way hizli dusus (tunelleme yok):");
+{
+  function _oneway(fall_y, vy, dt, frames) {
+    const scene = new DE.Scene("Tunnel", [16, 20, 34]);
+    const player = new DE.GameObject("Player", 300, fall_y, 40, 40, "Player");
+    player.add_component(new DE.BoxCollider(false, false));
+    player.add_component(new DE.Rigidbody2D(1400, true, 1800));
+    scene.add_object(player);
+    const plat = new DE.GameObject("Plat", 250, 300, 190, 22, "Platform");
+    plat.add_component(new DE.BoxCollider(false, true));
+    scene.add_object(plat);
+    const rb = player.get_component(DE.Rigidbody2D);
+    rb.velocity.y = vy;
+    for (let i = 0; i < frames; i++) scene.update(dt);
+    return { y: player.position.y, rb: rb };
+  }
+  // Platformun ust yuzeyi y=300, oyuncu boyu 40 -> durus y=260.
+  const fast = _oneway(150, 1500, 1 / 30, 8);   // kare basina 50px: tunelleme adayi
+  check("hizli dusus platformda durdu", Math.abs(fast.y - 260) <= 2, "y=" + fast.y.toFixed(2));
+  check("hizli dusus grounded", fast.rb.is_grounded === true);
+
+  const up = _oneway(340, -600, 1 / 60, 6);     // alttan yukari: gecmeli
+  check("alttan yukari gecer", up.y < 300, "y=" + up.y.toFixed(2));
+}
+
 console.log("\nSONUC: " + pass + " gecti, " + fail + " kaldi" + (fail === 0 ? " -> ALL OK" : ""));
 process.exit(fail === 0 ? 0 : 1);
