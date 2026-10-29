@@ -10,3 +10,10 @@ savegame.json
 # Windows shortcuts / empty scratch file (local machine only)
 *.lnk
 _e.txt
+# AI agent / session / internal docs (not published)
+.opencode/
+AGENTS.md
+opencode.json
+sessions/
+*.md
+!README.md
