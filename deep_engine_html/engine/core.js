@@ -113,6 +113,7 @@ DE.GameObject = class GameObject {
         this.parent = null;     // bağlandığı GameObject
         this.children = [];     // bu nesneye bağlı alt nesneler
         this.z_index = 0;       // kardeşler arası elle sıralama (yüksek = üstte)
+        this.z = 0;             // 2.5D derinlik pozisyonu (0 = ön, + = uzak)
     }
     /* --- Hierarchy -------------------------------------------------------- */
     add_child(child, local_offset) {

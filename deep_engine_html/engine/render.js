@@ -20,7 +20,10 @@ DE.SpriteRenderer = class SpriteRenderer extends DE.Component {
         // (components.py: screen_x = obj.position.x - camera_offset.x).
         const cam = camera_offset || { x: 0, y: 0 };
         const x = o.position.x - cam.x, y = o.position.y - cam.y;
-        const w = o.size.x, h = o.size.y;
+        let w = o.size.x, h = o.size.y;
+        // 2.5D köprüsü: z derinliği → perspektif küçülme (0 = ön, +uzak)
+        const s = Math.max(0.25, 1 - ((o.z || 0) * 0.015));
+        w *= s; h *= s;
 
         // Görsel (Image) modu — sprite olarak çizer (Python'daki "image" desteği)
         if (this._child) {
