@@ -1,0 +1,14 @@
+// TrenchBroom .map minimal örneği — DerinEngine test
+{
+"classname" "worldspawn"
+"_color" "0.8 0.9 1.0"
+"message" "Test Level"
+
+{
+"classname" "func_detail"
+"_color" "1.0 0.8 0.6"
+"origin" "100 200 -20"
+{
+"classname" "func_detail"
+"_color" "0.6 1.0 0.8"
+"origin" "300 400 10"
