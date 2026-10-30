@@ -259,6 +259,12 @@ function _build_player(scene, data) {
     // Varsayılan yeniden başlatma: ana menü (gerçek sahneler bunu ezer).
     const _restart_factory = DE_GAME.build_main_menu_scene;
 
+    /* 2.5D köprüsü: arka plan nesnesi (z=35 → %47.5 daha küçük, derinlik hissi) */
+    const bg = new DE.GameObject("BackgroundDepth", 450, 250, 320, 160, "UI");
+    bg.z = 35;  // derinlik
+    bg.add_component(new DE.SpriteRenderer([80, 100, 140], "rect", 8));
+    scene.add_object(bg);
+
     const score_obj = new DE.GameObject("ScoreUI", 20, 10, 0, 0, "UI");
     score_obj.add_component(new DE.TextRenderer(DE.I18n.t("score") + ": 0", 22, [255, 215, 0], true, null, false, false));
     scene.add_object(score_obj);
