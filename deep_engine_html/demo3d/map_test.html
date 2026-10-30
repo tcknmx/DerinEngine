@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head><meta charset="UTF-8"><title>.map Test — DerinEngine</title>
+<style>body{background:#111;color:#eee;font-family:sans-serif;padding:20px}</style>
+<script src="../engine/core.js"></script>
+<script src="../engine/components.js"></script>
+<script src="../engine/render.js"></script>
+<script src="../engine/scenemanager.js"></script>
+<script src="../engine/levelfile.js"></script>
+<script src="../engine/levelfile_map.js"></script>
+</head>
+<body>
+<h2>.map Loader Testi (TrenchBroom formatı)</h2>
+<p>Yüklenen entity sayısı: <b id="count">...</b></p>
+<p>Durum: <b id="status">Yükleniyor...</b></p>
+<script>
+// Tarayıcıda .map yükleme (Node fs yok, string okuma)
+fetch('test_level.map')
+  .then(r => r.text())
+  .then(text => {
+    // Minimal scene
+    const eng = new DE.Engine();
+    const sc = new DE.Scene("MapTest");
+    eng.set_scene(sc);
+    const result = DE.load_map_string(text, sc);
+    document.getElementById('count').textContent = result;
+    document.getElementById('status').textContent = 'BAŞARILI — ' + result;
+  })
+  .catch(e => { document.getElementById('status').textContent = 'HATA: ' + e.message; });
+</script>
+</body>
+</html>
