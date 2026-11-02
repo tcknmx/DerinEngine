@@ -1,12 +1,12 @@
-﻿# DerinEngine — Star Collector Hero
+﻿# DerinEngine
 
-A zero-dependency, component-based game engine built from scratch in JavaScript + HTML5 Canvas 2D, with a native WebGL rendering pipeline (3D Hello, voxel demo, TrenchBroom `.map` loader) and a 2.5D depth-scaling bridge integrated into the core. The engine runs entirely in the browser (no build step, no external libraries) and includes a full 2D platformer — **Star Collector Hero** — built on top of it.
+A zero-dependency, component-based game engine built from scratch in JavaScript + HTML5 Canvas 2D, with a native WebGL rendering pipeline (3D Hello, voxel demo, TrenchBroom `.map` loader) and a 2.5D depth-scaling bridge integrated into the core. The engine runs entirely in the browser (no build step, no external libraries) and includes a full 2D platformer **Star Collector Hero** built on top of it.
 
 > The Python reference (pygame) was removed on 2026-10-08 (`git log`). All current development is in the JS/HTML single source. Engine version: **1.0.0**, Game version: **0.1.20**.
 
 ---
 
-## Architecture — Core Layers
+## Architecture, Core Layers
 
 ### Engine (Core Loop)
 The `DE.Engine` class manages the main loop (delta-time tracking, fixed FPS cap, event dispatch). It holds the active `Scene`, updates the input state (keyboard/controller analog axes + touch events), and drives the developer overlay (`F3` debug info), lighting engine, and in-game console (` ` / `"` backtick / quote). The engine switches scenes atomically (clean-up + initialization queues) and supports `run_async()` (awaitable promise loop with 60-frame telemetry).
@@ -39,7 +39,7 @@ The 2D engine supports a depth dimension (`z`) without converting to full 3D. `G
 
 ---
 
-## 3D Pipeline (WebGL — Separate Demo Layer)
+## 3D Pipeline (WebGL, Separate Demo Layer)
 A standalone WebGL shader pipeline (`demo3d/`) verifies that 3D rendering is achievable with zero external libraries:
 
 - **Hello World** (`cube.js`): manual 4x4 matrix math (`perspective`, `rotation`, `translation`), vertex/fragment shaders, indexed triangle drawing (`36` indices per cube), and mouse-controlled camera (`yaw` / `pitch`).
@@ -60,7 +60,7 @@ Gravity (`Rigidbody2D`), AABB (`BoxCollider`) and polygon (`PolygonCollider`) co
 2D radial light sources (`LightSource` component) cast masks onto a dark ambient layer. The scene manager excludes `UI` and `Pause` scenes from the lighting pass (`transparent` overlay). The `Engine.lighting` property is lazily instantiated (`LightingEngine`).
 
 ### Audio
-8-bit retro sound effects synthesized at runtime (`SoundFX`) — no `.wav` or `.mp3` assets. Algorithmic 8-bit music (`SoundFX.play_music`) supports biome themes (`forest`, `lava_cave`, `ice`, `desert`, `astro`, `boss_*`, `victory`).
+8-bit retro sound effects synthesized at runtime (`SoundFX`), no `.wav` or `.mp3` assets. Algorithmic 8-bit music (`SoundFX.play_music`) supports biome themes (`forest`, `lava_cave`, `ice`, `desert`, `astro`, `boss_*`, `victory`).
 
 ### Particles, Tween, Parallax
 `ParticleEmitter` for spawn/death/explosion effects; `Tween` for smooth interpolation; `Parallax` background for depth layers.
@@ -82,7 +82,7 @@ In-game console (` ` / `"`) with 11 commands (`hp`, `heal`, `god`, `coins`, `spe
 
 ---
 
-## Product — Star Collector Hero (v0.1.20)
+## Product Star Collector Hero (v0.1.20)
 A fully playable 2D platformer with:
 - **Campaign**: 5 biomes (`forest`, `lava_cave`, `ice`, `desert`, `astro`) + final `victory`
 - **Endless Mode**: unlockable, procedural difficulty scaling
@@ -97,7 +97,7 @@ A fully playable 2D platformer with:
 ## Build / Validation
 
 ```bash
-# Full syntax scan (21 engine + 8 game + 3 demo files — 0 errors)
+# Full syntax scan (21 engine + 8 game + 3 demo files 0 errors)
 node -c deep_engine_html/engine/*.js
 node deep_engine_html/test_core.js    # 53/0
 node deep_engine_html/test_game.js    # 163/0
@@ -109,7 +109,7 @@ node tools_html/test_browser.js       # 52/0
 ---
 
 ## Running / Browser Play
-Open `deep_engine_html/index.html` in any modern browser (`file://` works — no server required). For `.map` level testing: `demo3d/map_test.html`. For 3D pipeline verification: `demo3d/index.html` (WebGL cube + voxel grid).
+Open `deep_engine_html/index.html` in any modern browser (`file://` works, no server required). For `.map` level testing: `demo3d/map_test.html`. For 3D pipeline verification: `demo3d/index.html` (WebGL cube + voxel grid).
 
 ---
 
